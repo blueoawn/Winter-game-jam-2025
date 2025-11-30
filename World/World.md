@@ -1,0 +1,5 @@
+- Potential sources of inspiration
+	-  "The last spell", the game could be set in a world where death is extremely imminent and the hero's must accomplish their mission or meet their ultimate demise
+	- "Stranger things" - an unknown source of corruption/evil is infecting the world and will take over without immediate intervention
+		- I also like stranger things for music inspiration. I think we could have dissonant/spacey major chords that sound like minor key. 
+		- On the topic of music, I think it'd be real cool for the game to transition to a more upbeat/techno type track when enemies start to pour in onscreen. Boss themes would also be tight.
