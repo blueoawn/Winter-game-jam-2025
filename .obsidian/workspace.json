@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "README.md",
+                "file": "Assets/Music.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "Music"
             }
           }
         ]
@@ -171,11 +171,12 @@
   },
   "active": "1029fd0a99a418f7",
   "lastOpenFiles": [
-    "Getting started.md",
-    "README.md",
-    "Tools/Tools.md",
     "World/World.md",
+    "Assets/Music.md",
     "Design/Design.md",
+    "README.md",
+    "Getting started.md",
+    "Tools/Tools.md",
     "Assets/Assets.md",
     "Game/thumbnail.png",
     "Game/project.config",
