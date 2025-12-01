@@ -20,11 +20,13 @@
         "build-nolog": "vite build --config vite/config.prod.mjs"
     },
     "devDependencies": {
+        "@vitejs/plugin-vue": "^6.0.2",
         "typescript": "~5.7.2",
         "vite": "^6.3.1"
     },
     "dependencies": {
         "phaser": "^3.90.0",
-        "terser": "^5.39.0"
+        "terser": "^5.39.0",
+        "vue": "^3.5.25"
     }
 }
