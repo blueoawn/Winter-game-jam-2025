@@ -7,3 +7,8 @@
 - Enemies will spawn in set patterns, though the exact pattern will be hidden from the players. The overworld will provide some hints to give minor details about what challenges lie ahead of them.
 	- For example, a level with an elite enemy might give a description of "A challenging foe stands between you and your destination" where a level with small enemies might read "A treacherous path, expect frequent ambushes"
 - Some maps can have area-hazards, such as lava or spikes, that players can either take damage from or shove enemies into
+- Periodically, when defeating enemies, a 'battery' will spawn. Picking the battery up will cause your next attack button press to overload, unleashing a super powerful attack that then exhausts the user for a short duration
+- In some circumstances, a chest may spawn, and opening the chest will reveal a buff/benefit to the player that also is accompanied by a drawback. The player can decide to take it or leave it.
+	- For example, a mid-level full-heal that slightly reduces damage for the rest of the run
+	- or buff to your characters knockback, but causes you to take more damage
+- Characters have base statistic of 100 health, taking >= 20 damage causes the player model to flash briefly indicating they have gained some invulnerability frames

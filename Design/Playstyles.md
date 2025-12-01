@@ -22,5 +22,6 @@
 
 # Railgun
 - Full screen attack, narrow line that pierces enemies - can delay attack for more damage
+	- after the attack press, if the player is still holding the button they root themselves in place to charge faster
 - Has a blink that works like hexflash (charge up)
 
