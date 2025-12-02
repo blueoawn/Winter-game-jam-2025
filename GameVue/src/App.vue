@@ -11,6 +11,9 @@ import { Lobby } from "./scenes/Lobby.ts";
 import { onMounted } from "vue";
 
 const config: Phaser.Types.Core.GameConfig = {
+  dom: {
+    createContainer: true
+  },
   type: Phaser.AUTO,
   title: 'Shmup',
   parent: 'game-container',
@@ -34,7 +37,7 @@ const config: Phaser.Types.Core.GameConfig = {
     GameOver
   ],
   scale: {
-    mode: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
 };
@@ -49,9 +52,6 @@ onMounted(() => {
 });
 </script>
 <template>
-  <div class="ui-overlay">
-    <!-- <button>CLICK ME</button> -->
-  </div>
   <div id="game-container">
   </div>
 </template>
@@ -60,12 +60,5 @@ onMounted(() => {
   width: 100%;
   height: 100vh;
   overflow: hidden;
-}
-
-.ui-overlay {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  position: absolute;
-  pointer-events: none;
 }
 </style>

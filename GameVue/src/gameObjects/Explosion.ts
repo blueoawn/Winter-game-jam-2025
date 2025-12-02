@@ -1,10 +1,10 @@
 import ASSETS from '../assets.js';
 import ANIMATION from '../animation.ts';
-import { Game } from "../scenes/Game.ts";
+import { GameScene } from "../scenes/Game.ts";
 
 export default class Explosion extends Phaser.GameObjects.Sprite {
 
-    constructor(scene: Game, x: number, y: number) {
+    constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, ASSETS.spritesheet.tiles.key, 4);
 
         scene.add.existing(this);

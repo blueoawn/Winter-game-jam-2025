@@ -1,12 +1,12 @@
 import ASSETS from '../assets.js';
-import { Game } from "../scenes/Game.ts";
+import { GameScene } from "../scenes/Game.ts";
 
 export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
     power = 1;
     moveVelocity = 1000;
-    gameScene: Game;
+    gameScene: GameScene;
 
-    constructor(scene: Game, x: number, y: number, power: number) {
+    constructor(scene: GameScene, x: number, y: number, power: number) {
         super(scene, x, y, ASSETS.spritesheet.tiles.key, power-1);
 
         scene.add.existing(this);

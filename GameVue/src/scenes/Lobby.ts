@@ -57,8 +57,10 @@ export class Lobby extends Phaser.Scene {
         this.setupMessageHandlers();
 
         if (this.mode === 'host') {
+            this.ui!.changeMode('host');
             this.hostGame();
         } else if (this.mode === 'join') {
+            this.ui!.changeMode('join');
             this.joinGame();
         }
     }
@@ -96,21 +98,6 @@ export class Lobby extends Phaser.Scene {
 
         // Show join dialog
         this.ui!.updateStatus('Enter room code to join', '#ffff00');
-
-        // Use browser prompt for room code input
-        // In a production app, you'd create a proper Phaser text input
-        setTimeout(() => {
-            const roomCode = prompt('Enter Room Code:');
-
-            if (!roomCode || !roomCode.trim()) {
-                this.ui!.showError('No room code entered');
-                setTimeout(() => this.onBackToMenu(), 2000);
-                return;
-            }
-
-            // Don't change case - PeerJS IDs are case-sensitive!
-            this.connectToHost(roomCode.trim());
-        }, 100);
     }
 
     async connectToHost(roomCode: string): Promise<void> {

@@ -1,12 +1,12 @@
 import ASSETS from '../assets.js';
-import { Game } from "../scenes/Game.ts";
+import { GameScene } from "../scenes/Game.ts";
 
 export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
     power = 1;
     moveVelocity = 200;
-    gameScene: Game;
+    gameScene: GameScene;
 
-    constructor(scene: Game, x: number, y: number, power: number) {
+    constructor(scene: GameScene, x: number, y: number, power: number) {
         const tileId = 11;
         super(scene, x, y, ASSETS.spritesheet.tiles.key, tileId + power);
 

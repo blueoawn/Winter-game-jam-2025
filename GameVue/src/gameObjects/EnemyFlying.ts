@@ -1,5 +1,5 @@
 import ASSETS from '../assets.js';
-import { Game } from "../scenes/Game.ts";
+import { GameScene } from "../scenes/Game.ts";
 import Vector2 = Phaser.Math.Vector2;
 import Spline = Phaser.Curves.Spline;
 
@@ -17,13 +17,13 @@ export default class EnemyFlying extends Phaser.Physics.Arcade.Sprite {
         [[-50, 360], [640, 50], [1180, 360], [640, 670], [50, 360], [640, 50], [1180, 360], [640, 670], [-50, 360]],
         [[1330, 360], [640, 50], [50, 360], [640, 670], [1180, 360], [640, 50], [50, 360], [640, 670], [1330, 360]],
     ]
-    gameScene: Game;
+    gameScene: GameScene;
     pathVector: Vector2;
     path: Spline;
     pathIndex: number;
     pathSpeed: number;
 
-    constructor(scene: Game, shipId: number, pathId: number, speed: number, power: number) {
+    constructor(scene: GameScene, shipId: number, pathId: number, speed: number, power: number) {
         const startingId = 12;
         super(scene, 500, 500, ASSETS.spritesheet.ships.key, startingId + shipId);
 

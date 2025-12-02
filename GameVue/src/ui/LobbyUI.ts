@@ -1,10 +1,12 @@
 import type { Lobby } from '../scenes/Lobby';
+import DOMElement = Phaser.GameObjects.DOMElement;
 
 interface UIElements {
     title?: Phaser.GameObjects.Text;
     roomCodeContainer?: Phaser.GameObjects.Container;
     roomCodeLabel?: Phaser.GameObjects.Text;
     roomCodeText?: Phaser.GameObjects.Text;
+    roomCodeInput?: DOMElement;
     playerListContainer?: Phaser.GameObjects.Container;
     playerListTitle?: Phaser.GameObjects.Text;
     statusText?: Phaser.GameObjects.Text;
@@ -14,21 +16,21 @@ interface UIElements {
 
 // UI helper class for lobby interface
 export class LobbyUI {
-    private scene: Lobby;
+    private lobbyScene: Lobby;
     private elements: UIElements = {};
-
+    public lobbyCodeRegex = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
     constructor(scene: Lobby) {
-        this.scene = scene;
+        this.lobbyScene = scene;
     }
 
     // Create lobby UI elements
     create(): UIElements {
-        const { width, height } = this.scene.scale;
+        const { width, height } = this.lobbyScene.scale;
         const centerX = width * 0.5;
         const centerY = height * 0.5;
 
         // Title
-        this.elements.title = this.scene.add.text(centerX, 50, 'Multiplayer Lobby', {
+        this.elements.title = this.lobbyScene.add.text(centerX, 50, 'Multiplayer Lobby', {
             fontFamily: 'Arial Black',
             fontSize: 48,
             color: '#ffffff',
@@ -38,9 +40,9 @@ export class LobbyUI {
         }).setOrigin(0.5);
 
         // Room code display container
-        this.elements.roomCodeContainer = this.scene.add.container(centerX, 150);
+        this.elements.roomCodeContainer = this.lobbyScene.add.container(centerX, 150);
 
-        this.elements.roomCodeLabel = this.scene.add.text(0, 0, 'Room Code:', {
+        this.elements.roomCodeLabel = this.lobbyScene.add.text(0, 0, 'Enter Room Code:', {
             fontFamily: 'Arial Black',
             fontSize: 24,
             color: '#ffffff',
@@ -48,13 +50,48 @@ export class LobbyUI {
             strokeThickness: 6
         }).setOrigin(0.5);
 
-        this.elements.roomCodeText = this.scene.add.text(0, 40, '------', {
+        this.elements.roomCodeInput = this.lobbyScene.add.dom(centerX, 190, 'input', `
+            outline: none;
+            font-size: 24,
+        `).setInteractive({useHandCursor: true})
+            .addListener('input').on('input', async (event) => {
+            if (event) {
+                if (this.elements.roomCodeInput) {
+                    this.elements.roomCodeInput.pointerEvents = 'none';
+                }
+
+                if (this.lobbyCodeRegex.test(event.target.value.trim())) {
+                    // Don't change case - PeerJS IDs are case-sensitive!
+                    await this.lobbyScene.connectToHost(event.target.value.trim());
+                }
+                if (this.elements.roomCodeInput) {
+                    this.elements.roomCodeInput.pointerEvents = 'auto';
+                }
+            }
+        })
+
+        this.elements.roomCodeText = this.lobbyScene.add.text(0, 40, '------', {
             fontFamily: 'Arial Black',
             fontSize: 36,
             color: '#00ff00',
             stroke: '#000000',
             strokeThickness: 8
-        }).setOrigin(0.5);
+        }).setOrigin(0.5)
+            .on('pointerover', (event) => {
+                this.elements.roomCodeText?.setColor('rgba(0, 255, 0, 0.8)');
+            })
+            .on('pointerout', (event) => {
+                this.elements.roomCodeText?.setColor('rgba(0, 255, 0, 1)');
+            })
+            .on('pointerdown', (event) => {
+                if (this.elements.roomCodeText) {
+                    navigator.clipboard.writeText(this.elements.roomCodeText.text.trim());
+                }
+                this.elements.roomCodeText?.setScale(0.95);
+                setTimeout(() => {
+                    this.elements.roomCodeText?.setScale(1);
+                }, 100)
+            })
 
         this.elements.roomCodeContainer.add([
             this.elements.roomCodeLabel,
@@ -62,9 +99,9 @@ export class LobbyUI {
         ]);
 
         // Player list container
-        this.elements.playerListContainer = this.scene.add.container(centerX, 250);
+        this.elements.playerListContainer = this.lobbyScene.add.container(centerX, 250);
 
-        this.elements.playerListTitle = this.scene.add.text(0, 0, 'Connected Players:', {
+        this.elements.playerListTitle = this.lobbyScene.add.text(0, 0, 'Connected Players:', {
             fontFamily: 'Arial Black',
             fontSize: 24,
             color: '#ffffff',
@@ -75,7 +112,7 @@ export class LobbyUI {
         this.elements.playerListContainer.add(this.elements.playerListTitle);
 
         // Status message
-        this.elements.statusText = this.scene.add.text(centerX, centerY + 100, '', {
+        this.elements.statusText = this.lobbyScene.add.text(centerX, centerY + 100, '', {
             fontFamily: 'Arial',
             fontSize: 20,
             color: '#ffff00',
@@ -89,7 +126,7 @@ export class LobbyUI {
             centerX,
             height - 100,
             'Start Game',
-            () => this.scene.onStartGame()
+            () => this.lobbyScene.onStartGame()
         );
         this.elements.startButton.setVisible(false);
 
@@ -98,7 +135,7 @@ export class LobbyUI {
             centerX,
             height - 50,
             'Back to Menu',
-            () => this.scene.onBackToMenu()
+            () => this.lobbyScene.onBackToMenu()
         );
 
         return this.elements;
@@ -106,7 +143,7 @@ export class LobbyUI {
 
     // Create an interactive button
     createButton(x: number, y: number, text: string, onClick: () => void): Phaser.GameObjects.Text {
-        const button = this.scene.add.text(x, y, text, {
+        const button = this.lobbyScene.add.text(x, y, text, {
             fontFamily: 'Arial Black',
             fontSize: 28,
             color: '#ffffff',
@@ -150,7 +187,7 @@ export class LobbyUI {
         // Add player entries
         players.forEach((playerId, index) => {
             const yOffset = 40 + (index * 35);
-            const playerText = this.scene.add.text(
+            const playerText = this.lobbyScene.add.text(
                 0,
                 yOffset,
                 `${index + 1}. Player ${playerId.slice(0, 8)}...`,
@@ -187,7 +224,7 @@ export class LobbyUI {
 
     // Show connection dialog for joining
     showJoinDialog(onJoin: (roomCode: string) => void): void {
-        const { width, height } = this.scene.scale;
+        const { width, height } = this.lobbyScene.scale;
         const centerX = width * 0.5;
         const centerY = height * 0.5;
 
@@ -207,5 +244,36 @@ export class LobbyUI {
             }
         });
         this.elements = {};
+    }
+
+    changeMode(mode: 'host' | 'join'): void {
+        switch (mode) {
+            case "host":
+                if (this.elements.roomCodeInput) {
+                    this.elements.roomCodeInput.visible = false;
+                }
+
+                if (this.elements.roomCodeLabel) {
+                    this.elements.roomCodeLabel.text = 'Room Code (Click to copy) :'
+                }
+
+                if (this.elements.roomCodeText) {
+                    this.elements.roomCodeText.setInteractive({ useHandCursor: true });
+                }
+                break;
+            case "join":
+                if (this.elements.roomCodeInput) {
+                    this.elements.roomCodeInput.visible = true;
+                }
+
+                if (this.elements.roomCodeLabel) {
+                    this.elements.roomCodeLabel.text = 'Enter Room Code:'
+                }
+
+                if (this.elements.roomCodeText) {
+                    this.elements.roomCodeText.disableInteractive(true);
+                }
+                break;
+        }
     }
 }

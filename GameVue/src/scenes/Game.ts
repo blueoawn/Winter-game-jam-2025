@@ -75,7 +75,7 @@ export class GameScene extends Scene
 
     create ()
     {
-         this.initVariables();
+        this.initVariables();
         this.initGameUi();
         this.initAnimations();
 
@@ -123,7 +123,7 @@ export class GameScene extends Scene
         this.mapHeight = Math.ceil(this.scale.height / this.tileSize) + this.mapOffset + 1; // height of the tile map (in tiles)
         this.mapWidth = Math.ceil(this.scale.width / this.tileSize); // width of the tile map (in tiles)
         //this.scrollSpeed = 1; // background scrolling speed (in pixels) DISABLED FOR NOW
-        //this.scrollMovement = 0; // current scroll amount DISABLED FOR NOW
+        // this.scrollMovement = 0; // current scroll amount DISABLED FOR NOW
         this.spawnEnemyCounter = 0; // timer before spawning next group of enemies
 
         // Network variables
@@ -303,9 +303,9 @@ export class GameScene extends Scene
 
         // Only set up collisions for single player mode
         if (!this.networkEnabled && this.player) {
-            this.physics.add.overlap(this.player, this.enemyBulletGroup, this.hitPlayer as any, undefined, this);
-            this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy as any, undefined, this);
-            this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer as any, undefined, this);
+            this.physics.add.overlap(this.player, this.enemyBulletGroup, this.hitPlayer as () => void, undefined, this);
+            this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy as () => void, undefined, this);
+            this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer as () => void, undefined, this);
         }
         // TODO: Set up collisions for multiplayer mode with all players
     }
@@ -326,7 +326,6 @@ export class GameScene extends Scene
     // create tile map data
     initMap() {
         const mapData = [];
-
         for (let y = 0; y < this.mapHeight; y++) {
             const row = [];
 
@@ -340,6 +339,7 @@ export class GameScene extends Scene
 
             mapData.push(row);
         }
+
         this.map = this.make.tilemap({ data: mapData, tileWidth: this.tileSize, tileHeight: this.tileSize });
         const tileset = this.map.addTilesetImage(ASSETS.spritesheet.tiles.key);
         if (tileset) {
