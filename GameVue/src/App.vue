@@ -7,6 +7,7 @@ import { Preloader } from "./scenes/Preloader.ts";
 import { GameOver } from "./scenes/GameOver.ts";
 import { Start } from "./scenes/Start.ts";
 import { GameScene } from "./scenes/Game.ts";
+import { Lobby } from "./scenes/Lobby.ts";
 import { onMounted } from "vue";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -28,6 +29,7 @@ const config: Phaser.Types.Core.GameConfig = {
     Boot,
     Preloader,
     Start,
+    Lobby,
     GameScene,
     GameOver
   ],
@@ -48,7 +50,7 @@ onMounted(() => {
 </script>
 <template>
   <div class="ui-overlay">
-    <button>CLICK ME</button>
+    <!-- <button>CLICK ME</button> -->
   </div>
   <div id="game-container">
   </div>
@@ -64,5 +66,6 @@ onMounted(() => {
   width: 100%;
   aspect-ratio: 16 / 9;
   position: absolute;
+  pointer-events: none;
 }
 </style>

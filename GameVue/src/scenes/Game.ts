@@ -14,7 +14,11 @@ import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/EnemyFlying.ts";
 import Explosion from "../gameObjects/Explosion.ts";
-import ArcadePhysicsCallback = Phaser.Types.Physics.Arcade.ArcadePhysicsCallback;
+
+import NetworkManager from '../../network/NetworkManager';
+import { MessageTypes } from '../../network/MessageTypes';
+import { StateSerializer } from '../../network/StateSerializer';
+import { PlayerManager } from '../../managers/PlayerManager';
 
 
 export class GameScene extends Scene
@@ -44,20 +48,49 @@ export class GameScene extends Scene
     cursors?: CursorKeys;
     timedEvent: TimerEvent;
 
+    // Network properties
+    networkEnabled: boolean = false;
+    isHost: boolean = false;
+    players: string[] = [];
+    playerManager: PlayerManager | null = null;
+    stateSyncRate: number;
+    lastStateSyncTime: number;
+    inputSendRate: number;
+    lastInputSendTime: number;
+    tick: number;
+
     constructor ()
     {
         super('GameScene');
     }
 
+    init(data: any): void {
+        // Receive data from Lobby scene
+        this.networkEnabled = data?.networkEnabled || false;
+        this.isHost = data?.isHost || false;
+        this.players = data?.players || [];
+
+        console.log('Game initialized:', { networkEnabled: this.networkEnabled, isHost: this.isHost, players: this.players });
+    }
+
     create ()
     {
-        this.initVariables();
+         this.initVariables();
         this.initGameUi();
         this.initAnimations();
-        this.initPlayer();
+
+        if (this.networkEnabled) {
+            this.initMultiplayer();
+        } else {
+            this.initSinglePlayer();
+        }
+
         this.initInput();
         this.initPhysics();
         this.initMap();
+
+        // Auto-start for now
+        this.startGame();
     }
 
     update() {
@@ -65,7 +98,12 @@ export class GameScene extends Scene
 
         if (!this.gameStarted) return;
 
-        this.player.update();
+        if (this.networkEnabled) {
+            this.updateMultiplayer();
+        } else {
+            this.updateSinglePlayer();
+        }
+
         if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
         else this.addFlyingGroup();
     }
@@ -84,9 +122,141 @@ export class GameScene extends Scene
         this.mapTop = -this.mapOffset * this.tileSize; // offset (in pixels) to move the map above the top of the screen
         this.mapHeight = Math.ceil(this.scale.height / this.tileSize) + this.mapOffset + 1; // height of the tile map (in tiles)
         this.mapWidth = Math.ceil(this.scale.width / this.tileSize); // width of the tile map (in tiles)
-        this.scrollSpeed = 1; // background scrolling speed (in pixels)
-        this.scrollMovement = 0; // current scroll amount
+        //this.scrollSpeed = 1; // background scrolling speed (in pixels) DISABLED FOR NOW
+        //this.scrollMovement = 0; // current scroll amount DISABLED FOR NOW
         this.spawnEnemyCounter = 0; // timer before spawning next group of enemies
+
+        // Network variables
+        this.stateSyncRate = 1000 / 15;  // 15 times per second
+        this.lastStateSyncTime = 0;
+        this.inputSendRate = 1000 / 60;  // 60 times per second
+        this.lastInputSendTime = 0;
+        this.tick = 0;
+    }
+
+    initSinglePlayer() {
+        // Create single player
+        this.player = new Player(this, this.centreX, this.scale.height - 100, 8);
+        this.player.isLocal = true;
+        this.playerManager = null;
+    }
+
+    initMultiplayer() {
+        // Create PlayerManager
+        this.playerManager = new PlayerManager(this);
+
+        // Create all players
+        const localPlayerId = NetworkManager.getStats().playerId;
+        this.players.forEach((playerId, index) => {
+            const isLocal = (playerId === localPlayerId);
+            this.playerManager!.createPlayer(playerId, isLocal, index);
+        });
+
+        // Set up network message handlers
+        this.setupNetworkHandlers();
+
+        console.log(`Multiplayer initialized - Host: ${this.isHost}, Players: ${this.players.length}`);
+    }
+
+    setupNetworkHandlers() {
+        if (this.isHost) {
+            // Host receives inputs from clients
+            NetworkManager.onMessage(MessageTypes.INPUT, (fromPeerId, payload) => {
+                this.playerManager?.applyInput(fromPeerId, payload.inputs);
+            });
+        } else {
+            // Client receives state from host
+            NetworkManager.onMessage(MessageTypes.STATE_SYNC, (fromPeerId, payload) => {
+                this.applyNetworkState(payload);
+            });
+        }
+    }
+
+    updateSinglePlayer() {
+        if (this.player && this.player.update) {
+            this.player.update();
+        }
+    }
+
+    updateMultiplayer() {
+        this.tick++;
+
+        if (this.isHost) {
+            this.updateHost();
+        } else {
+            this.updateClient();
+        }
+    }
+
+    updateHost() {
+        // Update all players
+        this.playerManager?.update();
+
+        // Broadcast state to clients
+        const now = Date.now();
+        if (now - this.lastStateSyncTime >= this.stateSyncRate) {
+            this.broadcastState();
+            this.lastStateSyncTime = now;
+        }
+    }
+
+    updateClient() {
+        // Update all players (interpolation happens in player update)
+        this.playerManager?.update();
+
+        // Send local input to host
+        const now = Date.now();
+        if (now - this.lastInputSendTime >= this.inputSendRate) {
+            this.sendInputToHost();
+            this.lastInputSendTime = now;
+        }
+    }
+
+    broadcastState() {
+        if (!this.playerManager) return;
+
+        const state = StateSerializer.serialize({
+            tick: this.tick,
+            players: this.playerManager.getAllPlayers() as any,
+            enemies: this.enemyGroup.getChildren() as any,
+            bullets: this.playerBulletGroup.getChildren() as any,
+            score: this.score,
+            scrollMovement: this.scrollMovement,
+            spawnEnemyCounter: this.spawnEnemyCounter,
+            gameStarted: this.gameStarted
+        });
+
+        NetworkManager.broadcast(MessageTypes.STATE_SYNC, state);
+    }
+
+    sendInputToHost() {
+        if (!this.playerManager) return;
+
+        const input = this.playerManager.collectLocalInput();
+        if (input) {
+            NetworkManager.sendToHost(MessageTypes.INPUT, {
+                inputs: input
+            });
+        }
+    }
+
+    applyNetworkState(state: any) {
+        // Apply player states
+        if (state.players && this.playerManager) {
+            this.playerManager.applyPlayerState(state.players);
+        }
+
+        // Apply game state
+        if (state.gameState) {
+            this.score = state.gameState.score;
+            this.scrollMovement = state.gameState.scrollMovement;
+            this.spawnEnemyCounter = state.gameState.spawnEnemyCounter;
+            this.gameStarted = state.gameState.gameStarted;
+
+            this.scoreText.setText(`Score: ${this.score}`);
+        }
+
+        // TODO: Sync enemies and bullets
     }
 
     initGameUi() {
@@ -131,9 +301,13 @@ export class GameScene extends Scene
         this.enemyBulletGroup = this.add.group();
         this.playerBulletGroup = this.add.group();
 
-        this.physics.add.overlap(this.player, this.enemyBulletGroup, (this.hitPlayer as ArcadePhysicsCallback), undefined, this);
-        this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy, undefined, this);
-        this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer, undefined, this);
+        // Only set up collisions for single player mode
+        if (!this.networkEnabled && this.player) {
+            this.physics.add.overlap(this.player, this.enemyBulletGroup, this.hitPlayer as any, undefined, this);
+            this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy as any, undefined, this);
+            this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer as any, undefined, this);
+        }
+        // TODO: Set up collisions for multiplayer mode with all players
     }
 
     initPlayer() {
@@ -270,7 +444,7 @@ export class GameScene extends Scene
     hitPlayer(player: Player, obstacle) {
         this.addExplosion(player.x, player.y);
         player.hit(obstacle.getPower());
-        obstacle.die();
+        //obstacle.die(); disabled
 
         this.GameOver();
     }
