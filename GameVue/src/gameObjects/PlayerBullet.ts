@@ -1,13 +1,14 @@
 import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
+import Vector2 = Phaser.Math.Vector2;
 
 export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
     power = 1;
-    moveVelocity = 1000;
+    bulletSpeed = 1000;
     gameScene: GameScene;
 
-    constructor(scene: GameScene, x: number, y: number, power: number) {
-        super(scene, x, y, ASSETS.spritesheet.tiles.key, power-1);
+    constructor(scene: GameScene, from: {x: number, y: number}, to: {x: number, y: number}, power: number) {
+        super(scene, from.x, from.y, ASSETS.spritesheet.tiles.key, power-1);
 
         scene.add.existing(this);
         scene.physics.add.existing(this);
@@ -15,7 +16,11 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         this.setSize(12, 32); // resize hitbox to correctly fit image instead of using the entire tile size
         this.setDepth(10);
         this.gameScene = scene;
-        this.setVelocityY(-this.moveVelocity); // bullet vertical speed
+        const velocityVector = new Vector2(to.x - from.x, to.y - from.y);
+        this.rotation = Math.atan2(to.y - from.y, to.x - from.x) - Math.PI / 2;
+        velocityVector.normalize();
+
+        this.setVelocity(velocityVector.x * this.bulletSpeed, velocityVector.y * this.bulletSpeed);
     }
 
     preUpdate(time: number, delta: number) {
@@ -28,9 +33,9 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         return this.power;
     }
 
-    // is this bullet above the screen?
+    // is this bullet off the screen?
     checkWorldBounds() {
-        if (this.y < 0) {
+        if (this.y < 0 || this.x < 0) {
             this.remove();
         }
     }

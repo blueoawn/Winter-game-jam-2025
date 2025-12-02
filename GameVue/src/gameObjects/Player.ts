@@ -53,7 +53,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         }
 
         const moveDirection = new Phaser.Math.Vector2();
-        const mouseXPosition = this.gameScene.input.mousePointer.x
+        const mouseXPosition = this.gameScene.input.mousePointer.x;
         const mouseYPosition = this.gameScene.input.mousePointer.y;
         const spaceKeyDown = cursors.space.isDown;
 
@@ -75,7 +75,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.fireCounter = this.fireRate;
 
-        this.gameScene.fireBullet(this.x, this.y);
+        this.gameScene.fireBullet(
+            {x: this.x, y: this.y},
+            {x: this.gameScene.input.mousePointer.x, y: this.gameScene.input.mousePointer.y}
+        );
     }
 
     hit(damage: number) {

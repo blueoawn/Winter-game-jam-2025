@@ -390,8 +390,8 @@ export class GameScene extends Scene
         this.addFlyingGroup();
     }
 
-    fireBullet(x: number, y: number) {
-        const bullet = new PlayerBullet(this, x, y, 1);
+    fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
+        const bullet = new PlayerBullet(this, from, to, 1);
         this.playerBulletGroup.add(bullet);
     }
 
