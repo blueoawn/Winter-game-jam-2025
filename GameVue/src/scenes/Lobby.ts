@@ -107,6 +107,7 @@ export class Lobby extends Phaser.Scene {
             await NetworkManager.joinGame(roomCode);
 
             this.ui!.updateRoomCode(roomCode);
+            this.ui!.changeMode('host');
             this.ui!.updateStatus('Connected! Waiting for host to start game...', '#00ff00');
 
             // Add self to player list

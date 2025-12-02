@@ -1,5 +1,5 @@
 import Player from '../src/gameObjects/Player';
-import type { Game } from '../src/scenes/Game';
+import type { GameScene } from '../src/scenes/Game';
 import type { PlayerState } from '../network/StateSerializer';
 
 export interface InputState {
@@ -12,11 +12,11 @@ export interface InputState {
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
-    private scene: Game;
+    private scene: GameScene;
     private players: Map<string, Player>;
     private localPlayerId: string | null;
 
-    constructor(scene: Game) {
+    constructor(scene: GameScene) {
         this.scene = scene;
         this.players = new Map();
         this.localPlayerId = null;

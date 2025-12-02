@@ -222,20 +222,6 @@ export class LobbyUI {
         this.updateStatus(errorMessage, '#ff0000');
     }
 
-    // Show connection dialog for joining
-    showJoinDialog(onJoin: (roomCode: string) => void): void {
-        const { width, height } = this.lobbyScene.scale;
-        const centerX = width * 0.5;
-        const centerY = height * 0.5;
-
-        // TODO: Replace with proper UI input instead of prompt EXAMPLE USING PHASER DOM https://phaser.discourse.group/t/text-input/3141 see post by retroVX
-        const roomCodeInput = prompt('Enter Room Code:');
-
-        if (roomCodeInput && roomCodeInput.trim()) {
-            onJoin(roomCodeInput.trim().toUpperCase());
-        }
-    }
-
     // Destroy all UI elements
     destroy(): void {
         Object.values(this.elements).forEach(element => {
