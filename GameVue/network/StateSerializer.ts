@@ -1,5 +1,7 @@
 // State serialization and deserialization for network transmission
 
+import Vector2 = Phaser.Math.Vector2;
+
 export interface PlayerState {
     id: string;
     x: number;
@@ -50,10 +52,9 @@ export interface SerializedGameState {
 }
 
 export interface InputState {
-    left: boolean;
-    right: boolean;
-    up: boolean;
-    down: boolean;
+    movementSpeed: number;
+    velocity: Vector2;
+    rotation: number;
     fire: boolean;
 }
 

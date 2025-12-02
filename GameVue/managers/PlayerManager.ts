@@ -1,14 +1,6 @@
 import Player from '../src/gameObjects/Player';
 import type { GameScene } from '../src/scenes/Game';
-import type { PlayerState } from '../network/StateSerializer';
-
-export interface InputState {
-    left?: boolean;
-    right?: boolean;
-    up?: boolean;
-    down?: boolean;
-    fire?: boolean;
-}
+import type { InputState, PlayerState } from '../network/StateSerializer';
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
@@ -96,8 +88,8 @@ export class PlayerManager {
     // Apply input state to a player (host uses this for all players)
     applyInput(playerId: string, inputState: InputState): void {
         const player = this.players.get(playerId);
-        if (player && (player as any).applyInput) {
-            (player as any).applyInput(inputState);
+        if (player && (player as Player).applyInput) {
+            (player as Player).applyInput(inputState);
         }
     }
 

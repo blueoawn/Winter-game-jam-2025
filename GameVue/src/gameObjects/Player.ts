@@ -1,14 +1,7 @@
 import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
-import type { PlayerState } from '../../network/StateSerializer';
-
-interface InputState {
-    left?: boolean;
-    right?: boolean;
-    up?: boolean;
-    down?: boolean;
-    fire?: boolean;
-}
+import type { InputState, PlayerState } from '../../network/StateSerializer';
+import Vector2 = Phaser.Math.Vector2;
 
 export default class Player extends Phaser.Physics.Arcade.Sprite {
     characterSpeed = 1000;
@@ -26,6 +19,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         sKeyDown: false,
         dKeyDown: false,
     }
+    lastVelocity: Vector2;
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
         super(scene, x, y, ASSETS.spritesheet.ships.key, shipId);
@@ -47,12 +41,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         // Only check input for local player
         if (this.isLocal) {
-            this.checkInput();
+            this.checkLocalInput();
         }
     }
 
 
-    checkInput() {
+    checkLocalInput() {
         const cursors = this.gameScene.cursors; // get cursors object from Game scene
         if (!cursors) {
             return
@@ -99,18 +93,11 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Apply input state (used by host for all players)
     applyInput(inputState: InputState) {
-        if (!this.body) return;
-
-        const moveDirection = { x: 0, y: 0 };
-
-        if (inputState.left) moveDirection.x--;
-        if (inputState.right) moveDirection.x++;
-        if (inputState.up) moveDirection.y--;
-        if (inputState.down) moveDirection.y++;
         if (inputState.fire) this.fire();
-
-        this.body.velocity.x += moveDirection.x * this.characterSpeed;
-        this.body.velocity.y += moveDirection.y * this.characterSpeed;
+        const velocityVector = new Vector2(inputState.velocity.x, inputState.velocity.y);
+        velocityVector.normalize();
+        this.setVelocity(velocityVector.x * inputState.movementSpeed, velocityVector.y * inputState.movementSpeed);
+        this.rotation = inputState.rotation;
     }
 
     // Apply full state from network (used by clients)
@@ -131,17 +118,39 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Get current input state (used by local player to send to host)
     getCurrentInput(): InputState {
-        const cursors = this.gameScene.cursors;
+        const cursors = this.gameScene.cursors; // get cursors object from Game scene
+        const defaultInputState = {
+            movementSpeed: this.characterSpeed,
+            velocity: this.lastVelocity,
+            rotation: this.rotation,
+            fire: false
+        }
         if (!cursors) {
-            return {};
+            return defaultInputState;
         }
 
+        const velocity = new Phaser.Math.Vector2();
+        const mouseXPosition = this.gameScene.input.mousePointer.x
+        const mouseYPosition = this.gameScene.input.mousePointer.y;
+        const spaceKeyDown = cursors.space.isDown;
+
+        if (this.keys.aKeyDown) velocity.x--;
+        if (this.keys.dKeyDown) velocity.x++;
+        if (this.keys.wKeyDown) velocity.y--;
+        if (this.keys.sKeyDown) velocity.y++;
+        if (spaceKeyDown) this.fire();
+
+        velocity.x = velocity.x * this.characterSpeed
+        velocity.y = velocity.y * this.characterSpeed
+
+        const rotation = Math.atan2((this.y - mouseYPosition), (this.x - mouseXPosition)) - Math.PI / 2;
+        this.lastVelocity = velocity;
+
         return {
-            left: cursors.left.isDown,
-            right: cursors.right.isDown,
-            up: cursors.up.isDown,
-            down: cursors.down.isDown,
-            fire: cursors.space.isDown
+            movementSpeed: this.characterSpeed,
+            velocity,
+            rotation,
+            fire: spaceKeyDown
         };
     }
 

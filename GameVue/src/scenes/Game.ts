@@ -94,7 +94,8 @@ export class GameScene extends Scene
     }
 
     update() {
-        this.updateMap();
+        // Feels good to have a nice background while testing
+        // this.updateMap();
 
         if (!this.gameStarted) return;
 
