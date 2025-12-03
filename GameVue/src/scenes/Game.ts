@@ -23,6 +23,7 @@ import { MessageTypes } from '../../network/MessageTypes';
 import { StateSerializer } from '../../network/StateSerializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { BulletPool } from '../../managers/BulletPool.ts';
+import Rectangle = Phaser.GameObjects.Rectangle;
 
 
 export class GameScene extends Scene
@@ -49,6 +50,7 @@ export class GameScene extends Scene
     enemyGroup: Group;
     enemyBulletGroup: Group;
     playerBulletGroup: Group;
+    enemyBulletDestroyersGroup: Group;
     cursors?: CursorKeys;
     timedEvent: TimerEvent;
 
@@ -172,7 +174,6 @@ export class GameScene extends Scene
         } else {
             this.player = new SwordAndBoard(this, this.centreX, this.scale.height - 100);
         }
-
         (this.player as any).isLocal = true;
         this.playerManager = null;
     }
@@ -550,15 +551,43 @@ export class GameScene extends Scene
         this.enemyGroup = this.add.group();
         this.enemyBulletGroup = this.add.group();
         this.playerBulletGroup = this.add.group();
+        this.enemyBulletDestroyersGroup = this.add.group();
 
         // Initialize bullet pool (Phase 2 optimization)
         this.bulletPool = new BulletPool(this, 200);  // Pool size: 200 bullets
 
         // Only set up collisions for single player mode
         if (!this.networkEnabled && this.player) {
-            this.physics.add.overlap(this.player, this.enemyBulletGroup, this.hitPlayer as () => void, undefined, this);
-            this.physics.add.overlap(this.playerBulletGroup, this.enemyGroup, this.hitEnemy as () => void, undefined, this);
-            this.physics.add.overlap(this.player, this.enemyGroup, this.hitPlayer as () => void, undefined, this);
+            // This overlap should come before checking if the bullet hit the player
+            this.physics.add.overlap(
+                this.enemyBulletDestroyersGroup,
+                this.enemyBulletGroup,
+                this.destroyEnemyBullet as () => void,
+                undefined,
+                this
+            );
+            this.physics.add.overlap(
+                this.playerBulletGroup,
+                this.enemyGroup,
+                this.hitEnemy as () => void,
+                undefined,
+                this
+            );
+            this.physics.add.overlap(
+                this.player,
+                this.enemyBulletGroup,
+                this.hitPlayer as () => void,
+                undefined,
+                this
+            );
+            this.physics.add.overlap(
+                this.player,
+                this.enemyGroup,
+                this.hitPlayer as () => void,
+                undefined,
+                this
+            );
+
         }
         // TODO: Set up collisions for multiplayer mode with all players
     }
@@ -658,7 +687,15 @@ export class GameScene extends Scene
     }
 
     removeEnemyBullet(bullet: EnemyBullet) {
-        this.playerBulletGroup.remove(bullet, true, true);
+        this.enemyBulletGroup.remove(bullet, true, true);
+    }
+
+    addEnemyBulletDestroyer(destroyer: Rectangle) {
+        this.enemyBulletDestroyersGroup.add(destroyer);
+    }
+
+    removeEnemyBulletDestroyer(destroyer: Rectangle) {
+        this.playerBulletGroup.remove(destroyer, true, true);
     }
 
     // add a group of flying enemies
@@ -700,11 +737,10 @@ export class GameScene extends Scene
         new Explosion(this, x, y);
     }
 
-    hitPlayer(player: PlayerController, obstacle: any) {
+    hitPlayer(player: PlayerController, obstacle: EnemyBullet) {
         this.addExplosion(player.x, player.y);
         player.hit(obstacle.getPower());
         //obstacle.die(); disabled
-
         this.GameOver();
     }
 
@@ -712,6 +748,10 @@ export class GameScene extends Scene
         this.updateScore(10);
         bullet.remove();
         enemy.hit(bullet.getPower());
+    }
+
+    destroyEnemyBullet(bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
+        this.removeEnemyBullet(enemyBullet);
     }
 
     updateScore(points: number) {
