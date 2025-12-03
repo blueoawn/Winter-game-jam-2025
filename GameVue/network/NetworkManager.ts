@@ -1,16 +1,8 @@
-import Peer, { DataConnection } from 'peerjs';
-import { MessageTypes, createMessage, isValidMessage, MessageType } from './MessageTypes';
+import PlaySocket from 'playsocketjs';
 
-type MessageHandler = (fromPeerId: string, payload: any) => void;
+type StorageUpdateHandler = (storage: any) => void;
 type PlayerJoinHandler = (playerId: string) => void;
 type PlayerLeaveHandler = (playerId: string) => void;
-type ConnectionErrorHandler = (playerId: string, error: Error) => void;
-
-interface ConnectionHandlers {
-    onPlayerJoin: PlayerJoinHandler | null;
-    onPlayerLeave: PlayerLeaveHandler | null;
-    onConnectionError: ConnectionErrorHandler | null;
-}
 
 interface NetworkStats {
     isHost: boolean;
@@ -20,22 +12,18 @@ interface NetworkStats {
     isConnected: boolean;
 }
 
-// Singleton NetworkManager for P2P communication
+// Singleton NetworkManager wrapping PlaySocketJS with storage-based sync
 class NetworkManager {
     private static instance: NetworkManager;
 
-    private peer: Peer | null = null;
-    private connections: Map<string, DataConnection> = new Map();
+    private socket: PlaySocket | null = null;
     private isHost: boolean = false;
-    private hostConnection: DataConnection | null = null;
     private localPlayerId: string | null = null;
     private roomCode: string | null = null;
-    private messageHandlers: Map<MessageType, MessageHandler> = new Map();
-    private connectionHandlers: ConnectionHandlers = {
-        onPlayerJoin: null,
-        onPlayerLeave: null,
-        onConnectionError: null
-    };
+    private storageUpdateHandler: StorageUpdateHandler | null = null;
+    private playerJoinHandler: PlayerJoinHandler | null = null;
+    private playerLeaveHandler: PlayerLeaveHandler | null = null;
+    private connectedPlayers: Set<string> = new Set();
 
     constructor() {
         if (NetworkManager.instance) {
@@ -45,289 +33,221 @@ class NetworkManager {
         NetworkManager.instance = this;
     }
 
-    // Initialize PeerJS with public server
+    // Initialize PlaySocket connection to server
     async initialize(): Promise<string> {
-        return new Promise((resolve, reject) => {
-            try {
-                // Use public PeerJS cloud server
-                this.peer = new Peer(undefined, {
-                    host: '0.peerjs.com',
-                    port: 443,
-                    path: '/',
-                    secure: true,
-                    debug: 2  // Enable debug logging
-                });
+        try {
+            // Generate a unique client ID
+            const clientId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-                this.peer.on('open', (id: string) => {
-                    console.log('PeerJS initialized with ID:', id);
-                    console.log('Peer is open and ready');
-                    this.localPlayerId = id;
-                    resolve(id);
-                });
+            // Create PlaySocket instance connected to local server
+            this.socket = new PlaySocket(clientId, {
+                endpoint: 'ws://localhost:3001'
+            });
 
-                this.peer.on('error', (error: Error) => {
-                    console.error('PeerJS error:', error);
-                    reject(error);
-                });
+            // Initialize connection
+            const playerId = await this.socket.init();
+            this.localPlayerId = playerId;
 
-                // Listen for incoming connections (host only)
-                this.peer.on('connection', (conn: DataConnection) => {
-                    console.log('!!! Peer received connection event from:', conn.peer);
-                    this.handleIncomingConnection(conn);
-                });
+            console.log('PlaySocket initialized with ID:', playerId);
 
-                console.log('PeerJS connection listener registered');
+            // Set up event listeners
+            this.setupEventListeners();
 
-            } catch (error) {
-                console.error('Failed to initialize PeerJS:', error);
-                reject(error);
+            return playerId;
+        } catch (error) {
+            console.error('Failed to initialize PlaySocket:', error);
+            throw error;
+        }
+    }
+
+    // Set up PlaySocket event listeners
+    private setupEventListeners(): void {
+        if (!this.socket) return;
+
+        // Listen for status changes
+        this.socket.onEvent('status', (status: string) => {
+            console.log('PlaySocket status:', status);
+        });
+
+        // Listen for storage updates (main synchronization mechanism)
+        this.socket.onEvent('storageUpdated', (storage: any) => {
+            console.log('Storage updated:', storage);
+
+            // Notify game of storage changes
+            if (this.storageUpdateHandler) {
+                this.storageUpdateHandler(storage);
+            }
+        });
+
+        // Listen for other clients connecting to room
+        this.socket.onEvent('clientConnected', (clientId: string) => {
+            console.log('Client connected to room:', clientId);
+            this.connectedPlayers.add(clientId);
+
+            if (this.playerJoinHandler) {
+                this.playerJoinHandler(clientId);
+            }
+        });
+
+        // Listen for clients disconnecting
+        this.socket.onEvent('clientDisconnected', (clientId: string) => {
+            console.log('Client disconnected from room:', clientId);
+            this.connectedPlayers.delete(clientId);
+
+            if (this.playerLeaveHandler) {
+                this.playerLeaveHandler(clientId);
             }
         });
     }
 
-    // Host a new game session
-    hostGame(): string {
-        if (!this.peer) {
+    // Host a new game session (create room)
+    async hostGame(): Promise<string> {
+        if (!this.socket) {
             throw new Error('NetworkManager not initialized');
         }
 
-        if (!this.peer.open) {
-            throw new Error('Peer connection not open yet');
+        try {
+            // Create room with initial storage
+            const roomCode = await this.socket.createRoom({
+                hostId: this.localPlayerId,
+                players: [this.localPlayerId],
+                isGameStarted: false,
+                playerInputs: {},  // Store player inputs here
+                gameState: null     // Host will update this
+            });
+
+            this.roomCode = roomCode;
+            this.isHost = true;
+            this.connectedPlayers.add(this.localPlayerId!);
+
+            console.log('Hosting game with room code:', roomCode);
+            return roomCode;
+        } catch (error) {
+            console.error('Failed to create room:', error);
+            throw error;
         }
-
-        this.isHost = true;
-        this.roomCode = this.generateRoomCode(this.localPlayerId!);
-        console.log('Hosting game with room code:', this.roomCode);
-        console.log('Host peer is ready to accept connections');
-
-        return this.roomCode;
     }
 
     // Join an existing game session
-    async joinGame(roomCode: string): Promise<DataConnection> {
-        if (!this.peer) {
+    async joinGame(roomCode: string): Promise<void> {
+        if (!this.socket) {
             throw new Error('NetworkManager not initialized');
         }
 
-        if (!this.peer.open) {
-            throw new Error('Peer not ready yet');
+        try {
+            this.roomCode = roomCode;
+            this.isHost = false;
+
+            console.log('Joining room:', roomCode);
+            await this.socket.joinRoom(roomCode);
+
+            // Add self to players list in storage
+            this.socket.updateStorage('players', 'array-add-unique', this.localPlayerId);
+
+            console.log('Successfully joined room');
+        } catch (error) {
+            console.error('Failed to join room:', error);
+            throw error;
         }
-
-        this.isHost = false;
-        this.roomCode = roomCode;
-
-        const hostPeerId = this.parseRoomCode(roomCode);
-        console.log('Joining game, connecting to host:', hostPeerId);
-        console.log('My peer ID:', this.localPlayerId);
-
-        return new Promise((resolve, reject) => {
-            try {
-                console.log('Attempting to connect...');
-                const conn = this.peer!.connect(hostPeerId, {
-                    reliable: true,
-                    serialization: 'json'
-                });
-
-                console.log('Connection object created:', conn);
-
-                conn.on('open', () => {
-                    console.log('✓ Connected to host successfully!');
-                    this.hostConnection = conn;
-                    this.setupConnectionHandlers(conn);
-
-                    // Send join message
-                    this.sendToHost(MessageTypes.PLAYER_JOIN, {
-                        playerId: this.localPlayerId
-                    });
-
-                    resolve(conn);
-                });
-
-                conn.on('error', (error: Error) => {
-                    console.error('✗ Connection error:', error);
-                    reject(error);
-                });
-
-                conn.on('close', () => {
-                    console.log('Connection closed');
-                });
-
-            } catch (error) {
-                console.error('✗ Failed to create connection:', error);
-                reject(error);
-            }
-        });
     }
 
-    // Handle incoming connection (host receives client connection)
-    private handleIncomingConnection(conn: DataConnection): void {
-        console.log('Incoming connection from:', conn.peer);
-
-        conn.on('open', () => {
-            console.log('Connection opened with:', conn.peer);
-            this.connections.set(conn.peer, conn);
-            this.setupConnectionHandlers(conn);
-
-            // Notify game of new player
-            if (this.connectionHandlers.onPlayerJoin) {
-                this.connectionHandlers.onPlayerJoin(conn.peer);
-            }
-        });
-
-        conn.on('error', (err: Error) => {
-            console.error('Connection error with peer:', conn.peer, err);
-        });
-    }
-
-    // Set up handlers for a connection
-    private setupConnectionHandlers(conn: DataConnection): void {
-        conn.on('data', (data: any) => {
-            this.handleMessage(conn.peer, data);
-        });
-
-        conn.on('close', () => {
-            console.log('Connection closed:', conn.peer);
-            this.connections.delete(conn.peer);
-
-            if (this.connectionHandlers.onPlayerLeave) {
-                this.connectionHandlers.onPlayerLeave(conn.peer);
-            }
-        });
-
-        conn.on('error', (error: Error) => {
-            console.error('Connection error:', conn.peer, error);
-            if (this.connectionHandlers.onConnectionError) {
-                this.connectionHandlers.onConnectionError(conn.peer, error);
-            }
-        });
-    }
-
-    // Handle received message
-    private handleMessage(fromPeerId: string, data: any): void {
-        if (!isValidMessage(data)) {
-            console.warn('Invalid message received:', data);
+    // Update player's input in shared storage
+    updatePlayerInput(inputState: any): void {
+        if (!this.socket) {
+            console.error('NetworkManager not initialized');
             return;
         }
 
-        // Call registered handler for this message type
-        const handler = this.messageHandlers.get(data.type);
-        if (handler) {
-            handler(fromPeerId, data.payload);
+        // Get current playerInputs from storage
+        const storage = this.socket.getStorage;
+        const playerInputs = storage?.playerInputs || {};
+
+        // Update this player's input
+        playerInputs[this.localPlayerId!] = {
+            ...inputState,
+            timestamp: Date.now()
+        };
+
+        // Write back to storage (will sync to all clients)
+        this.socket.updateStorage('playerInputs', 'set', playerInputs);
+    }
+
+    // Update game state (host only)
+    updateGameState(gameState: any): void {
+        if (!this.socket) {
+            console.error('NetworkManager not initialized');
+            return;
         }
+
+        if (!this.isHost) {
+            console.warn('Only host can update game state');
+            return;
+        }
+
+        // Update game state in storage (will sync to all clients)
+        this.socket.updateStorage('gameState', 'set', {
+            ...gameState,
+            timestamp: Date.now()
+        });
     }
 
-    // Register a message handler
-    onMessage(messageType: MessageType, handler: MessageHandler): void {
-        this.messageHandlers.set(messageType, handler);
+    // Get current storage snapshot
+    getStorage(): any {
+        if (!this.socket) {
+            return null;
+        }
+        return this.socket.getStorage;  // It's a getter property, not a method
     }
 
-    // Register connection event handlers
+    // Register storage update handler
+    onStorageUpdate(handler: StorageUpdateHandler): void {
+        this.storageUpdateHandler = handler;
+    }
+
+    // Register player join handler
     onPlayerJoin(handler: PlayerJoinHandler): void {
-        this.connectionHandlers.onPlayerJoin = handler;
+        this.playerJoinHandler = handler;
     }
 
+    // Register player leave handler
     onPlayerLeave(handler: PlayerLeaveHandler): void {
-        this.connectionHandlers.onPlayerLeave = handler;
-    }
-
-    onConnectionError(handler: ConnectionErrorHandler): void {
-        this.connectionHandlers.onConnectionError = handler;
-    }
-
-    // Send message to host (client only)
-    sendToHost(messageType: MessageType, payload: any): void {
-        if (this.isHost) {
-            console.warn('Host cannot send to itself');
-            return;
-        }
-
-        if (!this.hostConnection) {
-            console.error('No connection to host');
-            return;
-        }
-
-        const message = createMessage(messageType, payload);
-        this.hostConnection.send(message);
-    }
-
-    // Send message to specific peer (host only)
-    sendToPeer(peerId: string, messageType: MessageType, payload: any): void {
-        if (!this.isHost) {
-            console.warn('Only host can send to specific peers');
-            return;
-        }
-
-        const conn = this.connections.get(peerId);
-        if (!conn) {
-            console.error('No connection to peer:', peerId);
-            return;
-        }
-
-        const message = createMessage(messageType, payload);
-        conn.send(message);
-    }
-
-    // Broadcast message to all connected peers (host only)
-    broadcast(messageType: MessageType, payload: any): void {
-        if (!this.isHost) {
-            console.warn('Only host can broadcast');
-            return;
-        }
-
-        const message = createMessage(messageType, payload);
-        this.connections.forEach((conn) => {
-            conn.send(message);
-        });
+        this.playerLeaveHandler = handler;
     }
 
     // Get list of connected player IDs
     getConnectedPlayers(): string[] {
-        const players: string[] = this.localPlayerId ? [this.localPlayerId] : [];
-
-        if (this.isHost) {
-            // Host: add all connected clients
-            this.connections.forEach((conn, peerId) => {
-                players.push(peerId);
-            });
-        } else if (this.hostConnection) {
-            // Client: we don't know about other clients directly
-            // This will be handled by receiving state from host
-        }
-
-        return players;
+        return Array.from(this.connectedPlayers);
     }
 
     // Check if playing solo (no network)
     isSoloPlay(): boolean {
-        return this.peer === null;
+        return this.socket === null;
     }
 
-    // Generate a room code from peer ID
-    private generateRoomCode(peerId: string): string {
-        // For now, use the full peer ID as the room code
-        // In production, you'd use a mapping server for short codes
-        return peerId;
+    // Check if this client is the host
+    getIsHost(): boolean {
+        return this.isHost;
     }
 
-    // Parse room code back to peer ID
-    private parseRoomCode(roomCode: string): string {
-        // Room code IS the peer ID
-        return roomCode;
+    // Get local player ID
+    getPlayerId(): string | null {
+        return this.localPlayerId;
     }
 
     // Clean up connections
     destroy(): void {
-        if (this.peer) {
-            this.connections.forEach(conn => conn.close());
-            this.peer.destroy();
+        if (this.socket) {
+            this.socket.destroy();
         }
 
-        this.connections.clear();
-        this.peer = null;
+        this.socket = null;
         this.isHost = false;
-        this.hostConnection = null;
         this.localPlayerId = null;
         this.roomCode = null;
+        this.connectedPlayers.clear();
+        this.storageUpdateHandler = null;
+        this.playerJoinHandler = null;
+        this.playerLeaveHandler = null;
     }
 
     // Get network stats
@@ -336,8 +256,8 @@ class NetworkManager {
             isHost: this.isHost,
             playerId: this.localPlayerId,
             roomCode: this.roomCode,
-            connectedPlayers: this.connections.size,
-            isConnected: this.peer !== null && this.peer.open
+            connectedPlayers: this.connectedPlayers.size,
+            isConnected: this.socket !== null
         };
     }
 }

@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import ASSETS from '../assets';
+import NetworkManager from '../../network/NetworkManager';
 
 interface CharacterData {
     id: string;
@@ -13,6 +14,12 @@ interface CharacterData {
     };
     ability1: string;
     ability2: string;
+}
+
+interface CharacterSelection {
+    characterId: string;
+    ready: boolean;
+    timestamp: number;
 }
 
 export class CharacterSelectScene extends Scene {
@@ -49,11 +56,13 @@ export class CharacterSelectScene extends Scene {
     private networkEnabled: boolean = false;
     private isHost: boolean = false;
     private players: string[] = [];
+    private characterSelections: Map<string, CharacterSelection> = new Map();
 
     private titleText!: Phaser.GameObjects.Text;
     private characterCards: Map<string, Phaser.GameObjects.Container> = new Map();
     private startButton!: Phaser.GameObjects.Text;
     private startButtonBg!: Phaser.GameObjects.Rectangle;
+    private playerStatusText!: Phaser.GameObjects.Text;
 
     constructor() {
         super('CharacterSelectScene');
@@ -86,19 +95,54 @@ export class CharacterSelectScene extends Scene {
             align: 'center'
         }).setOrigin(0.5);
 
+        // Player status text (shows who is ready in multiplayer)
+        if (this.networkEnabled && this.players.length > 1) {
+            this.playerStatusText = this.add.text(centerX, 140, '', {
+                fontFamily: 'Arial',
+                fontSize: '20px',
+                color: '#ffff00',
+                align: 'center'
+            }).setOrigin(0.5);
+        }
+
         // Create character selection cards
         this.createCharacterCards(centerX, centerY);
 
         // Create start button (initially disabled)
         this.createStartButton(centerX, this.scale.height - 80);
 
+        // Update player status after UI is created
+        if (this.networkEnabled && this.players.length > 1) {
+            this.updatePlayerStatus();
+        }
+
         // Instructions
-        this.add.text(centerX, this.scale.height - 30, 'Click a character to select', {
+        const instructionText = this.networkEnabled && this.players.length > 1
+            ? 'Click a character to select - Waiting for all players...'
+            : 'Click a character to select';
+        this.add.text(centerX, this.scale.height - 30, instructionText, {
             fontFamily: 'Arial',
             fontSize: '20px',
             color: '#cccccc',
             align: 'center'
         }).setOrigin(0.5);
+
+        // Setup network storage handlers if multiplayer
+        if (this.networkEnabled) {
+            this.setupStorageHandlers();
+
+            // Initialize storage with character selections object if host
+            if (this.isHost) {
+                const storage = NetworkManager.getStorage();
+                if (storage && !storage.characterSelections) {
+                    const socket = (NetworkManager as any).socket;
+                    if (socket) {
+                        socket.updateStorage('characterSelections', 'set', {});
+                        socket.updateStorage('allPlayersReady', 'set', false);
+                    }
+                }
+            }
+        }
     }
 
     private createCharacterCards(centerX: number, centerY: number): void {
@@ -243,12 +287,36 @@ export class CharacterSelectScene extends Scene {
             bg.setStrokeStyle(6, 0x00ff00);
         }
 
-        // Enable start button
-        this.startButtonBg.setFillStyle(0x00aa00);
-        this.startButton.setColor('#ffffff');
-        this.startButtonBg.setInteractive({ useHandCursor: true });
-
         console.log('Character selected:', characterId);
+
+        // Update storage if multiplayer
+        if (this.networkEnabled) {
+            const playerId = NetworkManager.getPlayerId();
+            if (playerId) {
+                const storage = NetworkManager.getStorage();
+                const characterSelections = storage?.characterSelections || {};
+
+                characterSelections[playerId] = {
+                    characterId: characterId,
+                    ready: true,
+                    timestamp: Date.now()
+                };
+
+                const socket = (NetworkManager as any).socket;
+                if (socket) {
+                    socket.updateStorage('characterSelections', 'set', characterSelections);
+                }
+
+                // Update local state
+                this.characterSelections.set(playerId, characterSelections[playerId]);
+                this.updatePlayerStatus();
+            }
+        } else {
+            // Single player - just enable start button
+            this.startButtonBg.setFillStyle(0x00aa00);
+            this.startButton.setColor('#ffffff');
+            this.startButtonBg.setInteractive({ useHandCursor: true });
+        }
     }
 
     private createStartButton(x: number, y: number): void {
@@ -267,7 +335,7 @@ export class CharacterSelectScene extends Scene {
         // Make button interactive (disabled initially)
         this.startButtonBg.on('pointerdown', () => {
             if (this.selectedCharacterId) {
-                this.startGame();
+                this.onStartButtonClick();
             }
         });
 
@@ -284,6 +352,36 @@ export class CharacterSelectScene extends Scene {
         });
     }
 
+    private onStartButtonClick(): void {
+        // This is called when the button is clicked
+        // Only host can manually start the game
+        if (!this.selectedCharacterId) return;
+
+        if (this.networkEnabled && this.players.length > 1) {
+            if (!this.isHost) {
+                console.log('Only host can start the game');
+                return;
+            }
+
+            // Check if all players have selected characters
+            const allReady = this.checkAllPlayersReady();
+            if (!allReady) {
+                console.log('Not all players are ready');
+                return;
+            }
+
+            // Signal game start in storage (will trigger startGame on all clients)
+            const storage = NetworkManager.getStorage();
+            const socket = (NetworkManager as any).socket;
+            if (socket && storage) {
+                socket.updateStorage('gameStarting', 'set', true);
+            }
+        }
+
+        // Start game immediately for host/single player
+        this.startGame();
+    }
+
     private startGame(): void {
         if (!this.selectedCharacterId) return;
 
@@ -296,6 +394,85 @@ export class CharacterSelectScene extends Scene {
             isHost: this.isHost,
             players: this.players
         });
+    }
+
+    private setupStorageHandlers(): void {
+        // Listen for storage updates
+        NetworkManager.onStorageUpdate((storage: any) => {
+            console.log('CharacterSelect storage updated:', storage);
+
+            // Update character selections from storage
+            if (storage.characterSelections) {
+                this.characterSelections.clear();
+                Object.entries(storage.characterSelections).forEach(([playerId, selection]: [string, any]) => {
+                    this.characterSelections.set(playerId, selection);
+                });
+                this.updatePlayerStatus();
+            }
+
+            // Check if game is starting
+            if (storage.gameStarting) {
+                console.log('Game starting from storage update!');
+                this.startGame();
+            }
+        });
+    }
+
+    private updatePlayerStatus(): void {
+        if (!this.playerStatusText || !this.networkEnabled) return;
+
+        const readyCount = this.characterSelections.size;
+        const totalPlayers = this.players.length;
+
+        let statusText = `Players Ready: ${readyCount}/${totalPlayers}\n`;
+
+        // Show which players are ready
+        this.players.forEach((playerId, index) => {
+            const selection = this.characterSelections.get(playerId);
+            const playerNum = index + 1;
+            const shortId = playerId.slice(0, 8);
+
+            if (selection) {
+                const charName = this.characters.find(c => c.id === selection.characterId)?.name || 'Unknown';
+                statusText += `✓ Player ${playerNum} (${shortId}): ${charName}\n`;
+            } else {
+                statusText += `⏳ Player ${playerNum} (${shortId}): Not Ready\n`;
+            }
+        });
+
+        this.playerStatusText.setText(statusText);
+
+        // Update start button state
+        const allReady = this.checkAllPlayersReady();
+        if (allReady && this.isHost) {
+            this.startButtonBg.setFillStyle(0x00aa00);
+            this.startButton.setColor('#ffffff');
+            this.startButton.setText('START GAME');
+            this.startButtonBg.setInteractive({ useHandCursor: true });
+        } else if (this.isHost) {
+            this.startButtonBg.setFillStyle(0x444444);
+            this.startButton.setColor('#666666');
+            this.startButton.setText('WAITING FOR PLAYERS');
+        } else if (this.selectedCharacterId) {
+            this.startButtonBg.setFillStyle(0x444444);
+            this.startButton.setColor('#666666');
+            this.startButton.setText('WAITING FOR HOST');
+        }
+    }
+
+    private checkAllPlayersReady(): boolean {
+        if (!this.networkEnabled || this.players.length <= 1) {
+            return true; // Single player always ready
+        }
+
+        // Check if all players have made a selection
+        for (const playerId of this.players) {
+            if (!this.characterSelections.has(playerId)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private capitalize(str: string): string {

@@ -18,7 +18,7 @@ interface UIElements {
 export class LobbyUI {
     private lobbyScene: Lobby;
     private elements: UIElements = {};
-    public lobbyCodeRegex = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
+    public lobbyCodeRegex = /^[A-Z1-9]{6}$/;  // PlaySocketJS generates 6-character codes (A-Z, 1-9)
     constructor(scene: Lobby) {
         this.lobbyScene = scene;
     }

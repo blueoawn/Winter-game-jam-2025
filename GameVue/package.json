@@ -27,6 +27,7 @@
     "dependencies": {
         "peerjs": "^1.5.5",
         "phaser": "^3.90.0",
+        "playsocketjs": "^2.6.3",
         "terser": "^5.39.0",
         "vue": "^3.5.25"
     }

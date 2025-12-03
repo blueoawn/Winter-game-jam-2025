@@ -19,7 +19,6 @@ import EnemyFlying from "../gameObjects/EnemyFlying.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 
 import NetworkManager from '../../network/NetworkManager';
-import { MessageTypes } from '../../network/MessageTypes';
 import { StateSerializer } from '../../network/StateSerializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { BulletPool } from '../../managers/BulletPool.ts';
@@ -208,17 +207,27 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        if (this.isHost) {
-            // Host receives inputs from clients
-            NetworkManager.onMessage(MessageTypes.INPUT, (fromPeerId, payload) => {
-                this.playerManager?.applyInput(fromPeerId, payload.inputs);
-            });
-        } else {
-            // Client receives state from host
-            NetworkManager.onMessage(MessageTypes.STATE_SYNC, (fromPeerId, payload) => {
-                this.applyNetworkState(payload);
-            });
-        }
+        // Listen for storage updates (both host and clients)
+        NetworkManager.onStorageUpdate((storage: any) => {
+            if (this.isHost) {
+                // Host reads player inputs from storage
+                if (storage.playerInputs) {
+                    Object.entries(storage.playerInputs).forEach(([playerId, inputData]: [string, any]) => {
+                        // Skip own input (already processed locally)
+                        const localPlayerId = NetworkManager.getPlayerId();
+                        if (playerId !== localPlayerId) {
+                            // inputData has inputState properties spread at top level with timestamp
+                            this.playerManager?.applyInput(playerId, inputData);
+                        }
+                    });
+                }
+            } else {
+                // Clients receive game state from host via storage
+                if (storage.gameState) {
+                    this.applyNetworkState(storage.gameState);
+                }
+            }
+        });
     }
 
     updateSinglePlayer() {
@@ -318,7 +327,8 @@ export class GameScene extends Scene
             gameStarted: this.gameStarted
         }, this.lastStateSyncTime);  // Pass timestamp to avoid redundant Date.now()
 
-        NetworkManager.broadcast(MessageTypes.STATE_SYNC, state);
+        // Update game state in storage (will sync to all clients)
+        NetworkManager.updateGameState(state);
     }
 
     sendInputToHost() {
@@ -340,9 +350,8 @@ export class GameScene extends Scene
             ability2: abstractInput.ability2
         };
 
-        NetworkManager.sendToHost(MessageTypes.INPUT, {
-            inputs: inputState
-        });
+        // Update player input in storage (will sync to host)
+        NetworkManager.updatePlayerInput(inputState);
     }
 
     applyNetworkState(state: any) {

@@ -1,5 +1,4 @@
 import NetworkManager from '../../network/NetworkManager';
-import { MessageTypes } from '../../network/MessageTypes';
 import { LobbyUI } from '../ui/LobbyUI';
 
 interface LobbyInitData {
@@ -48,26 +47,24 @@ export class Lobby extends Phaser.Scene {
     async initializeNetworking(): Promise<void> {
         this.ui!.updateStatus('Connecting...', '#ffff00');
 
-        // Initialize PeerJS if not already initialized
-        if (!(NetworkManager as any).peer) {
-            await NetworkManager.initialize();
-        }
+        // Initialize PlaySocket
+        await NetworkManager.initialize();
 
-        // Setup message handlers
-        this.setupMessageHandlers();
+        // Setup storage update handler
+        this.setupStorageHandlers();
 
         if (this.mode === 'host') {
             this.ui!.changeMode('host');
-            this.hostGame();
+            await this.hostGame();
         } else if (this.mode === 'join') {
             this.ui!.changeMode('join');
             this.joinGame();
         }
     }
 
-    hostGame(): void {
+    async hostGame(): Promise<void> {
         this.isHost = true;
-        const roomCode = NetworkManager.hostGame();
+        const roomCode = await NetworkManager.hostGame();
 
         this.ui!.updateRoomCode(roomCode);
         this.ui!.updateStatus('Waiting for players to join...', '#00ff00');
@@ -80,7 +77,15 @@ export class Lobby extends Phaser.Scene {
         // Listen for players joining
         NetworkManager.onPlayerJoin((peerId: string) => {
             console.log('Player joined:', peerId);
-            this.connectedPlayers.push(peerId);
+
+            // Update players list in storage
+            const storage = NetworkManager.getStorage();
+            const players = storage?.players || [];
+            if (!players.includes(peerId)) {
+                players.push(peerId);
+            }
+
+            this.connectedPlayers = players;
             this.updatePlayerList();
             this.ui!.updateStatus(`${this.connectedPlayers.length} player(s) connected`, '#00ff00');
         });
@@ -110,21 +115,15 @@ export class Lobby extends Phaser.Scene {
             this.ui!.changeMode('host');
             this.ui!.updateStatus('Connected! Waiting for host to start game...', '#00ff00');
 
-            // Add self to player list
-            const stats = NetworkManager.getStats();
-            this.connectedPlayers = stats.playerId ? [stats.playerId] : [];
+            // Get current players from storage
+            const storage = NetworkManager.getStorage();
+            this.connectedPlayers = storage?.players || [];
             this.updatePlayerList();
 
-            // Listen for start game message from host
-            NetworkManager.onMessage(MessageTypes.START_GAME, (_fromPeerId: string, payload: StartGamePayload) => {
-                console.log('Game starting!');
-                this.startGame(payload);
-            });
-
-            // Listen for connection lost
+            // Listen for host disconnect
             NetworkManager.onPlayerLeave((peerId: string) => {
-                const hostConn = (NetworkManager as any).hostConnection;
-                if (peerId === hostConn?.peer) {
+                const storage = NetworkManager.getStorage();
+                if (peerId === storage?.hostId) {
                     this.ui!.showError('Connection to host lost');
                     setTimeout(() => this.onBackToMenu(), 2000);
                 }
@@ -137,10 +136,22 @@ export class Lobby extends Phaser.Scene {
         }
     }
 
-    setupMessageHandlers(): void {
-        // Handle player join acknowledgment (if needed)
-        NetworkManager.onMessage(MessageTypes.PLAYER_JOIN, (_fromPeerId: string, payload: any) => {
-            console.log('Player join message:', payload);
+    setupStorageHandlers(): void {
+        // Listen for storage updates
+        NetworkManager.onStorageUpdate((storage: any) => {
+            console.log('Lobby storage updated:', storage);
+
+            // Update player list
+            if (storage.players) {
+                this.connectedPlayers = storage.players;
+                this.updatePlayerList();
+            }
+
+            // Check if game is starting
+            if (storage.isGameStarted && storage.startGameData) {
+                console.log('Game starting!');
+                this.startGame(storage.startGameData);
+            }
         });
     }
 
@@ -159,13 +170,24 @@ export class Lobby extends Phaser.Scene {
             return;
         }
 
-        // Broadcast start game message to all clients
-        NetworkManager.broadcast(MessageTypes.START_GAME, {
-            players: this.connectedPlayers
-        });
+        const startGameData = { players: this.connectedPlayers };
 
-        // Start game for host
-        this.startGame({ players: this.connectedPlayers });
+        // Update storage to signal game start (will sync to all clients)
+        const storage = NetworkManager.getStorage();
+        if (storage) {
+            storage.isGameStarted = true;
+            storage.startGameData = startGameData;
+
+            // This will trigger storage update for all clients
+            const socket = (NetworkManager as any).socket;
+            if (socket) {
+                socket.updateStorage('isGameStarted', 'set', true);
+                socket.updateStorage('startGameData', 'set', startGameData);
+            }
+        }
+
+        // Start game for host immediately
+        this.startGame(startGameData);
     }
 
     startGame(data: StartGamePayload): void {
