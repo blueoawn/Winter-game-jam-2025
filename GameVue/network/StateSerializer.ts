@@ -55,7 +55,9 @@ export interface InputState {
     movementSpeed: number;
     velocity: Vector2;
     rotation: number;
-    fire: boolean;
+    ability1: boolean;  // Primary ability (was "fire")
+    ability2: boolean;  // Secondary ability
+    fire?: boolean;     // Deprecated - kept for backward compatibility
 }
 
 export interface SerializedInput {
@@ -205,17 +207,11 @@ export class StateSerializer {
     }
 
     // Serialize input state
-    static serializeInput(playerId: string, inputs: Partial<InputState>): SerializedInput {
+    static serializeInput(playerId: string, inputs: InputState): SerializedInput {
         return {
             playerId,
             timestamp: Date.now(),
-            inputs: {
-                left: inputs.left || false,
-                right: inputs.right || false,
-                up: inputs.up || false,
-                down: inputs.down || false,
-                fire: inputs.fire || false
-            }
+            inputs: inputs
         };
     }
 }

@@ -1,11 +1,13 @@
-import Player from '../src/gameObjects/Player';
+import { PlayerController } from './PlayerController';
+import { LizardWizard } from '../src/gameObjects/Characters/LizardWizard';
+import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
 import type { GameScene } from '../src/scenes/Game';
 import type { InputState, PlayerState } from '../network/StateSerializer';
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
     private scene: GameScene;
-    private players: Map<string, Player>;
+    private players: Map<string, PlayerController>;
     private localPlayerId: string | null;
 
     constructor(scene: GameScene) {
@@ -15,23 +17,30 @@ export class PlayerManager {
     }
 
     // Create a player instance
-    createPlayer(playerId: string, isLocal: boolean = false, shipId: number | null = null): Player {
+    createPlayer(
+        playerId: string,
+        isLocal: boolean = false,
+        characterType: 'LizardWizard' | 'SwordAndBoard' = 'LizardWizard',
+        shipId: number | null = null
+    ): PlayerController {
         if (this.players.has(playerId)) {
             console.warn('Player already exists:', playerId);
             return this.players.get(playerId)!;
-        }
-
-        // Assign ship ID based on player count if not specified
-        if (shipId === null) {
-            shipId = this.players.size % 12;  // 12 ship sprites available
         }
 
         // Calculate spawn position
         const spawnX = this.scene.scale.width * 0.5;
         const spawnY = this.scene.scale.height - 100;
 
-        // Create player instance
-        const player = new Player(this.scene, spawnX, spawnY, shipId);
+        // Create character instance based on type
+        let player: PlayerController;
+
+        if (characterType === 'LizardWizard') {
+            player = new LizardWizard(this.scene, spawnX, spawnY);
+        } else {
+            player = new SwordAndBoard(this.scene, spawnX, spawnY);
+        }
+
         (player as any).playerId = playerId;
         (player as any).isLocal = isLocal;
 
@@ -41,7 +50,7 @@ export class PlayerManager {
             this.localPlayerId = playerId;
         }
 
-        console.log(`Created player: ${playerId} (local: ${isLocal}, shipId: ${shipId})`);
+        console.log(`Created player: ${playerId} (${characterType}, local: ${isLocal})`);
 
         return player;
     }
@@ -57,17 +66,17 @@ export class PlayerManager {
     }
 
     // Get a specific player
-    getPlayer(playerId: string): Player | undefined {
+    getPlayer(playerId: string): PlayerController | undefined {
         return this.players.get(playerId);
     }
 
     // Get the local player
-    getLocalPlayer(): Player | null {
+    getLocalPlayer(): PlayerController | null {
         return this.localPlayerId ? this.players.get(this.localPlayerId) || null : null;
     }
 
     // Get all players as an array
-    getAllPlayers(): Player[] {
+    getAllPlayers(): PlayerController[] {
         return Array.from(this.players.values());
     }
 
@@ -88,8 +97,8 @@ export class PlayerManager {
     // Apply input state to a player (host uses this for all players)
     applyInput(playerId: string, inputState: InputState): void {
         const player = this.players.get(playerId);
-        if (player && (player as Player).applyInput) {
-            (player as Player).applyInput(inputState);
+        if (player && (player as PlayerController).applyInput) {
+            (player as PlayerController).applyInput(inputState);
         }
     }
 

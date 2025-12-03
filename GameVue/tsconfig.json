@@ -25,5 +25,5 @@
     },
     "include": [
         "src"
-    ]
+, "managers/PlayerController.ts"    ]
 }

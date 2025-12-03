@@ -1,5 +1,8 @@
 import { Scene } from 'phaser';
-import Player from "../gameObjects/Player.ts";
+import { PlayerController } from "../../managers/PlayerController.ts";
+import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
+import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
+import { ButtonMapper } from "../../managers/ButtonMapper.ts";
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
 import TilemapLayer = Phaser.Tilemaps.TilemapLayer;
@@ -18,7 +21,7 @@ import Explosion from "../gameObjects/Explosion.ts";
 import NetworkManager from '../../network/NetworkManager';
 import { MessageTypes } from '../../network/MessageTypes';
 import { StateSerializer } from '../../network/StateSerializer';
-import { PlayerManager } from '../../managers/PlayerManager';
+import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 
 
 export class GameScene extends Scene
@@ -53,6 +56,7 @@ export class GameScene extends Scene
     isHost: boolean = false;
     players: string[] = [];
     playerManager: PlayerManager | null = null;
+    buttonMapper: ButtonMapper | null = null;
     stateSyncRate: number;
     lastStateSyncTime: number;
     inputSendRate: number;
@@ -78,6 +82,9 @@ export class GameScene extends Scene
         this.initVariables();
         this.initGameUi();
         this.initAnimations();
+
+        // Initialize ButtonMapper for input
+        this.buttonMapper = new ButtonMapper(this);
 
         if (this.networkEnabled) {
             this.initMultiplayer();
@@ -136,9 +143,9 @@ export class GameScene extends Scene
     }
 
     initSinglePlayer() {
-        // Create single player
-        this.player = new Player(this, this.centreX, this.scale.height - 100, 8);
-        this.player.isLocal = true;
+        // Create single player with LizardWizard character
+        this.player = new LizardWizard(this, this.centreX, this.scale.height - 100);
+        (this.player as any).isLocal = true;
         this.playerManager = null;
     }
 
@@ -146,11 +153,13 @@ export class GameScene extends Scene
         // Create PlayerManager
         this.playerManager = new PlayerManager(this);
 
-        // Create all players
+        // Create all players with character assignments
         const localPlayerId = NetworkManager.getStats().playerId;
         this.players.forEach((playerId, index) => {
             const isLocal = (playerId === localPlayerId);
-            this.playerManager!.createPlayer(playerId, isLocal, index);
+            // Player 0 = LizardWizard, Player 1 = SwordAndBoard
+            const characterType = (index === 0) ? 'LizardWizard' : 'SwordAndBoard';
+            this.playerManager!.createPlayer(playerId, isLocal, characterType, index);
         });
 
         // Set up network message handlers
@@ -174,8 +183,19 @@ export class GameScene extends Scene
     }
 
     updateSinglePlayer() {
-        if (this.player && this.player.update) {
-            this.player.update();
+        if (!this.player || !this.buttonMapper) return;
+
+        // Get input from ButtonMapper
+        const input = this.buttonMapper.getInput();
+
+        // Process input
+        (this.player as PlayerController).processInput(input);
+
+        // Store for potential network serialization
+        (this.player as PlayerController).storeInputForNetwork(input);
+
+        if ((this.player as any).update) {
+            (this.player as any).update();
         }
     }
 
@@ -231,14 +251,26 @@ export class GameScene extends Scene
     }
 
     sendInputToHost() {
-        if (!this.playerManager) return;
+        if (!this.playerManager || !this.buttonMapper) return;
 
-        const input = this.playerManager.collectLocalInput();
-        if (input) {
-            NetworkManager.sendToHost(MessageTypes.INPUT, {
-                inputs: input
-            });
-        }
+        const localPlayer = this.playerManager.getLocalPlayer();
+        if (!localPlayer) return;
+
+        // Get abstract input from ButtonMapper
+        const abstractInput = this.buttonMapper.getInput();
+
+        // Convert to network InputState
+        const inputState = {
+            movementSpeed: (localPlayer as any).characterSpeed,
+            velocity: abstractInput.movement,
+            rotation: localPlayer.rotation,
+            ability1: abstractInput.ability1,
+            ability2: abstractInput.ability2
+        };
+
+        NetworkManager.sendToHost(MessageTypes.INPUT, {
+            inputs: inputState
+        });
     }
 
     applyNetworkState(state: any) {
@@ -311,9 +343,7 @@ export class GameScene extends Scene
         // TODO: Set up collisions for multiplayer mode with all players
     }
 
-    initPlayer() {
-        this.player = new Player(this, this.centreX, this.scale.height - 100, 8);
-    }
+    // initPlayer() removed - now using initSinglePlayer() and initMultiplayer() with character classes
 
     initInput() {
         this.cursors = this.input.keyboard?.createCursorKeys();
@@ -442,7 +472,7 @@ export class GameScene extends Scene
         new Explosion(this, x, y);
     }
 
-    hitPlayer(player: Player, obstacle) {
+    hitPlayer(player: PlayerController, obstacle: any) {
         this.addExplosion(player.x, player.y);
         player.hit(obstacle.getPower());
         //obstacle.die(); disabled
