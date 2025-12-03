@@ -740,8 +740,10 @@ export class GameScene extends Scene
     hitPlayer(player: PlayerController, obstacle: EnemyBullet) {
         this.addExplosion(player.x, player.y);
         player.hit(obstacle.getPower());
-        //obstacle.die(); disabled
-        this.GameOver();
+        obstacle.die();
+        if (player.health <= 0) {
+            this.GameOver();
+        }
     }
 
     hitEnemy(bullet: PlayerBullet, enemy: EnemyFlying) {

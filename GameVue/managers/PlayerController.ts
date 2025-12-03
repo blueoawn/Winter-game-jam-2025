@@ -2,6 +2,7 @@ import ASSETS from '../src/assets.js';
 import { GameScene } from "../src/scenes/Game.ts";
 import type { InputState, PlayerState } from '../network/StateSerializer.ts';
 import Vector2 = Phaser.Math.Vector2;
+import Container = Phaser.GameObjects.Container;
 
 export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     protected characterSpeed = 1000;
@@ -13,11 +14,13 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     protected ability2Cooldown = 0;
     fireRate = 10;  // Keep for backward compatibility
     fireCounter = 0;
-    health = 1;
+    maxHealth = 1;
+    health = this.maxHealth;
     gameScene: GameScene;
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
+    healthBarContainer: Container;
     protected currentAim: Vector2;  // Store current aim position for abilities
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
@@ -31,11 +34,14 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
+        this.createHealthBar();
+        this.handleDestruction();
     }
 
     preUpdate(time: number, delta: number) {
         super.preUpdate(time, delta);
 
+        this.updateHealthBarPosition();
         if (this.fireCounter > 0) this.fireCounter--;
         if (this.ability1Cooldown > 0) this.ability1Cooldown--;
         if (this.ability2Cooldown > 0) this.ability2Cooldown--;
@@ -125,7 +131,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
 
     hit(damage: number) {
         this.health -= damage;
-
+        this.updateHealthBarValue();
         if (this.health <= 0) this.die();
     }
 
@@ -167,6 +173,47 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
             ability1: false,
             ability2: false
         };
+    }
+
+    createHealthBar(): void {
+        // Create rectangles at (0, 0) since they're relative to the container
+        const healthBarBottom = this.scene.add.rectangle(0, 0, this.width, 10, 0xff0000);
+        const healthBarTop = this.scene.add.rectangle(0, 0, this.width, 10, 0x08ff00);
+        // Create container at player position
+        this.healthBarContainer = this.scene.add.container(this.x, this.y - this.height, [
+            healthBarBottom,
+            healthBarTop
+        ]);
+
+        // Set depth on the container, not individual rectangles
+        this.healthBarContainer.setDepth(101); // Higher than player depth (100)
+    }
+
+    updateHealthBarPosition(): void {
+        this.healthBarContainer.x = this.x;
+        this.healthBarContainer.y = this.y + this.height;
+    }
+
+    updateHealthBarValue(): void {
+        const remainingHealthRatio = this.health / this.maxHealth;
+        const fullHealthWidth = (this.healthBarContainer.list[0] as Phaser.GameObjects.Rectangle).width;
+        const remainingHealthWidth = fullHealthWidth * remainingHealthRatio;
+        if (remainingHealthRatio <= 0) {
+            (this.healthBarContainer.list[1] as Phaser.GameObjects.Rectangle).width = 0;
+        } else {
+            (this.healthBarContainer.list[1] as Phaser.GameObjects.Rectangle).width = remainingHealthWidth;
+        }
+    }
+
+    handleDestruction(): void {
+        this.on('destroy', () => {
+            // Delay destruction of health bar to ensure it is visible when player dies
+            // Because instantly destroying it after death would be kinda jank?? idk
+            const delayedDestructionTimer = this.gameScene.time.delayedCall(1000, () => {
+                this.healthBarContainer.destroy();
+                delayedDestructionTimer.destroy();
+            });
+        });
     }
 
     private lastNetworkInput: InputState | null = null;

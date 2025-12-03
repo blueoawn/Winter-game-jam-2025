@@ -6,11 +6,11 @@ interface CharacterData {
     name: string;
     frame: number;
     description: string;
-    // stats: {
-    //     speed: string;
-    //     health: string;
-    //     fireRate: string;
-    // };
+    stats: {
+        speed: string;
+        health: string;
+        fireRate: string;
+    };
     ability1: string;
     ability2: string;
 }
@@ -22,11 +22,11 @@ export class CharacterSelectScene extends Scene {
             name: 'Lizard Wizard',
             frame: 0,
             description: 'Fast and deadly, but fragile',
-            // stats: {
-            //     speed: 'Very Fast',
-            //     health: 'Low',
-            //     fireRate: 'Fast'
-            // },
+            stats: {
+                speed: 'Very Fast',
+                health: 'Low',
+                fireRate: 'Fast'
+            },
             ability1: 'Rapid Fire',
             ability2: 'Spread Shot (3 projectiles)'
         },
@@ -35,11 +35,11 @@ export class CharacterSelectScene extends Scene {
             name: 'Sword & Board',
             frame: 1,
             description: 'Tanky and defensive',
-            // stats: {
-            //     speed: 'Slow',
-            //     health: 'High',
-            //     fireRate: 'Slow'
-            // },
+            stats: {
+                speed: 'Slow',
+                health: 'High',
+                fireRate: 'Slow'
+            },
             ability1: 'Melee Attack',
             ability2: 'Shield (blocks damage)'
         }
@@ -90,10 +90,10 @@ export class CharacterSelectScene extends Scene {
         this.createCharacterCards(centerX, centerY);
 
         // Create start button (initially disabled)
-        this.createStartButton(centerX, this.scale.height - 100);
+        this.createStartButton(centerX, this.scale.height - 80);
 
         // Instructions
-        this.add.text(centerX, this.scale.height - 40, 'Click a character to select', {
+        this.add.text(centerX, this.scale.height - 30, 'Click a character to select', {
             fontFamily: 'Arial',
             fontSize: '20px',
             color: '#cccccc',
@@ -148,61 +148,60 @@ export class CharacterSelectScene extends Scene {
             align: 'center'
         }).setOrigin(0.5);
         container.add(descText);
-        // Offset for anything we want to put in the card below description
+
+        // Layout Stats and Abilities side by side
+        const leftX = -120;  // Left column X position
+        const rightX = 30;  // Right column X position
         let yOffset = 50;
 
-        // // Stats
-        // const statsTitle = this.add.text(0, yOffset, 'Stats:', {
-        //     fontFamily: 'Arial Black',
-        //     fontSize: '20px',
-        //     color: '#ffff00',
-        //     align: 'center'
-        // }).setOrigin(0.5);
-        // container.add(statsTitle);
-        // yOffset += 30;
+        // Stats (Left column)
+        const statsTitle = this.add.text(leftX, yOffset, 'Stats:', {
+            fontFamily: 'Arial Black',
+            fontSize: '20px',
+            color: '#ffff00',
+            align: 'left'
+        }).setOrigin(0, 0.5);
+        container.add(statsTitle);
 
-        //TODO : Re-add stats display later, with different names and format
-        // Probably as bars instead of text
+        let statsY = yOffset + 30;
+        Object.entries(character.stats).forEach(([key, value]) => {
+            const statText = this.add.text(leftX, statsY, `${this.capitalize(key)}: ${value}`, {
+                fontFamily: 'Arial',
+                fontSize: '14px',
+                color: '#ffffff',
+                align: 'left'
+            }).setOrigin(0, 0.5);
+            container.add(statText);
+            statsY += 25;
+        });
 
-        // Object.entries(character.stats).forEach(([key, value]) => {
-        //     const statText = this.add.text(0, yOffset, `${this.capitalize(key)}: ${value}`, {
-        //         fontFamily: 'Arial',
-        //         fontSize: '16px',
-        //         color: '#ffffff',
-        //         align: 'center'
-        //     }).setOrigin(0.5);
-        //     container.add(statText);
-        //     yOffset += 25;
-        // });
-
-        // Abilities
-        yOffset += 10;
-        const abilitiesTitle = this.add.text(0, yOffset, 'Abilities:', {
+        // Abilities (Right column)
+        const abilitiesTitle = this.add.text(rightX, yOffset, 'Abilities:', {
             fontFamily: 'Arial Black',
             fontSize: '20px',
             color: '#00ffff',
-            align: 'center'
-        }).setOrigin(0.5);
+            align: 'left'
+        }).setOrigin(0, 0.5);
         container.add(abilitiesTitle);
-        yOffset += 30;
 
-        const ability1Text = this.add.text(0, yOffset, `1: ${character.ability1}`, {
+        let abilitiesY = yOffset + 30;
+        const ability1Text = this.add.text(rightX, abilitiesY, `1: ${character.ability1}`, {
             fontFamily: 'Arial',
             fontSize: '14px',
             color: '#ffffff',
-            align: 'center',
-            wordWrap: { width: cardWidth - 40 }
-        }).setOrigin(0.5);
+            align: 'left',
+            wordWrap: { width: 120 }
+        }).setOrigin(0, 0.5);
         container.add(ability1Text);
-        yOffset += 30;
+        abilitiesY += 40;
 
-        const ability2Text = this.add.text(0, yOffset, `2: ${character.ability2}`, {
+        const ability2Text = this.add.text(rightX, abilitiesY, `2: ${character.ability2}`, {
             fontFamily: 'Arial',
             fontSize: '14px',
             color: '#ffffff',
-            align: 'center',
-            wordWrap: { width: cardWidth - 40 }
-        }).setOrigin(0.5);
+            align: 'left',
+            wordWrap: { width: 120 }
+        }).setOrigin(0, 0.5);
         container.add(ability2Text);
 
         // Make card interactive

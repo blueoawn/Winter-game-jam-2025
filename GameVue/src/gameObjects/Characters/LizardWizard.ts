@@ -8,7 +8,8 @@ export class LizardWizard extends PlayerController {
         // Override stats - fast and fragile
         this.characterSpeed = 800;
         this.velocityMax = 450;
-        this.health = 1;
+        this.maxHealth = 1;
+        this.health = this.maxHealth;
         this.ability1Rate = 10;   // Fast fire rate
         this.ability2Rate = 120;  // Special ability every 2 seconds
     }

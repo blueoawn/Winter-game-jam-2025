@@ -12,7 +12,8 @@ export class SwordAndBoard extends PlayerController {
         // Override stats - slow but tanky
         this.characterSpeed = 600;
         this.velocityMax = 350;
-        this.health = 3;  // More health
+        this.maxHealth = 3;  // More health
+        this.health = this.maxHealth;
         this.ability1Rate = 20;   // Slower attack
         this.ability2Rate = 180;  // Shield every 3 seconds
 
@@ -51,7 +52,7 @@ export class SwordAndBoard extends PlayerController {
 
     spawnShield(): void {
         // TODO Use a proper shield graphic
-        this.shield = this.gameScene.add.rectangle(0, 0, 100, 10, 0x00ff00);
+        this.shield = this.gameScene.add.rectangle(0, 0, 100, 10, 0x4c4c4c);
         this.gameScene.physics.add.existing(this.shield);
         // Make it a dynamic body
         (this.shield.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
