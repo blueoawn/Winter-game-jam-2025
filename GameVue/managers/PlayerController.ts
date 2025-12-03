@@ -18,6 +18,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
+    protected currentAim: Vector2;  // Store current aim position for abilities
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
         super(scene, x, y, ASSETS.spritesheet.ships.key, shipId);
@@ -29,6 +30,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         this.gameScene = scene;
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
+        this.currentAim = new Vector2(x, y);  // Initialize aim to player position
     }
 
     preUpdate(time: number, delta: number) {
@@ -74,13 +76,19 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         const speed = ('movementSpeed' in input) ? input.movementSpeed : this.characterSpeed;
         this.setVelocity(movement.x * speed, movement.y * speed);
 
-        // Handle rotation
-        if ('aim' in input) {
+        // Handle rotation and aim
+        if ('aim' in input && input.aim) {
+            this.currentAim = input.aim;  // Store aim position for abilities
             this.rotation = Phaser.Math.Angle.Between(
                 this.x, this.y, input.aim.x, input.aim.y
             ) + Math.PI / 2;
         } else {
             this.rotation = input.rotation;
+            // If no aim provided, use rotation to calculate aim position ahead of player
+            this.currentAim = new Vector2(
+                this.x + Math.cos(this.rotation - Math.PI / 2) * 100,
+                this.y + Math.sin(this.rotation - Math.PI / 2) * 100
+            );
         }
 
         // Handle abilities

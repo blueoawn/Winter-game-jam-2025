@@ -18,9 +18,10 @@ export class SwordAndBoard extends PlayerController {
         if (!this.canUseAbility1()) return;
 
         // Melee attack (fires short-range projectile for now)
+        // Uses stored aim position (works for both local and network input)
         this.gameScene.fireBullet(
             {x: this.x, y: this.y},
-            {x: this.gameScene.input.mousePointer.x, y: this.gameScene.input.mousePointer.y}
+            {x: this.currentAim.x, y: this.currentAim.y}
         );
 
         this.startAbility1Cooldown();

@@ -20,8 +20,9 @@ export class ButtonMapper {
     private gamepad: Phaser.Input.Gamepad.Gamepad | null = null;
 
     // Mapping dictionaries for remappable controls
+    // Action -> button index
     private keyboardMap: Map<string, number> = new Map();
-    private gamepadMap: Map<string, number> = new Map();  // Action -> button index
+    private gamepadMap: Map<string, number> = new Map();  
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;

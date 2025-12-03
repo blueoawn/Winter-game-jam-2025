@@ -17,10 +17,10 @@ export class LizardWizard extends PlayerController {
     protected ability1(): void {
         if (!this.canUseAbility1()) return;
 
-        // Fire projectile
+        // Fire projectile using stored aim position (works for both local and network input)
         this.gameScene.fireBullet(
             {x: this.x, y: this.y},
-            {x: this.gameScene.input.mousePointer.x, y: this.gameScene.input.mousePointer.y}
+            {x: this.currentAim.x, y: this.currentAim.y}
         );
 
         this.startAbility1Cooldown();

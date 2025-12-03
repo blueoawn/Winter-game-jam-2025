@@ -55,9 +55,10 @@ export interface InputState {
     movementSpeed: number;
     velocity: Vector2;
     rotation: number;
-    ability1: boolean;  // Primary ability (was "fire")
+    aim?: Vector2;      // Aim position in world coordinates
+    ability1: boolean;  // Primary ability
     ability2: boolean;  // Secondary ability
-    fire?: boolean;     // Deprecated - kept for backward compatibility
+    fire?: boolean;     // Deprecated
 }
 
 export interface SerializedInput {
@@ -125,9 +126,9 @@ interface GameState {
 
 export class StateSerializer {
     // Serialize full game state for transmission
-    static serialize(gameState: GameState): SerializedGameState {
+    static serialize(gameState: GameState, timestamp?: number): SerializedGameState {
         return {
-            timestamp: Date.now(),
+            timestamp: timestamp || Date.now(),  // Reuse timestamp if provided
             tick: gameState.tick || 0,
             players: this.serializePlayers(gameState.players),
             enemies: this.serializeEnemies(gameState.enemies),
@@ -158,52 +159,67 @@ export class StateSerializer {
         };
     }
 
-    // Serialize player data
+    // Serialize player data (Phase 2 optimization: direct access, no optional chaining)
     static serializePlayers(players?: PlayerObject[]): PlayerState[] {
         if (!players || !Array.isArray(players)) return [];
 
-        return players.map(player => ({
-            id: player.id || player.playerId || '',
-            x: Math.round(player.x * 10) / 10,  // Round to 1 decimal for bandwidth
-            y: Math.round(player.y * 10) / 10,
-            velocityX: Math.round(player.body?.velocity?.x || 0),
-            velocityY: Math.round(player.body?.velocity?.y || 0),
-            health: player.health || 0,
-            frame: player.frame?.name || 0,
-            rotation: player.rotation || 0
-        }));
+        const result: PlayerState[] = [];
+        for (let i = 0; i < players.length; i++) {
+            const p = players[i];
+            result.push({
+                id: p.id || p.playerId || '',  // Keep fallback for ID (critical field)
+                x: Math.round(p.x * 10) / 10,  // Round to 1 decimal for bandwidth
+                y: Math.round(p.y * 10) / 10,
+                velocityX: p.body && p.body.velocity && p.body.velocity.x !== undefined ? Math.round(p.body.velocity.x) : 0,
+                velocityY: p.body && p.body.velocity && p.body.velocity.y !== undefined ? Math.round(p.body.velocity.y) : 0,
+                health: p.health,
+                frame: p.frame && p.frame.name !== undefined ? p.frame.name : 0,
+                rotation: p.rotation
+            });
+        }
+        return result;
     }
 
-    // Serialize enemy data
+    // Serialize enemy data (Phase 2 optimization: direct access, for loop)
     static serializeEnemies(enemies?: EnemyObject[]): EnemyState[] {
         if (!enemies || !Array.isArray(enemies)) return [];
 
-        return enemies.map(enemy => ({
-            id: enemy.enemyId || enemy.id || '',
-            x: Math.round(enemy.x * 10) / 10,
-            y: Math.round(enemy.y * 10) / 10,
-            health: enemy.health || 0,
-            pathProgress: enemy.pathProgress || 0,
-            shipId: enemy.shipId,
-            pathId: enemy.pathId,
-            power: enemy.power
-        }));
+        const result: EnemyState[] = [];
+        for (let i = 0; i < enemies.length; i++) {
+            const e = enemies[i];
+            result.push({
+                id: e.enemyId || e.id || '',  // Keep fallback for ID
+                x: Math.round(e.x * 10) / 10,
+                y: Math.round(e.y * 10) / 10,
+                health: e.health,
+                pathProgress: e.pathProgress,
+                shipId: e.shipId,
+                pathId: e.pathId,
+                power: e.power
+            });
+        }
+        return result;
     }
 
-    // Serialize bullet data
+    // Serialize bullet data (Phase 2 optimization: direct access, for loop)
     static serializeBullets(bullets?: BulletObject[]): BulletState[] {
         if (!bullets || !Array.isArray(bullets)) return [];
 
-        return bullets.map(bullet => ({
-            id: bullet.bulletId || bullet.id || '',
-            x: Math.round(bullet.x * 10) / 10,
-            y: Math.round(bullet.y * 10) / 10,
-            velocityX: Math.round(bullet.body?.velocity?.x || 0),
-            velocityY: Math.round(bullet.body?.velocity?.y || 0),
-            ownerId: bullet.ownerId,
-            type: bullet.type || 'player',
-            power: bullet.power || 1
-        }));
+        const result: BulletState[] = [];
+        for (let i = 0; i < bullets.length; i++) {
+            const b = bullets[i];
+            result.push({
+                id: b.bulletId || b.id || '',  // Keep fallback for ID
+                x: Math.round(b.x * 10) / 10,
+                y: Math.round(b.y * 10) / 10,
+                velocityX: b.body && b.body.velocity && b.body.velocity.x !== undefined ? Math.round(b.body.velocity.x) : 0,
+                velocityY: b.body && b.body.velocity && b.body.velocity.y !== undefined ? Math.round(b.body.velocity.y) : 0,
+                ownerId: b.ownerId,
+                type: b.type || 'player',
+                power: b.power || 1
+            });
+        }
+        return result;
     }
 
     // Serialize input state
