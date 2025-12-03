@@ -77,12 +77,20 @@ export class GameScene extends Scene
     }
 
     init(data: any): void {
-        // Receive data from Lobby scene
+        // Receive data from CharacterSelect scene
         this.networkEnabled = data?.networkEnabled || false;
         this.isHost = data?.isHost || false;
         this.players = data?.players || [];
 
-        console.log('Game initialized:', { networkEnabled: this.networkEnabled, isHost: this.isHost, players: this.players });
+        // Store selected character ID
+        (this as any).selectedCharacterId = data?.characterId || 'lizard-wizard';
+
+        console.log('Game initialized:', {
+            networkEnabled: this.networkEnabled,
+            isHost: this.isHost,
+            players: this.players,
+            characterId: (this as any).selectedCharacterId
+        });
     }
 
     create ()
@@ -155,10 +163,28 @@ export class GameScene extends Scene
     }
 
     initSinglePlayer() {
-        // Create single player with LizardWizard character
-        this.player = new LizardWizard(this, this.centreX, this.scale.height - 100);
+        // Create single player with selected character
+        const characterId = (this as any).selectedCharacterId || 'lizard-wizard';
+        const characterType = this.getCharacterType(characterId);
+
+        if (characterType === 'LizardWizard') {
+            this.player = new LizardWizard(this, this.centreX, this.scale.height - 100);
+        } else {
+            this.player = new SwordAndBoard(this, this.centreX, this.scale.height - 100);
+        }
+
         (this.player as any).isLocal = true;
         this.playerManager = null;
+    }
+
+    getCharacterType(characterId: string): 'LizardWizard' | 'SwordAndBoard' {
+        if (characterId === 'lizard-wizard') {
+            return 'LizardWizard';
+        } else if (characterId === 'sword-and-board') {
+            return 'SwordAndBoard';
+        }
+        // Default to LizardWizard if unknown
+        return 'LizardWizard';
     }
 
     initMultiplayer() {

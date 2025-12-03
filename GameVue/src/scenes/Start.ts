@@ -89,8 +89,8 @@ export class Start extends Phaser.Scene {
     }
 
     startSoloGame() {
-        // Start game without networking
-        this.scene.start('GameScene', {
+        // Start character select for single player
+        this.scene.start('CharacterSelectScene', {
             networkEnabled: false,
             isHost: false,
             players: []

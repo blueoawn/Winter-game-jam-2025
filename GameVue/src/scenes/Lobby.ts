@@ -177,8 +177,8 @@ export class Lobby extends Phaser.Scene {
             players: data.players || this.connectedPlayers
         };
 
-        // Transition to Game scene
-        this.scene.start('GameScene', gameData);
+        // Transition to Character Select scene
+        this.scene.start('CharacterSelectScene', gameData);
     }
 
     onBackToMenu(): void {
