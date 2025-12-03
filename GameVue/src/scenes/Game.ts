@@ -63,9 +63,11 @@ export class GameScene extends Scene
     inputSendRate: number;
     lastInputSendTime: number;
     tick: number;
-    syncedBullets: Map<string, PlayerBullet> = new Map();  // Track network-synced bullets
+    syncedBullets: Map<string, PlayerBullet> = new Map();  // Track network-synced player bullets
+    syncedEnemyBullets: Map<string, EnemyBullet> = new Map();  // Track network-synced enemy bullets
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
-    bulletIdCache: Set<string> = new Set();  // Reusable Set for bullet ID tracking
+    bulletIdCache: Set<string> = new Set();  // Reusable Set for player bullet ID tracking
+    enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     bulletPool: BulletPool;  // Object pool for efficient bullet management (Phase 2 optimization)
 
@@ -266,12 +268,23 @@ export class GameScene extends Scene
     broadcastState() {
         if (!this.playerManager) return;
 
+        // Phase 3: Limit entity counts to prevent "Message too big" errors
+        const allEnemies = this.enemyGroup.getChildren();
+        const allEnemyBullets = this.enemyBulletGroup.getChildren();
+
+        // Limit enemies to 30 max (should be enough for multiplayer)
+        const enemies = allEnemies.length > 30 ? allEnemies.slice(0, 30) : allEnemies;
+
+        // Limit enemy bullets to 50 max (prevent packet overflow)
+        const enemyBullets = allEnemyBullets.length > 50 ? allEnemyBullets.slice(0, 50) : allEnemyBullets;
+
         // Reuse timestamp from rate limiting check to avoid redundant Date.now() calls
         const state = StateSerializer.serialize({
             tick: this.tick,
             players: this.playerManager.getAllPlayers() as any,
-            enemies: this.enemyGroup.getChildren() as any,
+            enemies: enemies as any,
             bullets: this.playerBulletGroup.getChildren() as any,
+            enemyBullets: enemyBullets as any,  // Limited enemy bullets
             score: this.score,
             scrollMovement: this.scrollMovement,
             spawnEnemyCounter: this.spawnEnemyCounter,
@@ -368,6 +381,55 @@ export class GameScene extends Scene
                     this.playerBulletGroup.remove(bullet, false, false);
                     this.bulletPool.release(bullet);
                     this.syncedBullets.delete(id);
+                }
+            });
+        }
+
+        // Sync enemy bullets from host
+        if (state.enemyBullets && Array.isArray(state.enemyBullets)) {
+            this.enemyBulletIdCache.clear();
+
+            state.enemyBullets.forEach((bulletState: any) => {
+                this.enemyBulletIdCache.add(bulletState.id);
+
+                // Check if enemy bullet already exists
+                let bullet = this.syncedEnemyBullets.get(bulletState.id);
+
+                if (!bullet) {
+                    // Create new enemy bullet
+                    bullet = new EnemyBullet(
+                        this,
+                        bulletState.x,
+                        bulletState.y,
+                        bulletState.power
+                    );
+
+                    // Override generated ID with network state ID for sync
+                    bullet.id = bulletState.id;
+
+                    // Set velocity from network state
+                    if (bullet.body) {
+                        bullet.body.velocity.x = bulletState.velocityX;
+                        bullet.body.velocity.y = bulletState.velocityY;
+                    }
+
+                    this.enemyBulletGroup.add(bullet);
+                    this.syncedEnemyBullets.set(bulletState.id, bullet);
+                } else {
+                    // Update existing enemy bullet position and velocity
+                    bullet.setPosition(bulletState.x, bulletState.y);
+                    if (bullet.body) {
+                        bullet.body.velocity.x = bulletState.velocityX;
+                        bullet.body.velocity.y = bulletState.velocityY;
+                    }
+                }
+            });
+
+            // Remove enemy bullets that are no longer in the state
+            this.syncedEnemyBullets.forEach((bullet, id) => {
+                if (!this.enemyBulletIdCache.has(id)) {
+                    this.enemyBulletGroup.remove(bullet, true, true);
+                    this.syncedEnemyBullets.delete(id);
                 }
             });
         }
@@ -553,13 +615,13 @@ export class GameScene extends Scene
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
-        // Use bullet pool instead of creating new bullets (Phase 2 optimization)
+        // Use bullet pool instead of creating new bullets
         const bullet = this.bulletPool.acquire(from, to, 1);
         this.playerBulletGroup.add(bullet);
     }
 
     removeBullet(bullet: PlayerBullet) {
-        // Release bullet back to pool instead of destroying (Phase 2 optimization)
+        // Release bullet back to pool instead of destroying 
         this.playerBulletGroup.remove(bullet, false, false);  // Don't destroy, just remove from group
         this.bulletPool.release(bullet);
     }

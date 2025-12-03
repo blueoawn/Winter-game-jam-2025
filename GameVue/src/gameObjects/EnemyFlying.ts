@@ -9,6 +9,10 @@ export default class EnemyFlying extends Phaser.Physics.Arcade.Sprite {
     fireCounterMax = 300; // maximum fire rate
     fireCounter;
     power = 1; // enemy strength
+    shipId: number;  // Store shipId for network sync
+    pathId: number;  // Store pathId for network sync
+    enemyId: string;  // Unique ID for network tracking
+    private static nextId = 0;  // Static counter for generating unique IDs
 
     // path coordinates for enemy to follow
     paths = [
@@ -30,7 +34,12 @@ export default class EnemyFlying extends Phaser.Physics.Arcade.Sprite {
         scene.add.existing(this);
         scene.physics.add.existing(this);
 
+        // Store properties for network synchronization
+        this.shipId = shipId;
+        this.pathId = pathId;
         this.power = power;
+        this.enemyId = `enemy_${Date.now()}_${EnemyFlying.nextId++}`;  // Generate unique ID
+
         this.fireCounter = Phaser.Math.RND.between(this.fireCounterMin, this.fireCounterMax); // random firing interval
         this.setFlipY(true); // flip image vertically
         this.setDepth(10);

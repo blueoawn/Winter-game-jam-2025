@@ -48,6 +48,7 @@ export interface SerializedGameState {
     players: PlayerState[];
     enemies: EnemyState[];
     bullets: BulletState[];
+    enemyBullets: BulletState[];  // Enemy bullets tracked separately
     gameState: GameStateData;
 }
 
@@ -118,6 +119,7 @@ interface GameState {
     players?: PlayerObject[];
     enemies?: EnemyObject[];
     bullets?: BulletObject[];
+    enemyBullets?: BulletObject[];  // Enemy bullets tracked separately
     score?: number;
     scrollMovement?: number;
     spawnEnemyCounter?: number;
@@ -133,6 +135,7 @@ export class StateSerializer {
             players: this.serializePlayers(gameState.players),
             enemies: this.serializeEnemies(gameState.enemies),
             bullets: this.serializeBullets(gameState.bullets),
+            enemyBullets: this.serializeBullets(gameState.enemyBullets),  // Serialize enemy bullets
             gameState: {
                 score: gameState.score || 0,
                 scrollMovement: gameState.scrollMovement || 0,
@@ -155,11 +158,12 @@ export class StateSerializer {
             players: data.players || [],
             enemies: data.enemies || [],
             bullets: data.bullets || [],
+            enemyBullets: data.enemyBullets || [],  // Deserialize enemy bullets
             gameState: data.gameState || {}
         };
     }
 
-    // Serialize player data (Phase 2 optimization: direct access, no optional chaining)
+    // Serialize player data (Phase 3 optimization: integer positions for packet size reduction)
     static serializePlayers(players?: PlayerObject[]): PlayerState[] {
         if (!players || !Array.isArray(players)) return [];
 
@@ -168,19 +172,19 @@ export class StateSerializer {
             const p = players[i];
             result.push({
                 id: p.id || p.playerId || '',  // Keep fallback for ID (critical field)
-                x: Math.round(p.x * 10) / 10,  // Round to 1 decimal for bandwidth
-                y: Math.round(p.y * 10) / 10,
+                x: Math.round(p.x),  // Integer positions 
+                y: Math.round(p.y),
                 velocityX: p.body && p.body.velocity && p.body.velocity.x !== undefined ? Math.round(p.body.velocity.x) : 0,
                 velocityY: p.body && p.body.velocity && p.body.velocity.y !== undefined ? Math.round(p.body.velocity.y) : 0,
                 health: p.health,
                 frame: p.frame && p.frame.name !== undefined ? p.frame.name : 0,
-                rotation: p.rotation
+                rotation: Math.round(p.rotation * 100) / 100  // 2 decimals for rotation
             });
         }
         return result;
     }
 
-    // Serialize enemy data (Phase 2 optimization: direct access, for loop)
+    // Serialize enemy data (Phase 3 optimization: integer positions, remove pathProgress)
     static serializeEnemies(enemies?: EnemyObject[]): EnemyState[] {
         if (!enemies || !Array.isArray(enemies)) return [];
 
@@ -189,10 +193,10 @@ export class StateSerializer {
             const e = enemies[i];
             result.push({
                 id: e.enemyId || e.id || '',  // Keep fallback for ID
-                x: Math.round(e.x * 10) / 10,
-                y: Math.round(e.y * 10) / 10,
+                x: Math.round(e.x),  // Integer positions
+                y: Math.round(e.y),
                 health: e.health,
-                pathProgress: e.pathProgress,
+                pathProgress: 0,  // Not needed for network-synced enemies (position overridden)
                 shipId: e.shipId,
                 pathId: e.pathId,
                 power: e.power
@@ -201,7 +205,7 @@ export class StateSerializer {
         return result;
     }
 
-    // Serialize bullet data (Phase 2 optimization: direct access, for loop)
+    // Serialize bullet data (Phase 3 optimization: integer positions, minimal fields)
     static serializeBullets(bullets?: BulletObject[]): BulletState[] {
         if (!bullets || !Array.isArray(bullets)) return [];
 
@@ -210,11 +214,11 @@ export class StateSerializer {
             const b = bullets[i];
             result.push({
                 id: b.bulletId || b.id || '',  // Keep fallback for ID
-                x: Math.round(b.x * 10) / 10,
-                y: Math.round(b.y * 10) / 10,
+                x: Math.round(b.x),  // Integer positions
+                y: Math.round(b.y),
                 velocityX: b.body && b.body.velocity && b.body.velocity.x !== undefined ? Math.round(b.body.velocity.x) : 0,
                 velocityY: b.body && b.body.velocity && b.body.velocity.y !== undefined ? Math.round(b.body.velocity.y) : 0,
-                ownerId: b.ownerId,
+                ownerId: b.ownerId || '',  // Can be empty for enemy bullets
                 type: b.type || 'player',
                 power: b.power || 1
             });

@@ -21,7 +21,6 @@ export class PlayerManager {
         playerId: string,
         isLocal: boolean = false,
         characterType: 'LizardWizard' | 'SwordAndBoard' = 'LizardWizard',
-        shipId: number | null = null
     ): PlayerController {
         if (this.players.has(playerId)) {
             console.warn('Player already exists:', playerId);

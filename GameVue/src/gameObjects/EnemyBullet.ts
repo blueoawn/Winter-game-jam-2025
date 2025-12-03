@@ -2,9 +2,11 @@ import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
 
 export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
+    id: string;  // Unique ID for network syncing
     power = 1;
     moveVelocity = 200;
     gameScene: GameScene;
+    private static nextId = 0;  // Static counter for generating unique IDs
 
     constructor(scene: GameScene, x: number, y: number, power: number) {
         const tileId = 11;
@@ -12,6 +14,9 @@ export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
 
         scene.add.existing(this);
         scene.physics.add.existing(this);
+
+        // Generate unique ID for this bullet
+        this.id = `enemy_bullet_${Date.now()}_${EnemyBullet.nextId++}`;
 
         this.power = power;
         this.setSize(16, 24); // resize hitbox to correctly fit image instead of using the entire tile size
