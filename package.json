@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "playsocketjs": "^2.6.3",
+    "ws": "^8.18.3"
+  }
+}
