@@ -27,9 +27,10 @@ export class PlayerManager {
             return this.players.get(playerId)!;
         }
 
-        // Calculate spawn position (world coordinates, not screen coordinates)
-        const spawnX = 800;   // Center X of 1600px world
-        const spawnY = 1000;  // Bottom third of 1343px world
+        // Get spawn position from current map data
+        const spawn = (this.scene as any).currentMap?.spawnPoints?.default || { x: 800, y: 1000 };
+        const spawnX = spawn.x;
+        const spawnY = spawn.y;
 
         // Create character instance based on type
         let player: PlayerController;

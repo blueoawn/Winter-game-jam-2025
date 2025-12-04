@@ -23,6 +23,8 @@ import { StateSerializer } from '../../network/StateSerializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { BulletPool } from '../../managers/BulletPool.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
+import { MapData } from '../maps/SummonerRift';
+import { getDefaultMap, getMapById } from '../maps/MapRegistry';
 
 
 export class GameScene extends Scene
@@ -71,6 +73,7 @@ export class GameScene extends Scene
     enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     bulletPool: BulletPool;  // Object pool for efficient bullet management (Phase 2 optimization)
+    currentMap: MapData;  // Current active map data
 
     constructor ()
     {
@@ -145,6 +148,9 @@ export class GameScene extends Scene
     }
 
     initVariables() {
+        // Load current map (default to Summoners Rift)
+        this.currentMap = getDefaultMap();
+
         this.score = 0;
         this.centreX = this.scale.width * 0.5;
         this.centreY = this.scale.height * 0.5;
@@ -171,31 +177,26 @@ export class GameScene extends Scene
     }
 
     initBackground() {
-        const mapWidth = 1600;
-        const mapHeight = 1343;
-
         // Add background image centered in world
-        this.add.image(mapWidth / 2, mapHeight / 2, 'summoners-rift')
+        this.add.image(
+            this.currentMap.width / 2,
+            this.currentMap.height / 2,
+            this.currentMap.assetKey
+        )
             .setOrigin(0.5, 0.5)
             .setDepth(0);  // Behind all game objects
     }
 
     initWorldBounds() {
-        const mapWidth = 1600;
-        const mapHeight = 1343;
-
         // Set physics world bounds to map size
-        this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+        this.physics.world.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
     }
 
     initCamera() {
-        const mapWidth = 1600;
-        const mapHeight = 1343;
-
         const camera = this.cameras.main;
 
         // Set camera bounds to prevent showing black areas
-        camera.setBounds(0, 0, mapWidth, mapHeight);
+        camera.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
 
         // Determine which player to follow
         let playerToFollow = null;
@@ -219,14 +220,13 @@ export class GameScene extends Scene
         const characterId = (this as any).selectedCharacterId || 'lizard-wizard';
         const characterType = this.getCharacterType(characterId);
 
-        // Spawn in center/bottom of world map (world coordinates, not screen coordinates)
-        const spawnX = 800;   // Center X of 1600px world
-        const spawnY = 1000;  // Bottom third of 1343px world
+        // Use default spawn point from current map
+        const spawn = this.currentMap.spawnPoints.default;
 
         if (characterType === 'LizardWizard') {
-            this.player = new LizardWizard(this, spawnX, spawnY);
+            this.player = new LizardWizard(this, spawn.x, spawn.y);
         } else {
-            this.player = new SwordAndBoard(this, spawnX, spawnY);
+            this.player = new SwordAndBoard(this, spawn.x, spawn.y);
         }
         (this.player as any).isLocal = true;
         this.playerManager = null;
@@ -242,6 +242,33 @@ export class GameScene extends Scene
         }
         // Default to LizardWizard if unknown
         return 'LizardWizard';
+    }
+
+    /**
+     * Load a new map by ID
+     * This method can be used in the future to transition between maps
+     * @param mapId The ID of the map to load (e.g., 'summoners-rift')
+     * @returns True if map was loaded, false if not found
+     */
+    loadMap(mapId: string): boolean {
+        const newMap = getMapById(mapId);
+        if (!newMap) {
+            console.error(`Map not found: ${mapId}`);
+            return false;
+        }
+
+        this.currentMap = newMap;
+        console.log(`Loaded map: ${newMap.name} (${newMap.id})`);
+
+        // Note: To fully transition to a new map:
+        // 1. Clear existing game objects (enemies, bullets, etc.)
+        // 2. Update world bounds via initWorldBounds()
+        // 3. Update camera bounds via initCamera()
+        // 4. Respawn players at new spawn points
+        // 5. Reload the background via initBackground()
+        // This is left for future implementation when map transitions are needed, for now we just load at start. 
+
+        return true;
     }
 
     initMultiplayer() {
