@@ -150,7 +150,7 @@ export class GameScene extends Scene
         const canSpawn = this.enemyGroup.getChildren().length < maxActiveEnemies;
 
         if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
-        // else if (canSpawn) this.addFlyingGroup();
+        else if (canSpawn) this.addFlyingGroup();
     }
 
     initVariables() {
