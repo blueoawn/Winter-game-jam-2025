@@ -5,12 +5,12 @@ export default {
     //         args: ['assets/sound.mp3', 'assets/sound.m4a', 'assets/sound.ogg']
     //     },
     // },
-    // 'image': {
-    //     spikes: {
-    //         key: 'spikes',
-    //         args: ['assets/spikes.png']
-    //     },
-    // },
+    image: {
+        summonersRift: {
+            key: 'summoners-rift',
+            args: ['assets/Backgrounds/summonersRift.png']
+        },
+    },
     spritesheet: {
         ships: {
             key: 'ships',

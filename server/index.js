@@ -37,7 +37,7 @@ server.onEvent('clientJoinedRoom', (clientId, roomId) => {
 // Event: Storage updated
 server.onEvent('storageUpdated', ({ roomId, clientId, update }) => {
     if (clientId) {
-        console.log(`📝 Storage updated in room ${roomId} by ${clientId}:`, update.key);
+        //console.log(`📝 Storage updated in room ${roomId} by ${clientId}:`, update.key); //debug
     }
 });
 

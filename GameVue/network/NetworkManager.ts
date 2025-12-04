@@ -66,12 +66,12 @@ class NetworkManager {
 
         // Listen for status changes
         this.socket.onEvent('status', (status: string) => {
-            console.log('PlaySocket status:', status);
+            //console.log('PlaySocket status:', status); //DEBUG
         });
 
         // Listen for storage updates (main synchronization mechanism)
         this.socket.onEvent('storageUpdated', (storage: any) => {
-            console.log('Storage updated:', storage);
+            //console.log('Storage updated:', storage); //DEBUG
 
             // Notify game of storage changes
             if (this.storageUpdateHandler) {

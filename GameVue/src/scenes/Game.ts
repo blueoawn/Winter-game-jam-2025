@@ -97,11 +97,15 @@ export class GameScene extends Scene
     create ()
     {
         this.initVariables();
+        this.initBackground();  // Add Summoners Rift map background
         this.initGameUi();
         this.initAnimations();
 
         // Initialize ButtonMapper for input
         this.buttonMapper = new ButtonMapper(this);
+
+        // Set world bounds before creating players
+        this.initWorldBounds();
 
         if (this.networkEnabled) {
             this.initMultiplayer();
@@ -111,7 +115,10 @@ export class GameScene extends Scene
 
         this.initInput();
         this.initPhysics();
-        this.initMap();
+        // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
+
+        // Setup camera after players are created
+        this.initCamera();
 
         // Auto-start for now
         this.startGame();
@@ -163,15 +170,63 @@ export class GameScene extends Scene
         this.tick = 0;
     }
 
+    initBackground() {
+        const mapWidth = 1600;
+        const mapHeight = 1343;
+
+        // Add background image centered in world
+        this.add.image(mapWidth / 2, mapHeight / 2, 'summoners-rift')
+            .setOrigin(0.5, 0.5)
+            .setDepth(0);  // Behind all game objects
+    }
+
+    initWorldBounds() {
+        const mapWidth = 1600;
+        const mapHeight = 1343;
+
+        // Set physics world bounds to map size
+        this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+    }
+
+    initCamera() {
+        const mapWidth = 1600;
+        const mapHeight = 1343;
+
+        const camera = this.cameras.main;
+
+        // Set camera bounds to prevent showing black areas
+        camera.setBounds(0, 0, mapWidth, mapHeight);
+
+        // Determine which player to follow
+        let playerToFollow = null;
+
+        if (this.networkEnabled && this.playerManager) {
+            // Multiplayer: Follow local player
+            playerToFollow = this.playerManager.getLocalPlayer();
+        } else if (this.player) {
+            // Single player: Follow the player
+            playerToFollow = this.player;
+        }
+
+        // Start following with smooth camera
+        if (playerToFollow) {
+            camera.startFollow(playerToFollow, true, 0.1, 0.1);
+        }
+    }
+
     initSinglePlayer() {
         // Create single player with selected character
         const characterId = (this as any).selectedCharacterId || 'lizard-wizard';
         const characterType = this.getCharacterType(characterId);
 
+        // Spawn in center/bottom of world map (world coordinates, not screen coordinates)
+        const spawnX = 800;   // Center X of 1600px world
+        const spawnY = 1000;  // Bottom third of 1343px world
+
         if (characterType === 'LizardWizard') {
-            this.player = new LizardWizard(this, this.centreX, this.scale.height - 100);
+            this.player = new LizardWizard(this, spawnX, spawnY);
         } else {
-            this.player = new SwordAndBoard(this, this.centreX, this.scale.height - 100);
+            this.player = new SwordAndBoard(this, spawnX, spawnY);
         }
         (this.player as any).isLocal = true;
         this.playerManager = null;
@@ -530,14 +585,16 @@ export class GameScene extends Scene
             align: 'center'
         })
             .setOrigin(0.5)
-            .setDepth(100);
+            .setDepth(100)
+            .setScrollFactor(0);  // Fix to camera viewport
 
         // Create score text
         this.scoreText = this.add.text(20, 20, 'Score: 0', {
             fontFamily: 'Arial Black', fontSize: 28, color: '#ffffff',
             stroke: '#000000', strokeThickness: 8,
         })
-            .setDepth(100);
+            .setDepth(100)
+            .setScrollFactor(0);  // Fix to camera viewport
 
         // Create game over text
         this.gameOverText = this.add.text(this.scale.width * 0.5, this.scale.height * 0.5, 'Game Over', {
@@ -547,7 +604,8 @@ export class GameScene extends Scene
         })
             .setOrigin(0.5)
             .setDepth(100)
-            .setVisible(false);
+            .setVisible(false)
+            .setScrollFactor(0);  // Fix to camera viewport
     }
 
     initAnimations() {
@@ -681,7 +739,7 @@ export class GameScene extends Scene
         
         //TODO This is broken in multiplayer and I'm working on fixing it. 
         // You can comment it out if you want to just see multiple ships flying around without enemies
-        this.addFlyingGroup(); 
+        //this.addFlyingGroup(); 
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
