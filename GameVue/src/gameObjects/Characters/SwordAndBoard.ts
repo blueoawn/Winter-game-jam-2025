@@ -39,7 +39,7 @@ export class SwordAndBoard extends PlayerController {
 
     protected ability2(): void {
         if (!this.canUseAbility2()) return;
-
+        this.removeShield();
         this.spawnShield();
         this.updateShieldPositionAndRotation();
 
