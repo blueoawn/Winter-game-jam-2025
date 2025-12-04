@@ -5,6 +5,7 @@ import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
 import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
 import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
 import { BigSword } from "../gameObjects/Characters/BigSword.ts";
+import { BoomStick } from "../gameObjects/Characters/BoomStick.ts";
 import { ButtonMapper } from "../../managers/ButtonMapper.ts";
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
@@ -149,7 +150,7 @@ export class GameScene extends Scene
         const canSpawn = this.enemyGroup.getChildren().length < maxActiveEnemies;
 
         if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
-        else if (canSpawn) this.addFlyingGroup();
+        // else if (canSpawn) this.addFlyingGroup();
     }
 
     initVariables() {
@@ -238,6 +239,9 @@ export class GameScene extends Scene
             case CharacterNamesEnum.CheeseTouch:
                 this.player = new CheeseTouch(this, spawn.x, spawn.y);
                 break;
+            case CharacterNamesEnum.BoomStick:
+                this.player = new BoomStick(this, spawn.x, spawn.y);
+                break;
             case CharacterNamesEnum.LizardWizard:
             default:
                 this.player = new LizardWizard(this, spawn.x, spawn.y);
@@ -255,6 +259,8 @@ export class GameScene extends Scene
                 return CharacterNamesEnum.SwordAndBoard;
             case CharacterIdsEnum.CheeseTouch:
                 return CharacterNamesEnum.CheeseTouch;
+            case CharacterIdsEnum.BoomStick:
+                return CharacterNamesEnum.BoomStick;
             case CharacterIdsEnum.LizardWizard:
             default:
                 return CharacterNamesEnum.LizardWizard;
@@ -786,8 +792,20 @@ export class GameScene extends Scene
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
-        // Use bullet pool instead of creating new bullets
         const bullet = this.bulletPool.acquire(from, to, 1);
+        this.playerBulletGroup.add(bullet);
+    }
+
+    fireBulletWithFalloff(
+        from: {x: number, y: number},
+        to: {x: number, y: number},
+        baseDamage: number,
+        minDamage: number,
+        falloffStart: number,
+        falloffEnd: number
+    ) {
+        const bullet = this.bulletPool.acquire(from, to, 1);
+        bullet.setFalloff(baseDamage, minDamage, falloffStart, falloffEnd);
         this.playerBulletGroup.add(bullet);
     }
 

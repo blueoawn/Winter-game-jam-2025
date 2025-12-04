@@ -38,6 +38,9 @@ export default class EnemyFlying extends EnemyController {
         this.fireCounter = Phaser.Math.RND.between(this.fireCounterMin, this.fireCounterMax);
 
         this.setFlipY(true);
+        if (pathId === 0) {
+            this.setPosition(this.gameScene.scale.width / 2, this.gameScene.scale.height / 2);
+        }
         this.initPath(pathId, speed);
     }
 

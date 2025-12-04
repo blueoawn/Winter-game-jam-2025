@@ -82,6 +82,19 @@ export class CharacterSelectScene extends Scene {
             },
             ability1: 'Heavy Slash (frontal swing)',
             ability2: 'Piercing Strike (charge dash)'
+        },
+        {
+            id: 'boom-stick',
+            name: 'Boom Stick',
+            frame: 4,
+            description: 'Close range devastation',
+            stats: {
+                speed: 'Fast',
+                health: 'Low',
+                fireRate: 'Slow but deadly'
+            },
+            ability1: 'Shotgun Blast (7 pellet spread)',
+            ability2: 'Burst Dash (quick dodge)'
         }
     ];
 
