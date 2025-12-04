@@ -1,6 +1,7 @@
 import { PlayerController } from './PlayerController';
 import { LizardWizard } from '../src/gameObjects/Characters/LizardWizard';
 import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
+import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';
 import type { GameScene } from '../src/scenes/Game';
 import type { InputState, PlayerState } from '../network/StateSerializer';
 
@@ -20,7 +21,7 @@ export class PlayerManager {
     createPlayer(
         playerId: string,
         isLocal: boolean = false,
-        characterType: 'LizardWizard' | 'SwordAndBoard' = 'LizardWizard',
+        characterType: 'LizardWizard' | 'SwordAndBoard' | 'CheeseTouch' = 'LizardWizard',
     ): PlayerController {
         if (this.players.has(playerId)) {
             console.warn('Player already exists:', playerId);
@@ -37,8 +38,10 @@ export class PlayerManager {
 
         if (characterType === 'LizardWizard') {
             player = new LizardWizard(this.scene, spawnX, spawnY);
-        } else {
+        } else if (characterType === 'SwordAndBoard') {
             player = new SwordAndBoard(this.scene, spawnX, spawnY);
+        } else {
+            player = new CheeseTouch(this.scene, spawnX, spawnY);
         }
 
         (player as any).playerId = playerId;

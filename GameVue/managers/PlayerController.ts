@@ -1,5 +1,6 @@
 import ASSETS from '../src/assets.js';
 import { GameScene } from "../src/scenes/Game.ts";
+import { Depth } from '../src/constants.ts';
 import type { InputState, PlayerState } from '../network/StateSerializer.ts';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
@@ -21,6 +22,10 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     playerId: string = '';
     lastVelocity: Vector2;
     healthBarContainer: Container;
+    skillBarContainer: Container | null = null;
+    protected skillBarEnabled: boolean = false;  // Disabled by default
+    protected skillMeter: number = 0;
+    protected maxSkillMeter: number = 100;
     protected currentAim: Vector2;  // Store current aim position for abilities
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
@@ -29,12 +34,13 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         scene.add.existing(this);
         scene.physics.add.existing(this);
         this.setCollideWorldBounds(true); // prevent ship from leaving the screen
-        this.setDepth(100); // make ship appear on top of other game objects
+        this.setDepth(Depth.PLAYER); // make character appear on top of other game objects
         this.gameScene = scene;
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
         this.createHealthBar();
+        this.createSkillBar();
         this.handleDestruction();
     }
 
@@ -42,6 +48,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         super.preUpdate(time, delta);
 
         this.updateHealthBarPosition();
+        this.updateSkillBarPosition();
         if (this.fireCounter > 0) this.fireCounter--;
         if (this.ability1Cooldown > 0) this.ability1Cooldown--;
         if (this.ability2Cooldown > 0) this.ability2Cooldown--;
@@ -186,7 +193,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         ]);
 
         // Set depth on the container, not individual rectangles
-        this.healthBarContainer.setDepth(101); // Higher than player depth (100)
+        this.healthBarContainer.setDepth(Depth.PLAYER_UI);
     }
 
     updateHealthBarPosition(): void {
@@ -205,12 +212,43 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
+    createSkillBar(): void {
+        if (!this.skillBarEnabled) return;
+
+        // Create skill bar (yellow) below health bar
+        const skillBarBottom = this.scene.add.rectangle(0, 0, this.width, 6, 0x555555);
+        const skillBarTop = this.scene.add.rectangle(0, 0, this.width, 6, 0xffcc00);
+        skillBarTop.width = 0;  // Start empty
+
+        this.skillBarContainer = this.scene.add.container(this.x, this.y + this.height + 12, [
+            skillBarBottom,
+            skillBarTop
+        ]);
+        this.skillBarContainer.setDepth(Depth.PLAYER_UI);
+    }
+
+    updateSkillBarPosition(): void {
+        if (!this.skillBarContainer) return;
+        this.skillBarContainer.x = this.x;
+        this.skillBarContainer.y = this.y + this.height + 12;
+    }
+
+    updateSkillBarValue(): void {
+        if (!this.skillBarContainer) return;
+        const ratio = this.skillMeter / this.maxSkillMeter;
+        const fullWidth = (this.skillBarContainer.list[0] as Phaser.GameObjects.Rectangle).width;
+        (this.skillBarContainer.list[1] as Phaser.GameObjects.Rectangle).width = fullWidth * Math.max(0, Math.min(1, ratio));
+    }
+
     handleDestruction(): void {
         this.on('destroy', () => {
             // Delay destruction of health bar to ensure it is visible when player dies
             // Because instantly destroying it after death would be kinda jank?? idk
             const delayedDestructionTimer = this.gameScene.time.delayedCall(1000, () => {
                 this.healthBarContainer.destroy();
+                if (this.skillBarContainer) {
+                    this.skillBarContainer.destroy();
+                }
                 delayedDestructionTimer.destroy();
             });
         });

@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import { PlayerController } from "../../managers/PlayerController.ts";
 import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
 import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
+import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
 import { ButtonMapper } from "../../managers/ButtonMapper.ts";
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
@@ -225,8 +226,10 @@ export class GameScene extends Scene
 
         if (characterType === 'LizardWizard') {
             this.player = new LizardWizard(this, spawn.x, spawn.y);
-        } else {
+        } else if (characterType === 'SwordAndBoard') {
             this.player = new SwordAndBoard(this, spawn.x, spawn.y);
+        } else {
+            this.player = new CheeseTouch(this, spawn.x, spawn.y);
         }
         (this.player as any).isLocal = true;
         this.playerManager = null;
@@ -234,11 +237,13 @@ export class GameScene extends Scene
 
 
     //TODO refactor as a switch when we have more characters
-    getCharacterType(characterId: string): 'LizardWizard' | 'SwordAndBoard' {
+    getCharacterType(characterId: string): 'LizardWizard' | 'SwordAndBoard' | 'CheeseTouch' {
         if (characterId === 'lizard-wizard') {
             return 'LizardWizard';
         } else if (characterId === 'sword-and-board') {
             return 'SwordAndBoard';
+        } else if (characterId === 'cheese-touch') {
+            return 'CheeseTouch';
         }
         // Default to LizardWizard if unknown
         return 'LizardWizard';

@@ -56,6 +56,19 @@ export class CharacterSelectScene extends Scene {
             },
             ability1: 'Melee Attack',
             ability2: 'Shield (blocks damage)'
+        },
+        {
+            id: 'cheese-touch',
+            name: 'Cheese Touch',
+            frame: 2,
+            description: 'Big cheese energy',
+            stats: {
+                speed: 'Medium',
+                health: 'Medium',
+                fireRate: 'Continuous'
+            },
+            ability1: 'Cheese Beam (damage over time)',
+            ability2: 'Eat Cheese (heal self)'
         }
     ];
 

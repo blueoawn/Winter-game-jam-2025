@@ -107,10 +107,8 @@ export class ButtonMapper {
 
         movement.normalize();
 
-        const aim = new Phaser.Math.Vector2(
-            this.scene.input.mousePointer.x,
-            this.scene.input.mousePointer.y
-        );
+        const worldPoints = this.scene.cameras.main.getWorldPoint(this.scene.input.mousePointer.x, this.scene.input.mousePointer.y);
+        const aim = new Phaser.Math.Vector2(worldPoints);
 
         return {
             movement,
