@@ -1,6 +1,7 @@
 import { PlayerController } from '../../../managers/PlayerController';
 import { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
+import { audioManager } from '../../../managers/AudioManager';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 
@@ -85,6 +86,9 @@ export class CheeseTouch extends PlayerController {
         if (!this.canUseAbility2()) return;
         if (this.skillMeter <= 0) return;  // Need cheese to heal
         if (this.health >= this.maxHealth) return;  // Already full health
+
+        // Play cheese eating sound
+        audioManager.playCheeseEat();
 
         // Consume cheese meter to heal
         const healAmount = Math.min(1, this.skillMeter / 50);  // Heal 1 HP per 50 cheese

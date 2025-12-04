@@ -27,6 +27,7 @@ import { BulletPool } from '../../managers/BulletPool.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
+import { audioManager } from '../../managers/AudioManager';
 
 
 export class GameScene extends Scene
@@ -101,6 +102,9 @@ export class GameScene extends Scene
 
     create ()
     {
+        // Initialize audio manager
+        audioManager.init(this);
+
         this.initVariables();
         this.initBackground();  // Add Summoners Rift map background
         this.initGameUi();

@@ -1,10 +1,11 @@
 export default {
-    // 'audio': {
-    //     score: {
-    //         key: 'sound',
-    //         args: ['assets/sound.mp3', 'assets/sound.m4a', 'assets/sound.ogg']
-    //     },
-    // },
+    audio: {
+        cheeseEat: {
+            key: 'cheese-eat',
+            // Not sure if it's legal to use roblox sound effects, but it's funny
+            args: ['assets/SoundEffects/roblox-eating-sound-effect-nom-nom-nom.mp3']
+        },
+    },
     image: {
         summonersRift: {
             key: 'summoners-rift',

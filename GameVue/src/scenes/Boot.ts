@@ -9,15 +9,23 @@ export class Boot extends Scene
 
     preload ()
     {
-        // TODO We could put a "Made with Phaser" logo or similar here. This would be displayed while the Preloader scene loads all the game assets, which will be more visible when we have more assets.
-
-        //  The Boot Scene is typically used to load in any assets you require for your Preloader, such as a game logo or background.
-        //  The smaller the file size of the assets, the better, as the Boot Scene itself has no preloader.
-        // this.load.image('background', 'assets/bg.png');
+        this.load.image('phaser-logo', 'assets/Sprites/phaser3-logo.png');
     }
 
     create ()
     {
-        this.scene.start('Preloader');
+        const { width, height } = this.scale;
+
+        this.add.image(width / 2, height / 2 - 50, 'phaser-logo').setScale(0.5);
+
+        this.add.text(width / 2, height / 2 + 50, 'Made with Phaser', {
+            fontFamily: 'Arial',
+            fontSize: 24,
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        // this.time.delayedCall(1500, () => {
+            this.scene.start('Preloader');
+        // });
     }
 }
