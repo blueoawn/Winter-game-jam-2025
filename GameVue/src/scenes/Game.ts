@@ -874,6 +874,10 @@ export class GameScene extends Scene
 
     GameOver() {
         this.gameStarted = false;
-        this.gameOverText.setVisible(true);
+        this.cameras.main.fade(1000, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+            if (progress === 1) {
+                this.scene.start('GameOver');
+            }
+        });
     }
 }
