@@ -63,18 +63,18 @@ export class CharacterSelectScene extends Scene {
             frame: 2,
             description: 'Big cheese energy',
             stats: {
-                speed: 'Medium',
-                health: 'Medium',
-                fireRate: 'Continuous'
+                speed: 'Fine',
+                health: 'Half a truckle',
+                fireRate: 'Swiss cheese'
             },
             ability1: 'Cheese Beam (damage over time)',
             ability2: 'Eat Cheese (heal self)'
         },
         {
             id: 'big-sword',
-            name: 'Big Sword',
+            name: 'Big G',
             frame: 3,
-            description: 'Heavy melee with dash attack',
+            description: 'Has a sword that is as big as he is',
             stats: {
                 speed: 'Medium',
                 health: 'High',
