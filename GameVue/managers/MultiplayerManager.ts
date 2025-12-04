@@ -2,8 +2,10 @@ import { PlayerController } from './PlayerController';
 import { LizardWizard } from '../src/gameObjects/Characters/LizardWizard';
 import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
 import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';
+import { BigSword } from '../src/gameObjects/Characters/BigSword';
 import type { GameScene } from '../src/scenes/Game';
 import type { InputState, PlayerState } from '../network/StateSerializer';
+import { CharacterNamesEnum } from "../src/gameObjects/Characters/CharactersEnum.ts";
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
@@ -21,10 +23,9 @@ export class PlayerManager {
     createPlayer(
         playerId: string,
         isLocal: boolean = false,
-        characterType: 'LizardWizard' | 'SwordAndBoard' | 'CheeseTouch' = 'LizardWizard',
+        characterType: CharacterNamesEnum,
     ): PlayerController {
         if (this.players.has(playerId)) {
-            console.warn('Player already exists:', playerId);
             return this.players.get(playerId)!;
         }
 
@@ -36,12 +37,21 @@ export class PlayerManager {
         // Create character instance based on type
         let player: PlayerController;
 
-        if (characterType === 'LizardWizard') {
-            player = new LizardWizard(this.scene, spawnX, spawnY);
-        } else if (characterType === 'SwordAndBoard') {
-            player = new SwordAndBoard(this.scene, spawnX, spawnY);
-        } else {
-            player = new CheeseTouch(this.scene, spawnX, spawnY);
+
+        switch (characterType) {
+            case CharacterNamesEnum.BigSword:
+                player = new BigSword(this.scene, spawnX, spawnY);
+                break;
+            case CharacterNamesEnum.SwordAndBoard:
+                player = new SwordAndBoard(this.scene, spawnX, spawnY);
+                break;
+            case CharacterNamesEnum.CheeseTouch:
+                player = new CheeseTouch(this.scene, spawnX, spawnY);
+                break;
+            case CharacterNamesEnum.LizardWizard:
+            default:
+                player = new LizardWizard(this.scene, spawnX, spawnY);
+                break;
         }
 
         (player as any).playerId = playerId;

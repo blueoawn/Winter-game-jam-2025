@@ -4,6 +4,7 @@ import { EnemyController } from "../../managers/EnemyController.ts";
 import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
 import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
 import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
+import { BigSword } from "../gameObjects/Characters/BigSword.ts";
 import { ButtonMapper } from "../../managers/ButtonMapper.ts";
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
@@ -28,6 +29,7 @@ import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
 import { audioManager } from '../../managers/AudioManager';
+import { CharacterIdsEnum, CharacterNamesEnum } from "../gameObjects/Characters/CharactersEnum.ts";
 
 
 export class GameScene extends Scene
@@ -134,9 +136,6 @@ export class GameScene extends Scene
     }
 
     update() {
-        // Feels good to have a nice background while testing
-        // this.updateMap();
-
         if (!this.gameStarted) return;
 
         if (this.networkEnabled) {
@@ -229,29 +228,37 @@ export class GameScene extends Scene
         // Use default spawn point from current map
         const spawn = this.currentMap.spawnPoints.default;
 
-        if (characterType === 'LizardWizard') {
-            this.player = new LizardWizard(this, spawn.x, spawn.y);
-        } else if (characterType === 'SwordAndBoard') {
-            this.player = new SwordAndBoard(this, spawn.x, spawn.y);
-        } else {
-            this.player = new CheeseTouch(this, spawn.x, spawn.y);
+        switch (characterType) {
+            case CharacterNamesEnum.BigSword:
+                this.player = new BigSword(this, spawn.x, spawn.y);
+                break;
+            case CharacterNamesEnum.SwordAndBoard:
+                this.player = new SwordAndBoard(this, spawn.x, spawn.y);
+                break;
+            case CharacterNamesEnum.CheeseTouch:
+                this.player = new CheeseTouch(this, spawn.x, spawn.y);
+                break;
+            case CharacterNamesEnum.LizardWizard:
+            default:
+                this.player = new LizardWizard(this, spawn.x, spawn.y);
         }
+
         (this.player as any).isLocal = true;
         this.playerManager = null;
     }
 
-
-    //TODO refactor as a switch when we have more characters
-    getCharacterType(characterId: string): 'LizardWizard' | 'SwordAndBoard' | 'CheeseTouch' {
-        if (characterId === 'lizard-wizard') {
-            return 'LizardWizard';
-        } else if (characterId === 'sword-and-board') {
-            return 'SwordAndBoard';
-        } else if (characterId === 'cheese-touch') {
-            return 'CheeseTouch';
+    getCharacterType(characterId: string): CharacterNamesEnum {
+        switch (characterId) {
+            case CharacterIdsEnum.BigSword:
+                return CharacterNamesEnum.BigSword;
+            case CharacterIdsEnum.SwordAndBoard:
+                return CharacterNamesEnum.SwordAndBoard;
+            case CharacterIdsEnum.CheeseTouch:
+                return CharacterNamesEnum.CheeseTouch;
+            case CharacterIdsEnum.LizardWizard:
+            default:
+                return CharacterNamesEnum.LizardWizard;
         }
-        // Default to LizardWizard if unknown
-        return 'LizardWizard';
     }
 
     /**
@@ -289,8 +296,7 @@ export class GameScene extends Scene
         const localPlayerId = NetworkManager.getStats().playerId;
         this.players.forEach((playerId, index) => {
             const isLocal = (playerId === localPlayerId);
-            // Player 0 = LizardWizard, Player 1 = SwordAndBoard
-            const characterType = (index === 0) ? 'LizardWizard' : 'SwordAndBoard';
+            const characterType = Object.values(CharacterNamesEnum)[index];
             this.playerManager!.createPlayer(playerId, isLocal, characterType, index);
         });
 

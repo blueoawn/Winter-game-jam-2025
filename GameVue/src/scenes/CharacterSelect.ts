@@ -69,6 +69,19 @@ export class CharacterSelectScene extends Scene {
             },
             ability1: 'Cheese Beam (damage over time)',
             ability2: 'Eat Cheese (heal self)'
+        },
+        {
+            id: 'big-sword',
+            name: 'Big Sword',
+            frame: 3,
+            description: 'Heavy melee with dash attack',
+            stats: {
+                speed: 'Medium',
+                health: 'High',
+                fireRate: 'Melee'
+            },
+            ability1: 'Heavy Slash (frontal swing)',
+            ability2: 'Piercing Strike (charge dash)'
         }
     ];
 
@@ -166,109 +179,179 @@ export class CharacterSelectScene extends Scene {
     }
 
     private createCharacterCards(centerX: number, centerY: number): void {
-        const cardWidth = 350;
-        const cardSpacing = 50;
-        const totalWidth = (cardWidth * this.characters.length) + (cardSpacing * (this.characters.length - 1));
-        const startX = centerX - (totalWidth / 2) + (cardWidth / 2);
+        const screenWidth = this.scale.width;
+        const screenPadding = 40;
+        const cardSpacing = 20;
+        const availableWidth = screenWidth - (screenPadding * 2);
+
+        const minCardWidth = 200;
+        const maxCardWidth = 350;
+        const cardHeight = 450;
+
+        const numCards = this.characters.length;
+        const totalSpacing = cardSpacing * (numCards - 1);
+        const widthPerCard = (availableWidth - totalSpacing) / numCards;
+        const cardWidth = Phaser.Math.Clamp(widthPerCard, minCardWidth, maxCardWidth);
+
+        const actualTotalWidth = (cardWidth * numCards) + totalSpacing;
+        const needsScroll = actualTotalWidth > availableWidth;
+
+        const startX = needsScroll
+            ? screenPadding + cardWidth / 2
+            : centerX - (actualTotalWidth / 2) + (cardWidth / 2);
+
+        const container = this.add.container(0, 0);
 
         this.characters.forEach((character, index) => {
             const x = startX + (index * (cardWidth + cardSpacing));
-            const card = this.createCharacterCard(character, x, centerY);
+            const card = this.createCharacterCard(character, x, centerY, cardWidth, cardHeight);
             this.characterCards.set(character.id, card);
+            container.add(card);
+        });
+
+        if (needsScroll) {
+            this.setupScrolling(container, actualTotalWidth, availableWidth);
+        }
+    }
+
+    private setupScrolling(container: Phaser.GameObjects.Container, contentWidth: number, viewWidth: number): void {
+        const maxScroll = contentWidth - viewWidth;
+        let currentScroll = 0;
+
+        const leftArrow = this.add.text(20, this.scale.height / 2, '◀', {
+            fontSize: '48px',
+            color: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setAlpha(0.3);
+
+        const rightArrow = this.add.text(this.scale.width - 20, this.scale.height / 2, '▶', {
+            fontSize: '48px',
+            color: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        const updateArrows = () => {
+            leftArrow.setAlpha(currentScroll > 0 ? 1 : 0.3);
+            rightArrow.setAlpha(currentScroll < maxScroll ? 1 : 0.3);
+        };
+
+        const scrollAmount = 300;
+
+        leftArrow.on('pointerdown', () => {
+            if (currentScroll > 0) {
+                currentScroll = Math.max(0, currentScroll - scrollAmount);
+                this.tweens.add({
+                    targets: container,
+                    x: -currentScroll,
+                    duration: 200,
+                    ease: 'Power2'
+                });
+                updateArrows();
+            }
+        });
+
+        rightArrow.on('pointerdown', () => {
+            if (currentScroll < maxScroll) {
+                currentScroll = Math.min(maxScroll, currentScroll + scrollAmount);
+                this.tweens.add({
+                    targets: container,
+                    x: -currentScroll,
+                    duration: 200,
+                    ease: 'Power2'
+                });
+                updateArrows();
+            }
+        });
+
+        this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any, _deltaX: number, deltaY: number) => {
+            currentScroll = Phaser.Math.Clamp(currentScroll + deltaY, 0, maxScroll);
+            container.x = -currentScroll;
+            updateArrows();
         });
     }
 
-    private createCharacterCard(character: CharacterData, x: number, y: number): Phaser.GameObjects.Container {
+    private createCharacterCard(character: CharacterData, x: number, y: number, cardWidth: number = 300, cardHeight: number = 450): Phaser.GameObjects.Container {
         const container = this.add.container(x, y);
-        const cardWidth = 300;
-        const cardHeight = 450;
+        const scale = cardWidth / 300;
 
-        // Card background
         const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, 0x222222, 0.9);
         bg.setStrokeStyle(4, 0x666666);
         container.add(bg);
 
-        // Character sprite (large)
-        const sprite = this.add.sprite(0, -120, ASSETS.spritesheet.ships.key, character.frame);
-        sprite.setScale(4);
+        const sprite = this.add.sprite(0, -120 * scale, ASSETS.spritesheet.ships.key, character.frame);
+        sprite.setScale(3 * scale);
         container.add(sprite);
 
-        // Character name
-        const nameText = this.add.text(0, -30, character.name, {
+        const nameText = this.add.text(0, -30 * scale, character.name, {
             fontFamily: 'Arial Black',
-            fontSize: '28px',
+            fontSize: `${Math.floor(24 * scale)}px`,
             color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 6,
+            strokeThickness: 4,
             align: 'center'
         }).setOrigin(0.5);
         container.add(nameText);
 
-        // Description
-        const descText = this.add.text(0, 10, character.description, {
+        const descText = this.add.text(0, 10 * scale, character.description, {
             fontFamily: 'Arial',
-            fontSize: '18px',
+            fontSize: `${Math.floor(14 * scale)}px`,
             color: '#aaaaaa',
-            align: 'center'
+            align: 'center',
+            wordWrap: { width: cardWidth - 20 }
         }).setOrigin(0.5);
         container.add(descText);
 
-        // Layout Stats and Abilities side by side
-        const leftX = -120;  // Left column X position
-        const rightX = 30;  // Right column X position
-        let yOffset = 50;
+        const contentWidth = cardWidth - 30;
+        const leftX = -contentWidth / 2 + 10;
+        const rightX = 10;
+        let yOffset = 40 * scale;
 
-        // Stats (Left column)
         const statsTitle = this.add.text(leftX, yOffset, 'Stats:', {
             fontFamily: 'Arial Black',
-            fontSize: '20px',
+            fontSize: `${Math.floor(16 * scale)}px`,
             color: '#ffff00',
             align: 'left'
         }).setOrigin(0, 0.5);
         container.add(statsTitle);
 
-        let statsY = yOffset + 30;
+        let statsY = yOffset + 25 * scale;
         Object.entries(character.stats).forEach(([key, value]) => {
             const statText = this.add.text(leftX, statsY, `${this.capitalize(key)}: ${value}`, {
                 fontFamily: 'Arial',
-                fontSize: '14px',
+                fontSize: `${Math.floor(12 * scale)}px`,
                 color: '#ffffff',
                 align: 'left'
             }).setOrigin(0, 0.5);
             container.add(statText);
-            statsY += 25;
+            statsY += 20 * scale;
         });
 
-        // Abilities (Right column)
         const abilitiesTitle = this.add.text(rightX, yOffset, 'Abilities:', {
             fontFamily: 'Arial Black',
-            fontSize: '20px',
+            fontSize: `${Math.floor(16 * scale)}px`,
             color: '#00ffff',
             align: 'left'
         }).setOrigin(0, 0.5);
         container.add(abilitiesTitle);
 
-        let abilitiesY = yOffset + 30;
+        let abilitiesY = yOffset + 25 * scale;
         const ability1Text = this.add.text(rightX, abilitiesY, `1: ${character.ability1}`, {
             fontFamily: 'Arial',
-            fontSize: '14px',
+            fontSize: `${Math.floor(12 * scale)}px`,
             color: '#ffffff',
             align: 'left',
-            wordWrap: { width: 120 }
+            wordWrap: { width: contentWidth / 2 - 20 }
         }).setOrigin(0, 0.5);
         container.add(ability1Text);
-        abilitiesY += 40;
+        abilitiesY += 35 * scale;
 
         const ability2Text = this.add.text(rightX, abilitiesY, `2: ${character.ability2}`, {
             fontFamily: 'Arial',
-            fontSize: '14px',
+            fontSize: `${Math.floor(12 * scale)}px`,
             color: '#ffffff',
             align: 'left',
-            wordWrap: { width: 120 }
+            wordWrap: { width: contentWidth / 2 - 20 }
         }).setOrigin(0, 0.5);
         container.add(ability2Text);
 
-        // Make card interactive
         bg.setInteractive({ useHandCursor: true });
         bg.on('pointerdown', () => this.selectCharacter(character.id));
         bg.on('pointerover', () => {
@@ -282,7 +365,6 @@ export class CharacterSelectScene extends Scene {
             }
         });
 
-        // Store reference to bg for selection highlighting
         container.setData('bg', bg);
         container.setData('characterId', character.id);
 
