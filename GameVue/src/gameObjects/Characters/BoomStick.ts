@@ -1,11 +1,11 @@
 //TODO
 
 // ABILITY 1 - Boomstick Blast
-// Description: Fires a powerful blast from the boomstick 
+// Description: Fires a powerful blast from the boomstick, should have longer cooldown and damage fall-off over distance
 
     // // Higher the spread value the tighter the spread
-    // protected ability2(spread = 6, amountOfProjectiles = 7): void {
-    //     if (!this.canUseAbility2()) return;
+    // protected ability1(spread = 4, amountOfProjectiles = 7): void {
+    //     if (!this.canUseAbility1()) return;
     //     const yDifference = this.currentAim.y - this.y;
     //     const xDifference = this.currentAim.x - this.x;
     //     const distance = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2));
@@ -33,7 +33,7 @@
     //         );
     //     })
 
-    //     this.startAbility2Cooldown();
+    //     this.startAbility1Cooldown();
     // }
 
 // TODO ABILITY 2 - Burst of movement, briefly exceed max velocity in the aimed direction

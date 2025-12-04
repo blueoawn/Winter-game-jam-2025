@@ -58,8 +58,8 @@ export class LizardWizard extends PlayerController {
 
         this.startAbility2Cooldown();
     }
-
-    // Optional: AI behavior stub for future
+    
+    // TODO
     updateAI(): void {
         // For CPU-controlled characters
         // Not implemented in this phase

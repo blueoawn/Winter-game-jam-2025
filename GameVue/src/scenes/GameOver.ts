@@ -18,6 +18,9 @@ export class GameOver extends Scene
             stroke: '#000000', strokeThickness: 8,
             align: 'center'
         }).setOrigin(0.5);
+        
+        //TODO add button to go back to main menu in solo
 
+        // For multiplayer, the player should have the option to leave or wait until another player is able to revive them
     }
 }

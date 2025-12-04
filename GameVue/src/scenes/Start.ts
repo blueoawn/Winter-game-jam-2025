@@ -61,6 +61,12 @@ export class Start extends Phaser.Scene {
         }).setOrigin(0.5);
     }
 
+    //TODO Volume slider, or settings menu button with one
+
+    //TODO Audio manager setup 
+
+    //TODO Make buttons selectable with gamepad
+
     createButton(x: number, y: number, text: string, onClick: () => void): Phaser.GameObjects.Text {
         const button = this.add.text(x, y, text, {
             fontFamily: 'Arial Black',

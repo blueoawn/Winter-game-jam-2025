@@ -1,3 +1,5 @@
+//TODO Bluepawn is reworking this into something better
+
 import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
 import Vector2 = Phaser.Math.Vector2;

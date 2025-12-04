@@ -14,6 +14,10 @@ export class Preloader extends Scene
         const barWidth = 468;
         const barHeight = 32;
         const barMargin = 4;
+       
+        // TODO Add a background image/logo here?
+        // TODO Play a sound effect when loading finishes?
+
         //  We loaded this image in our Boot Scene, so we can display it here
 
         //  A simple progress bar. This is the outline of the bar.

@@ -177,6 +177,8 @@ export class GameScene extends Scene
         this.playerManager = null;
     }
 
+
+    //TODO refactor as a switch when we have more characters
     getCharacterType(characterId: string): 'LizardWizard' | 'SwordAndBoard' {
         if (characterId === 'lizard-wizard') {
             return 'LizardWizard';
@@ -239,7 +241,7 @@ export class GameScene extends Scene
         // Process input
         (this.player as PlayerController).processInput(input);
 
-        // Store for potential network serialization
+        // Store for potential network serialization - might use this for debugging
         (this.player as PlayerController).storeInputForNetwork(input);
 
         if ((this.player as any).update) {
@@ -353,7 +355,8 @@ export class GameScene extends Scene
         // Update player input in storage (will sync to host)
         NetworkManager.updatePlayerInput(inputState);
     }
-
+    
+    // This function is Work in progress
     applyNetworkState(state: any) {
         // Apply player states
         if (state.players && this.playerManager) {
@@ -675,7 +678,10 @@ export class GameScene extends Scene
     startGame() {
         this.gameStarted = true;
         this.tutorialText.setVisible(false);
-        this.addFlyingGroup();
+        
+        //TODO This is broken in multiplayer and I'm working on fixing it. 
+        // You can comment it out if you want to just see multiple ships flying around without enemies
+        this.addFlyingGroup(); 
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
@@ -708,6 +714,7 @@ export class GameScene extends Scene
     }
 
     // add a group of flying enemies
+    // TODO FIX for Bluepawn: This function is currently broken in multiplayer mode, will be reworked significantly if not outright removed
     addFlyingGroup() {
         this.spawnEnemyCounter = Phaser.Math.RND.between(5, 8) * 60; // spawn next group after x seconds
         const randomId = Phaser.Math.RND.between(0, 11); // id to choose image in tiles.png

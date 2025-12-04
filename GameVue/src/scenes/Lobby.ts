@@ -15,6 +15,8 @@ interface GameSceneData {
     players: string[];
 }
 
+//TODO Background image?
+
 export class Lobby extends Phaser.Scene {
     private ui: LobbyUI | null = null;
     private connectedPlayers: string[] = [];

@@ -90,7 +90,7 @@ export class SwordAndBoard extends PlayerController {
         return this.velocityMax;
     }
 
-    // Optional: AI behavior stub for future
+    // TODO
     updateAI(): void {
         // For CPU-controlled characters
         // Not implemented in this phase
