@@ -1,5 +1,6 @@
 import { Scene } from 'phaser';
 import { PlayerController } from "../../managers/PlayerController.ts";
+import { EnemyController } from "../../managers/EnemyController.ts";
 import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
 import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
 import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
@@ -835,7 +836,7 @@ export class GameScene extends Scene
         this.enemyGroup.add(enemy);
     }
 
-    removeEnemy(enemy: EnemyFlying) {
+    removeEnemy(enemy: EnemyController) {
         this.enemyGroup.remove(enemy, true, true);
     }
 

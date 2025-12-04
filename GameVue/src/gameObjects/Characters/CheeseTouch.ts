@@ -17,17 +17,18 @@ import TimerEvent = Phaser.Time.TimerEvent;
 export class CheeseTouch extends PlayerController {
     // Beam properties
     beamGraphics: Graphics | null = null;
-    isBeaming: boolean = false;
+    isBeaming = false;
     beamDamageTimer: TimerEvent | null = null;
-    beamRange: number = 300;
+    beamRange = 300;
+    beamDamage = 1;
 
     // Lock-on properties
-    lockOnRadius: number = 100;  // Configurable radius around cursor to find targets
+    lockOnRadius = 100;  // Configurable radius around cursor to find targets
     lockedTarget: Phaser.Physics.Arcade.Sprite | null = null;
     lockOnIndicator: Graphics | null = null;
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 2);  // Frame 2 for CheeseTouch
+        super(scene, x, y, 2);  // Frame 2 for CheeseTouc
 
         // Balanced stats
         this.characterSpeed = 700;
@@ -42,6 +43,9 @@ export class CheeseTouch extends PlayerController {
         this.maxSkillMeter = 100;
         this.skillMeter = 0;
         this.createSkillBar();  // Create it now that it's enabled
+
+        this.ability1Rate = 60;
+        this.ability1Cooldown = 0;
 
         // Cleanup on destroy
         this.on('destroy', () => {
@@ -211,7 +215,7 @@ export class CheeseTouch extends PlayerController {
         // If we have a locked target, damage it directly
         if (this.lockedTarget && this.lockedTarget.active) {
             if ((this.lockedTarget as any).hit) {
-                (this.lockedTarget as any).hit(1);
+                (this.lockedTarget as any).hit(this.beamDamage);
                 this.skillMeter = Math.min(this.maxSkillMeter, this.skillMeter + 10);
                 this.updateSkillBarValue();
             }
@@ -229,7 +233,7 @@ export class CheeseTouch extends PlayerController {
             if (this.isInBeamPath(e.x, e.y)) {
                 // Deal damage to enemy
                 if ((e as any).hit) {
-                    (e as any).hit(1);
+                    (e as any).hit(this.beamDamage);
                     // Gain cheese meter when dealing damage
                     this.skillMeter = Math.min(this.maxSkillMeter, this.skillMeter + 10);
                     this.updateSkillBarValue();
