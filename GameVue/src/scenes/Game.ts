@@ -18,6 +18,7 @@ import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
 import PlayerBullet from "../gameObjects/PlayerBullet.ts";
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
+import Wall from "../gameObjects/Wall.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/EnemyFlying.ts";
 import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
@@ -59,6 +60,7 @@ export class GameScene extends Scene
     enemyBulletGroup: Group;
     playerBulletGroup: Group;
     enemyBulletDestroyersGroup: Group;
+    wallGroup: Group;
     cursors?: CursorKeys;
     timedEvent: TimerEvent;
 
@@ -76,6 +78,7 @@ export class GameScene extends Scene
     syncedBullets: Map<string, PlayerBullet> = new Map();  // Track network-synced player bullets
     syncedEnemyBullets: Map<string, EnemyBullet> = new Map();  // Track network-synced enemy bullets
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
+    syncedWalls: Map<string, Wall> = new Map();  // Track network-synced walls
     bulletIdCache: Set<string> = new Set();  // Reusable Set for player bullet ID tracking
     enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
@@ -129,7 +132,14 @@ export class GameScene extends Scene
 
         this.initInput();
         this.initPhysics();
+
+        // Set up multiplayer wall collisions after physics is initialized
+        if (this.networkEnabled) {
+            this.setupMultiplayerWallCollisions();
+        }
+
         this.initSpawners();  // Initialize enemy spawners from map config
+        this.initWalls();     // Initialize walls from map config
         // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
 
         // Setup camera after players are created
@@ -309,6 +319,15 @@ export class GameScene extends Scene
         this.setupNetworkHandlers();
 
         console.log(`Multiplayer initialized - Host: ${this.isHost}, Players: ${this.players.length}`);
+    }
+
+    setupMultiplayerWallCollisions() {
+        if (!this.playerManager) return;
+
+        // Add wall collision for each multiplayer player
+        this.playerManager.getAllPlayers().forEach(player => {
+            this.physics.add.collider(player, this.wallGroup);
+        });
     }
 
     setupNetworkHandlers() {
@@ -690,6 +709,7 @@ export class GameScene extends Scene
         this.enemyBulletGroup = this.add.group();
         this.playerBulletGroup = this.add.group();
         this.enemyBulletDestroyersGroup = this.add.group();
+        this.wallGroup = this.add.group();
 
         // Initialize bullet pool (Phase 2 optimization)
         this.bulletPool = new BulletPool(this, 200);  // Pool size: 200 bullets
@@ -728,6 +748,29 @@ export class GameScene extends Scene
 
         }
         // TODO: Set up collisions for multiplayer mode with all players
+
+        // Wall collisions (applies to both single and multiplayer)
+        // Players collide with walls (solid collision)
+        if (this.player) {
+            this.physics.add.collider(this.player, this.wallGroup);
+        }
+
+        // Enemies collide with walls (solid collision)
+        this.physics.add.collider(this.enemyGroup, this.wallGroup);
+
+        // Player bullets can damage destructible walls
+        this.physics.add.overlap(
+            this.playerBulletGroup,
+            this.wallGroup,
+            this.hitWall as () => void,
+            undefined,
+            this
+        );
+
+        // Enemy bullets collide with walls (both types blocked)
+        this.physics.add.collider(this.enemyBulletGroup, this.wallGroup, (bullet: any) => {
+            this.removeEnemyBullet(bullet);
+        });
     }
 
     /**
@@ -782,6 +825,38 @@ export class GameScene extends Scene
         });
 
         console.log(`Initialized ${this.spawners.length} spawner(s)`);
+    }
+
+    /**
+     * Initialize walls from current map configuration
+     * Creates Wall instances based on map's walls array
+     */
+    initWalls(): void {
+        if (!this.currentMap.walls) {
+            console.log('No walls defined for current map');
+            return;
+        }
+
+        // Create wall instances from map config
+        this.currentMap.walls.forEach(wallData => {
+            const wall = new Wall(
+                this,
+                wallData.x,
+                wallData.y,
+                wallData.spriteKey,
+                wallData.frame || 0,
+                wallData.health
+            );
+
+            this.addWall(wall);
+
+            // Track destructible walls for network sync
+            if (!wall.isIndestructible) {
+                this.syncedWalls.set(wall.wallId, wall);
+            }
+        });
+
+        console.log(`Initialized ${this.currentMap.walls.length} wall(s)`);
     }
 
     /**
@@ -968,6 +1043,14 @@ export class GameScene extends Scene
         this.enemyGroup.remove(enemy, true, true);
     }
 
+    addWall(wall: Wall) {
+        this.wallGroup.add(wall);
+    }
+
+    removeWall(wall: Wall) {
+        this.wallGroup.remove(wall, true, true);
+    }
+
     addExplosion(x: number, y: number) {
         new Explosion(this, x, y);
     }
@@ -985,6 +1068,14 @@ export class GameScene extends Scene
         this.updateScore(10);
         bullet.remove();
         enemy.hit(bullet.getPower());
+    }
+
+    hitWall(bullet: PlayerBullet, wall: Wall) {
+        // Only damage destructible walls
+        if (!wall.isIndestructible) {
+            wall.hit(bullet.getPower());
+        }
+        bullet.remove();
     }
 
     destroyEnemyBullet(bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {

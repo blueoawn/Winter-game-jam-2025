@@ -11,6 +11,10 @@ export default {
             key: 'summoners-rift',
             args: ['assets/Backgrounds/summonersRift.png']
         },
+        cookieCutterWall: {
+            key: 'cookie-cutter-wall',
+            args: ['assets/Sprites/cookiecutterwall.png']
+        },
     },
     spritesheet: {
         ships: {

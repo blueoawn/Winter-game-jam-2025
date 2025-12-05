@@ -57,6 +57,15 @@ export interface MapData {
 
     // Optional: Enemy spawner configurations
     spawners?: SpawnerConfig[];
+
+    // Optional: Wall configurations
+    walls?: Array<{
+        x: number;
+        y: number;
+        spriteKey: string;
+        frame?: number;
+        health: number;
+    }>;
 }
 
 /**
@@ -115,6 +124,17 @@ export const SummonersRift: MapData = {
             enemyType: 'EnemyLizardWizard',
             behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
         }
+    ],
+
+    // Wall barriers - Destructible barrier across mid lane
+    walls: [
+        { x: 600, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 664, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 728, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 792, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 856, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 920, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 984, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
     ]
 };
 
