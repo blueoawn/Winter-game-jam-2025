@@ -2,7 +2,9 @@
 
 // Railgun ability 1 - ninja star attack, fast moving projectile that does moderate damage with distance falloff
 
-// Should probably have a longer interval than the magic missle, but be more powerful
+// Should probably have a longer interval than the magic missle, but be more powerful, perhaps using the spreadshot logic from lizard wizard ability 2
+
+// We could then give lizard wizard ability 2 something a little more unique
 
 
 // Railgun ability 2 - long range beam that pierces (doesn't stop when it makes contact with collider)
