@@ -10,6 +10,9 @@ export default class EnemyLizardWizard extends EnemyController {
         const lizardWizardFrame = 0;  // Frame 0 is LizardWizard
         super(scene, x, y, lizardWizardFrame);
 
+        // Set enemy type for network sync
+        this.enemyType = 'EnemyLizardWizard';
+
         // Set enemy stats
         this.health = 5;
         this.maxHealth = 5;

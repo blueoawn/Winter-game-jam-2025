@@ -592,26 +592,35 @@ export class GameScene extends Scene
                 let enemy = this.syncedEnemies.get(enemyState.id);
 
                 if (!enemy) {
-                    // Create new enemy (network-synced, so we just need a sprite without path logic)
-                    // We'll manually update its position from the host
-                    enemy = new EnemyFlying(
-                        this,
-                        enemyState.shipId,
-                        0,  // pathId 0 (will be overridden by network position)
-                        0,  // speed 0 (not following path, position synced from host)
-                        enemyState.power
-                    );
+                    // Create correct enemy type based on network state
+                    if (enemyState.enemyType === 'EnemyLizardWizard') {
+                        // Create EnemyLizardWizard
+                        enemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
 
-                    // Set ID for tracking
-                    (enemy as any).enemyId = enemyState.id;
+                        // Set ID for tracking
+                        (enemy as any).enemyId = enemyState.id;
+                    } else {
+                        // Create EnemyFlying (default/fallback)
+                        enemy = new EnemyFlying(
+                            this,
+                            enemyState.shipId,
+                            0,  // pathId 0 (will be overridden by network position)
+                            0,  // speed 0 (not following path, position synced from host)
+                            enemyState.power
+                        );
 
-                    // Disable path following for network-synced enemies
-                    (enemy as any).pathIndex = 999;  // Set > 1 to stop path updates (see preUpdate line 44)
+                        // Set ID for tracking
+                        (enemy as any).enemyId = enemyState.id;
 
-                    // Set initial position from network state
-                    enemy.setPosition(enemyState.x, enemyState.y);
+                        // Disable path following for network-synced enemies
+                        (enemy as any).pathIndex = 999;  // Set > 1 to stop path updates (see preUpdate line 44)
 
-                    this.enemyGroup.add(enemy);
+                        // Set initial position from network state
+                        enemy.setPosition(enemyState.x, enemyState.y);
+
+                        this.enemyGroup.add(enemy);
+                    }
+
                     this.syncedEnemies.set(enemyState.id, enemy);
                 } else {
                     // Update existing enemy position from host

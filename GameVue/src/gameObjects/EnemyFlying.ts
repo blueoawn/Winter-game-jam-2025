@@ -32,6 +32,9 @@ export default class EnemyFlying extends EnemyController {
         const startingFrame = 12;
         super(scene, 500, 500, startingFrame + shipId);
 
+        // Set enemy type for network sync
+        this.enemyType = 'EnemyFlying';
+
         this.shipId = shipId;
         this.pathId = pathId;
         this.power = power;

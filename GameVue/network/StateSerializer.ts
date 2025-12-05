@@ -19,7 +19,7 @@ export interface EnemyState {
     y: number;
     health: number;
     pathProgress: number;
-    shipId: number;
+    enemyType: string;
     pathId: number;
     power: number;
 }
@@ -93,6 +93,7 @@ interface EnemyObject {
     y: number;
     health: number;
     pathProgress: number;
+    enemyType: string;
     shipId: number;
     pathId: number;
     power: number;
@@ -197,6 +198,7 @@ export class StateSerializer {
                 y: Math.round(e.y),
                 health: e.health,
                 pathProgress: 0,  // Not needed for network-synced enemies (position overridden)
+                enemyType: e.enemyType || 'EnemyFlying',  // Include enemy type for correct client-side creation
                 shipId: e.shipId,
                 pathId: e.pathId,
                 power: e.power

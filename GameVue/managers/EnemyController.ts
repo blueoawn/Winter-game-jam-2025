@@ -8,6 +8,7 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite {
     maxHealth: number = 1;
     power: number = 1;  // Damage dealt to player
     enemyId: string;
+    enemyType: string = 'EnemyFlying';  // Default type, should be overridden by subclasses
     gameScene: GameScene;
     healthBarContainer: Container | null = null;
     protected showHealthBar: boolean = true;  // Can be disabled per enemy type
