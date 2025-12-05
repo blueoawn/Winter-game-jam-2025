@@ -143,6 +143,30 @@ export class BigSword extends PlayerController {
     }
 
     checkSlashHits(slashX: number, slashY: number, slashAngle: number): void {
+        // Check walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || this.hitEnemiesSlash.has(w)) continue;
+
+            const dx = w.x - slashX;
+            const dy = w.y - slashY;
+
+            const cos = Math.cos(-slashAngle);
+            const sin = Math.sin(-slashAngle);
+            const localX = dx * cos - dy * sin;
+            const localY = dx * sin + dy * cos;
+
+            if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
+                Math.abs(localY) < this.slashHeight / 2 + 20) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.slashDamage);
+                    this.hitEnemiesSlash.add(w);
+                }
+            }
+        }
+
+        // Check enemies
         const enemies = this.gameScene.enemyGroup.getChildren();
 
         for (const enemy of enemies) {
@@ -285,6 +309,24 @@ export class BigSword extends PlayerController {
     }
 
     checkDashHits(): void {
+        // Check walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || this.hitEnemies.has(w)) continue;
+
+            const dx = Math.abs(w.x - this.x);
+            const dy = Math.abs(w.y - this.y);
+
+            if (dx < this.dashHitboxWidth / 2 + 20 && dy < this.dashHitboxHeight / 2 + 20) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.dashDamage);
+                    this.hitEnemies.add(w);
+                }
+            }
+        }
+
+        // Check enemies
         const enemies = this.gameScene.enemyGroup.getChildren();
 
         for (const enemy of enemies) {

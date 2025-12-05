@@ -226,6 +226,19 @@ export class CheeseTouch extends PlayerController {
             return;
         }
 
+        // Check for walls in beam path
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active) continue;
+
+            if (this.isInBeamPath(w.x, w.y)) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.beamDamage);
+                }
+            }
+        }
+
         // Fallback: Check for enemies in beam path
         const enemies = this.gameScene.enemyGroup.getChildren();
 
