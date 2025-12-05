@@ -20,9 +20,9 @@ import PlayerBullet from "../gameObjects/PlayerBullet.ts";
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/EnemyFlying.ts";
-import EnemyLizardWizard from "../gameObjects/EnemyLizardWizard.ts";
+import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
-
+import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../network/NetworkManager';
 import { StateSerializer } from '../../network/StateSerializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
@@ -81,6 +81,7 @@ export class GameScene extends Scene
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     bulletPool: BulletPool;  // Object pool for efficient bullet management (Phase 2 optimization)
     currentMap: MapData;  // Current active map data
+    spawners: Spawner[] = [];  // Enemy spawners for current map
 
     constructor ()
     {
@@ -128,6 +129,7 @@ export class GameScene extends Scene
 
         this.initInput();
         this.initPhysics();
+        this.initSpawners();  // Initialize enemy spawners from map config
         // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
 
         // Setup camera after players are created
@@ -146,12 +148,6 @@ export class GameScene extends Scene
             this.updateSinglePlayer();
         }
 
-        // DISABLED: EnemyFlying has bugs - using EnemyLizardWizard instead
-        // Limit enemy spawning in multiplayer to avoid overwhelming network
-        // const maxActiveEnemies = this.networkEnabled ? 30 : 100;  // Cap at 30 enemies in multiplayer
-        // const canSpawn = this.enemyGroup.getChildren().length < maxActiveEnemies;
-        // if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
-        // else if (canSpawn) this.addFlyingGroup();
     }
 
     initVariables() {
@@ -284,6 +280,9 @@ export class GameScene extends Scene
         this.currentMap = newMap;
         console.log(`Loaded map: ${newMap.name} (${newMap.id})`);
 
+        // Clear existing spawners on map transition
+        this.spawners = [];
+
         // Note: To fully transition to a new map:
         // 1. Clear existing game objects (enemies, bullets, etc.)
         // 2. Update world bounds via initWorldBounds()
@@ -377,6 +376,9 @@ export class GameScene extends Scene
 
         // Update all players
         this.playerManager?.update();
+
+        // Update spawners (host-only)
+        this.updateSpawners();
 
         // Broadcast state to clients
         const now = Date.now();
@@ -712,6 +714,74 @@ export class GameScene extends Scene
         // TODO: Set up collisions for multiplayer mode with all players
     }
 
+    /**
+     * Initialize spawners from current map configuration
+     * Creates Spawner instances based on map's spawners array
+     */
+    initSpawners(): void {
+        if (!this.currentMap.spawners) {
+            console.log('No spawners defined for current map');
+            return;
+        }
+
+        // Create spawner instances from map config
+        this.currentMap.spawners.forEach(config => {
+            // Create behavior if specified
+            let behavior: IBehavior | undefined;
+
+            if (config.behaviorType) {
+                switch (config.behaviorType) {
+                    case 'Aggressive':
+                        behavior = new AggressiveBehavior(config.behaviorOptions);
+                        break;
+                    case 'Territorial':
+                        behavior = new TerritorialBehavior(
+                            config.x,
+                            config.y,
+                            config.behaviorOptions
+                        );
+                        break;
+                    case 'Pacifist':
+                        behavior = new PacifistBehavior(
+                            config.x,
+                            config.y,
+                            config.behaviorOptions
+                        );
+                        break;
+                }
+            }
+
+            const spawner = new Spawner(
+                this,
+                config.x,
+                config.y,
+                config.totalEnemies,
+                config.spawnRate,
+                config.timeOffset,
+                config.enemyType,
+                behavior
+            );
+
+            this.spawners.push(spawner);
+        });
+
+        console.log(`Initialized ${this.spawners.length} spawner(s)`);
+    }
+
+    /**
+     * Update all active spawners (host-only)
+     * Called every frame from updateHost()
+     */
+    updateSpawners(): void {
+        // Only host updates spawners (clients receive enemies via network sync)
+        if (!this.isHost) return;
+
+        // Update all active spawners
+        for (let i = 0; i < this.spawners.length; i++) {
+            this.spawners[i].update();
+        }
+    }
+
     // initPlayer() removed - now using initSinglePlayer() and initMultiplayer() with character classes
 
     initInput() {
@@ -790,14 +860,8 @@ export class GameScene extends Scene
         this.gameStarted = true;
         this.tutorialText.setVisible(false);
 
-        //TODO This is broken in multiplayer and I'm working on fixing it.
-        // You can comment it out if you want to just see multiple ships flying around without enemies
-        //this.addFlyingGroup();
+        // Enemies will now spawn based off of data in the map. 
 
-        // Spawn LizardWizard enemy in the center of Summoner's Rift
-        const mapCenterX = this.currentMap.width / 2;
-        const mapCenterY = this.currentMap.height / 2;
-        this.addLizardWizardEnemy(mapCenterX, mapCenterY);
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {

@@ -1,6 +1,23 @@
 // Summoners Rift map configuration
 // A three-lane battle arena map
 
+import { AggressiveBehavior } from "../behaviorScripts/Aggressive";
+import { IBehavior } from "../behaviorScripts/Behavior";
+
+/**
+ * Spawner configuration for enemy spawning
+ */
+export interface SpawnerConfig {
+    x: number;
+    y: number;
+    totalEnemies: number;
+    spawnRate: number;      // Milliseconds between spawns
+    timeOffset: number;     // Milliseconds before first spawn
+    enemyType: string;      // e.g., 'EnemyLizardWizard'
+    behaviorType?: IBehavior;  // 'Aggressive' | 'Territorial' | 'Pacifist'
+    behaviorOptions?: any;  // Behavior-specific configuration
+}
+
 /**
  * Map data interface for defining game maps
  * All maps should conform to this structure
@@ -37,6 +54,9 @@ export interface MapData {
         type: string;
         position: { x: number; y: number };
     }>;
+
+    // Optional: Enemy spawner configurations
+    spawners?: SpawnerConfig[];
 }
 
 /**
@@ -82,6 +102,19 @@ export const SummonersRift: MapData = {
     entities: [
         { id: 'dragon', type: 'neutral-objective', position: { x: 400, y: 800 } },
         { id: 'baron', type: 'neutral-objective', position: { x: 1200, y: 543 } },
+    ],
+
+    // Enemy spawners
+    spawners: [
+        {
+            x: 800,              // Map center X
+            y: 672,              // Map center Y (1343/2 ≈ 672)
+            totalEnemies: 10,
+            spawnRate: 2000,     // 2 seconds between spawns
+            timeOffset: 0,    // Start immediately
+            enemyType: 'EnemyLizardWizard',
+            behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
+        }
     ]
 };
 
