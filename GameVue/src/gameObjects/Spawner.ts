@@ -67,7 +67,7 @@ export class Spawner {
      */
     update(): void {
         // Only host spawns enemies (clients receive via network sync)
-        if (!this.scene.isHost) {
+        if (!this.scene.isHost && this.scene.networkEnabled) {
             return;
         }
 

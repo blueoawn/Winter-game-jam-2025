@@ -281,9 +281,8 @@ export class GameScene extends Scene
         console.log(`Loaded map: ${newMap.name} (${newMap.id})`);
 
         // Clear existing spawners on map transition
-        this.spawners = [];
-
         // Note: To fully transition to a new map:
+        // 0. Clear existing spawners
         // 1. Clear existing game objects (enemies, bullets, etc.)
         // 2. Update world bounds via initWorldBounds()
         // 3. Update camera bounds via initCamera()
@@ -351,6 +350,8 @@ export class GameScene extends Scene
         if ((this.player as any).update) {
             (this.player as any).update();
         }
+
+        this.updateSpawners();
     }
 
     updateMultiplayer() {
@@ -774,7 +775,7 @@ export class GameScene extends Scene
      */
     updateSpawners(): void {
         // Only host updates spawners (clients receive enemies via network sync)
-        if (!this.isHost) return;
+        if (!this.isHost && this.networkEnabled) return;
 
         // Update all active spawners
         for (let i = 0; i < this.spawners.length; i++) {
