@@ -1,9 +1,5 @@
 import { GameScene } from '../scenes/Game';
 import { IBehavior } from '../behaviorScripts/Behavior';
-import { IdleBehavior } from '../behaviorScripts/Idle';
-import { AggressiveBehavior } from '../behaviorScripts/Aggressive';
-import { TerritorialBehavior } from '../behaviorScripts/Territorial';
-import { PacifistBehavior } from '../behaviorScripts/Pacifist';
 /**
  * Spawner - Host-authoritative enemy spawner with tick-based timing
  *

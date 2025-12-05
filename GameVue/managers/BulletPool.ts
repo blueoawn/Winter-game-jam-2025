@@ -29,7 +29,12 @@ export class BulletPool {
             bullet = new PlayerBullet(this.scene, from, to, power);
         } else {
             // Reuse pooled bullet - reinitialize it
+            console.log(`BulletPool: Reusing bullet from pool`);
+
             bullet.setPosition(from.x, from.y);
+
+            // Reset creation time for auto-reclaim timer
+            (bullet as any).createdTime = Date.now();
 
             // Recalculate velocity vector
             const velocityX = to.x - from.x;
@@ -48,12 +53,46 @@ export class BulletPool {
             // Generate new unique ID
             bullet.id = `bullet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            // Reactivate sprite
+            // CRITICAL: Reactivate sprite and ensure it's in the scene
             bullet.setActive(true);
             bullet.setVisible(true);
+            bullet.setDepth(10);  // Ensure proper depth
+
+            // Re-add to scene display list (in case it was removed)
+            if (!this.scene.sys.displayList.exists(bullet)) {
+                this.scene.add.existing(bullet);
+                console.log(`BulletPool: Re-added bullet to display list`);
+            }
+
+            // Ensure physics body exists and is properly configured
+            if (!bullet.body) {
+                // Physics body was destroyed, recreate it
+                this.scene.physics.add.existing(bullet);
+                console.log(`BulletPool: Recreated physics body`);
+            }
+
+            // Explicitly enable and reset physics body
+            if (bullet.body) {
+                const body = bullet.body as Phaser.Physics.Arcade.Body;
+                body.enable = true;
+                body.checkCollision.none = false;
+                body.checkCollision.up = true;
+                body.checkCollision.down = true;
+                body.checkCollision.left = true;
+                body.checkCollision.right = true;
+                console.log(`BulletPool: Physics body enabled - checkCollision=${JSON.stringify(body.checkCollision)}`);
+            }
+
+            console.log(`BulletPool: Reused bullet ready - visible=${bullet.visible}, active=${bullet.active}, depth=${bullet.depth}, hasBody=${!!bullet.body}`);
         }
 
         this.active.set(bullet.id, bullet);
+
+        // Only warn if pool is completely exhausted (not just "low")
+        if (this.pool.length === 0 && this.active.size > 50) {
+            console.warn(`BulletPool: Pool exhausted! Active: ${this.active.size}, Pooled: ${this.pool.length}`);
+        }
+
         return bullet;
     }
 

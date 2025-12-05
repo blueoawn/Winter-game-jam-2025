@@ -338,6 +338,9 @@ export class GameScene extends Scene
     updateSinglePlayer() {
         if (!this.player || !this.buttonMapper) return;
 
+        // Increment tick counter for spawner timing (same as multiplayer)
+        this.tick++;
+
         // Get input from ButtonMapper
         const input = this.buttonMapper.getInput();
 
@@ -671,12 +674,15 @@ export class GameScene extends Scene
     }
 
     initAnimations() {
-        this.anims.create({
-            key: ANIMATION.explosion.key,
-            frames: this.anims.generateFrameNumbers(ANIMATION.explosion.texture, ANIMATION.explosion.config),
-            frameRate: ANIMATION.explosion.frameRate,
-            repeat: ANIMATION.explosion.repeat
-        });
+        // Only create animation if it doesn't already exist (prevents error on scene restart)
+        if (!this.anims.exists(ANIMATION.explosion.key)) {
+            this.anims.create({
+                key: ANIMATION.explosion.key,
+                frames: this.anims.generateFrameNumbers(ANIMATION.explosion.texture, ANIMATION.explosion.config),
+                frameRate: ANIMATION.explosion.frameRate,
+                repeat: ANIMATION.explosion.repeat
+            });
+        }
     }
 
     initPhysics() {
@@ -875,8 +881,13 @@ export class GameScene extends Scene
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
+        const stats = this.bulletPool.getStats();
+        console.log(`Game.fireBullet: Acquiring bullet (pool: active=${stats.active}, pooled=${stats.pooled})`);
+
         const bullet = this.bulletPool.acquire(from, to, 1);
         this.playerBulletGroup.add(bullet);
+
+        console.log(`Game.fireBullet: Bullet acquired, ID=${bullet.id}`);
     }
 
     fireBulletWithFalloff(

@@ -44,6 +44,11 @@ export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
             this.setFlipY(true); // flip image vertically to point downwards
             this.setVelocityY(this.moveVelocity * power * 0.5); // bullet vertical speed
         }
+
+        // Ensure physics body is enabled and active
+        if (this.body) {
+            this.body.enable = true;
+        }
     }
 
     preUpdate(time: number, delta: number) {
@@ -56,9 +61,14 @@ export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
         return this.power;
     }
 
-    // is this bullet below the screen?
+    // is this bullet off the screen?
     checkWorldBounds() {
-        if (this.y > this.scene.scale.height) {
+        const worldBounds = this.scene.physics.world.bounds;
+
+        if (this.x < worldBounds.x ||
+            this.x > worldBounds.x + worldBounds.width ||
+            this.y < worldBounds.y ||
+            this.y > worldBounds.y + worldBounds.height) {
             this.die();
         }
     }

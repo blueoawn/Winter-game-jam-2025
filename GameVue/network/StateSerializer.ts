@@ -164,7 +164,7 @@ export class StateSerializer {
         };
     }
 
-    // Serialize player data (Phase 3 optimization: integer positions for packet size reduction)
+    // Serialize player data
     static serializePlayers(players?: PlayerObject[]): PlayerState[] {
         if (!players || !Array.isArray(players)) return [];
 
@@ -185,7 +185,7 @@ export class StateSerializer {
         return result;
     }
 
-    // Serialize enemy data (Phase 3 optimization: integer positions, remove pathProgress)
+    // Serialize enemy data
     static serializeEnemies(enemies?: EnemyObject[]): EnemyState[] {
         if (!enemies || !Array.isArray(enemies)) return [];
 

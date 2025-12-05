@@ -15,7 +15,12 @@ export class LizardWizard extends PlayerController {
     }
 
     protected ability1(): void {
-        if (!this.canUseAbility1()) return;
+        if (!this.canUseAbility1()) {
+            console.log(`LizardWizard: ability1 blocked by cooldown (${this.ability1Cooldown} frames remaining)`);
+            return;
+        }
+
+        console.log(`LizardWizard: Firing ability1`);
 
         // Fire projectile using stored aim position (works for both local and network input)
         this.gameScene.fireBullet(
