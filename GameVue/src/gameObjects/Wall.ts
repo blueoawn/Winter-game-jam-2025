@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { GameScene } from '../scenes/Game';
 import { Depth } from '../constants';
+import { SyncableEntity, EntityState } from '../../network/SyncableEntity';
 
 /**
  * Wall - Static obstacle entity with optional destructibility
@@ -13,10 +14,11 @@ import { Depth } from '../constants';
  * - Any positive health value makes wall destructible (automatic network sync)
  * - Indestructible walls don't waste network bandwidth
  */
-export default class Wall extends Phaser.Physics.Arcade.Sprite {
+export default class Wall extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
     private static nextId = 0;
 
-    wallId: string;
+    id: string;  // Implements SyncableEntity.id
+    wallId: string;  // Alias for id (backwards compatibility)
     wallType: string = 'Wall';
     gameScene: GameScene;
 
@@ -55,9 +57,11 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite {
 
         // Only generate network ID for destructible walls
         if (!this.isIndestructible) {
-            this.wallId = `wall_${Date.now()}_${Wall.nextId++}`;
+            this.id = `wall_${Date.now()}_${Wall.nextId++}`;
+            this.wallId = this.id; // Alias for backwards compatibility
         } else {
-            this.wallId = ''; // Indestructible walls don't need network tracking
+            this.id = ''; // Indestructible walls don't need network tracking
+            this.wallId = '';
         }
 
         // Add to scene
@@ -173,44 +177,44 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite {
     }
 
     /**
-     * Gets the wall data for network serialization
+     * Gets the wall data for network serialization (SyncableEntity interface)
      * Only destructible walls need network sync
      *
      * @returns Object containing wall state for network sync, or null if indestructible
      */
-    getNetworkState(): {
-        wallId: string;
-        wallType: string;
-        x: number;
-        y: number;
-        health: number;
-        maxHealth: number;
-    } | null {
+    getNetworkState(): EntityState | null {
         // Indestructible walls don't need network sync
         if (this.isIndestructible) {
             return null;
         }
 
         return {
-            wallId: this.wallId,
-            wallType: this.wallType,
-            x: this.x,
-            y: this.y,
+            id: this.id,
+            type: this.wallType,
+            x: Math.round(this.x),
+            y: Math.round(this.y),
             health: this.health,
             maxHealth: this.maxHealth
         };
     }
 
     /**
-     * Updates wall state from network data
+     * Updates wall state from network data (SyncableEntity interface)
      *
      * @param state - Network state data
      */
-    applyNetworkState(state: { health: number }): void {
+    updateFromNetworkState(state: EntityState): void {
         if (this.isIndestructible) return;
 
+        // Update position (shouldn't change for static walls, but included for completeness)
+        if (state.x !== undefined) this.x = state.x;
+        if (state.y !== undefined) this.y = state.y;
+
+        // Update health
         const oldHealth = this.health;
-        this.health = state.health;
+        if (state.health !== undefined) {
+            this.health = state.health;
+        }
 
         if (oldHealth !== this.health) {
             this.updateHealthBarValue();

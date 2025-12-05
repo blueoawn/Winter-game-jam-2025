@@ -18,6 +18,9 @@ import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
+import { MagicMissile } from "../gameObjects/Projectile/MagicMissile.ts";
+import { ShotgunPellet } from "../gameObjects/Projectile/ShotgunPellet.ts";
+import { NinjaStar } from "../gameObjects/Projectile/NinjaStar.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/EnemyFlying.ts";
 import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
@@ -434,6 +437,7 @@ export class GameScene extends Scene
         // Phase 3: Limit entity counts to prevent "Message too big" errors
         const allEnemies = this.enemyGroup.getChildren();
         const allEnemyBullets = this.enemyBulletGroup.getChildren();
+        const allProjectiles = this.playerBulletGroup.getChildren();
 
         // Limit enemies to 30 max (should be enough for multiplayer)
         const enemies = allEnemies.length > 30 ? allEnemies.slice(0, 30) : allEnemies;
@@ -441,13 +445,20 @@ export class GameScene extends Scene
         // Limit enemy bullets to 50 max (prevent packet overflow)
         const enemyBullets = allEnemyBullets.length > 50 ? allEnemyBullets.slice(0, 50) : allEnemyBullets;
 
+        // Limit projectiles to 100 max (character-specific projectiles)
+        const projectiles = allProjectiles.length > 100 ? allProjectiles.slice(0, 100) : allProjectiles;
+
+        // Get destructible walls from synced walls map
+        const walls = Array.from(this.syncedWalls.values());
+
         // Reuse timestamp from rate limiting check to avoid redundant Date.now() calls
         const state = StateSerializer.serialize({
             tick: this.tick,
             players: this.playerManager.getAllPlayers() as any,
             enemies: enemies as any,
-            bullets: this.playerBulletGroup.getChildren() as any,
+            projectiles: projectiles as any,  // Character-specific projectiles
             enemyBullets: enemyBullets as any,  // Limited enemy bullets
+            walls: walls as any,  // Destructible walls
             score: this.score,
             scrollMovement: this.scrollMovement,
             spawnEnemyCounter: this.spawnEnemyCounter,
@@ -603,6 +614,110 @@ export class GameScene extends Scene
                 }
             });
         }
+
+        // Sync projectiles from host (character-specific: MagicMissile, ShotgunPellet, NinjaStar)
+        if (state.projectiles && Array.isArray(state.projectiles)) {
+            const projectileIdCache: Set<string> = new Set();
+
+            state.projectiles.forEach((projState: any) => {
+                projectileIdCache.add(projState.id);
+
+                // Check if projectile already exists in playerBulletGroup
+                const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === projState.id);
+
+                if (!existing) {
+                    // Create new projectile based on type
+                    const projectile = this.createProjectileFromState(projState);
+                    if (projectile) {
+                        this.playerBulletGroup.add(projectile);
+                    }
+                } else {
+                    // Update existing projectile
+                    if ((existing as any).updateFromNetworkState) {
+                        (existing as any).updateFromNetworkState(projState);
+                    }
+                }
+            });
+
+            // Remove projectiles that are no longer in the state
+            this.playerBulletGroup.getChildren().forEach((projectile: any) => {
+                if (projectile.id && !projectileIdCache.has(projectile.id)) {
+                    projectile.destroy();
+                }
+            });
+        }
+
+        // Sync walls from host
+        if (state.walls && Array.isArray(state.walls)) {
+            state.walls.forEach((wallState: any) => {
+                // Check if wall already exists
+                let wall = this.syncedWalls.get(wallState.id);
+
+                if (wall) {
+                    // Update existing wall
+                    wall.updateFromNetworkState(wallState);
+                }
+                // Note: Walls are created from map data, not network state
+                // So we only update existing walls, never create new ones here
+            });
+        }
+    }
+
+    // Helper method to create projectiles from network state
+    private createProjectileFromState(state: any): any {
+        let projectile: any = null;
+
+        switch (state.type) {
+            case 'MagicMissile':
+                projectile = new MagicMissile(
+                    this,
+                    state.x,
+                    state.y,
+                    state.x + (state.velocityX || 0),
+                    state.y + (state.velocityY || 0),
+                    state.damage || 1
+                );
+                break;
+            case 'ShotgunPellet':
+                projectile = new ShotgunPellet(
+                    this,
+                    state.x,
+                    state.y,
+                    state.x + (state.velocityX || 0),
+                    state.y + (state.velocityY || 0),
+                    state.baseDamage || 3,
+                    state.minDamageMultiplier || 0.2,
+                    state.falloffStart || 80,
+                    state.falloffEnd || 220
+                );
+                // Set start position for damage falloff
+                if (state.startX !== undefined) (projectile as any).startX = state.startX;
+                if (state.startY !== undefined) (projectile as any).startY = state.startY;
+                break;
+            case 'NinjaStar':
+                projectile = new NinjaStar(
+                    this,
+                    state.x,
+                    state.y,
+                    state.x + (state.velocityX || 0),
+                    state.y + (state.velocityY || 0),
+                    state.damage || 2
+                );
+                break;
+            default:
+                console.warn(`Unknown projectile type: ${state.type}`);
+                return null;
+        }
+
+        if (projectile) {
+            // Override generated ID with network ID
+            projectile.id = state.id;
+
+            // Apply full network state
+            projectile.updateFromNetworkState(state);
+        }
+
+        return projectile;
     }
 
     initGameUi() {

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
 
 /**
  * ShotgunPellet - BoomStick's shotgun projectile
@@ -9,7 +10,7 @@ import ASSETS from '../../assets';
  * A fast-moving pellet with distance-based damage falloff
  * Visual: Orange/yellow tinted sprite representing shotgun scatter
  */
-export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite {
+export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
     private static nextId = 0;
 
     id: string;
@@ -127,5 +128,57 @@ export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite {
      */
     remove(): void {
         this.destroy();
+    }
+
+    /**
+     * Get network state for synchronization (SyncableEntity interface)
+     */
+    getNetworkState(): EntityState | null {
+        if (!this.active) return null;
+
+        return {
+            id: this.id,
+            type: 'ShotgunPellet',
+            x: Math.round(this.x),
+            y: Math.round(this.y),
+            velocityX: this.body ? Math.round(this.body.velocity.x) : 0,
+            velocityY: this.body ? Math.round(this.body.velocity.y) : 0,
+            rotation: this.rotation,
+            baseDamage: this.baseDamage,
+            startX: this.startX,  // Needed for falloff calculation
+            startY: this.startY,  // Needed for falloff calculation
+            minDamageMultiplier: this.minDamageMultiplier,
+            falloffStart: this.falloffStart,
+            falloffEnd: this.falloffEnd
+        };
+    }
+
+    /**
+     * Update from network state (SyncableEntity interface)
+     */
+    updateFromNetworkState(state: EntityState): void {
+        this.setPosition(state.x, state.y);
+
+        if (state.velocityX !== undefined && state.velocityY !== undefined && this.body) {
+            this.body.velocity.x = state.velocityX;
+            this.body.velocity.y = state.velocityY;
+        }
+
+        if (state.rotation !== undefined) {
+            this.rotation = state.rotation;
+        }
+
+        // Update damage falloff properties
+        if (state.baseDamage !== undefined) this.baseDamage = state.baseDamage;
+        if (state.startX !== undefined) this.startX = state.startX;
+        if (state.startY !== undefined) this.startY = state.startY;
+        if (state.minDamageMultiplier !== undefined) this.minDamageMultiplier = state.minDamageMultiplier;
+        if (state.falloffStart !== undefined) this.falloffStart = state.falloffStart;
+        if (state.falloffEnd !== undefined) this.falloffEnd = state.falloffEnd;
+
+        // Recalculate distance traveled
+        const dx = this.x - this.startX;
+        const dy = this.y - this.startY;
+        this.distanceTraveled = Math.sqrt(dx * dx + dy * dy);
     }
 }

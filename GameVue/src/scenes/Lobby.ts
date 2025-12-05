@@ -64,6 +64,8 @@ export class Lobby extends Phaser.Scene {
         }
     }
 
+    //TODO add field to enter player name after clicking host/join (backend can still use existing clientId system, but display names are nicer)
+
     async hostGame(): Promise<void> {
         this.isHost = true;
         const roomCode = await NetworkManager.hostGame();

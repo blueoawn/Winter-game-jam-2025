@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
 
 /**
  * ninjastar - Right now this is used by Sword and Board, but I think it makes more sense as ability1 of the railgun character
  *
  * A silver/blue spinning blade projectile representing a sword slash attack
  */
-export class NinjaStar extends Phaser.Physics.Arcade.Sprite {
+export class NinjaStar extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
     private static nextId = 0;
 
     id: string;
@@ -93,5 +94,43 @@ export class NinjaStar extends Phaser.Physics.Arcade.Sprite {
      */
     remove(): void {
         this.destroy();
+    }
+
+    /**
+     * Get network state for synchronization (SyncableEntity interface)
+     */
+    getNetworkState(): EntityState | null {
+        if (!this.active) return null;
+
+        return {
+            id: this.id,
+            type: 'NinjaStar',
+            x: Math.round(this.x),
+            y: Math.round(this.y),
+            velocityX: this.body ? Math.round(this.body.velocity.x) : 0,
+            velocityY: this.body ? Math.round(this.body.velocity.y) : 0,
+            rotation: this.rotation,
+            damage: this.damage
+        };
+    }
+
+    /**
+     * Update from network state (SyncableEntity interface)
+     */
+    updateFromNetworkState(state: EntityState): void {
+        this.setPosition(state.x, state.y);
+
+        if (state.velocityX !== undefined && state.velocityY !== undefined && this.body) {
+            this.body.velocity.x = state.velocityX;
+            this.body.velocity.y = state.velocityY;
+        }
+
+        if (state.rotation !== undefined) {
+            this.rotation = state.rotation;
+        }
+
+        if (state.damage !== undefined) {
+            this.damage = state.damage;
+        }
     }
 }
