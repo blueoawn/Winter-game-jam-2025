@@ -16,7 +16,6 @@ import CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys;
 
 import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
-import PlayerBullet from "../gameObjects/PlayerBullet.ts";
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
@@ -27,7 +26,6 @@ import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../network/NetworkManager';
 import { StateSerializer } from '../../network/StateSerializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
-import { BulletPool } from '../../managers/BulletPool.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
@@ -75,14 +73,11 @@ export class GameScene extends Scene
     inputSendRate: number;
     lastInputSendTime: number;
     tick: number;
-    syncedBullets: Map<string, PlayerBullet> = new Map();  // Track network-synced player bullets
     syncedEnemyBullets: Map<string, EnemyBullet> = new Map();  // Track network-synced enemy bullets
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
     syncedWalls: Map<string, Wall> = new Map();  // Track network-synced walls
-    bulletIdCache: Set<string> = new Set();  // Reusable Set for player bullet ID tracking
     enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
-    bulletPool: BulletPool;  // Object pool for efficient bullet management (Phase 2 optimization)
     currentMap: MapData;  // Current active map data
     spawners: Spawner[] = [];  // Enemy spawners for current map
 
@@ -503,57 +498,6 @@ export class GameScene extends Scene
             this.scoreText.setText(`Score: ${this.score}`);
         }
 
-        // Sync bullets from host
-        if (state.bullets && Array.isArray(state.bullets)) {
-            // Track which bullets we've seen in this update (reuse Set to avoid allocation)
-            this.bulletIdCache.clear();
-
-            state.bullets.forEach((bulletState: any) => {
-                this.bulletIdCache.add(bulletState.id);
-
-                // Check if bullet already exists
-                let bullet = this.syncedBullets.get(bulletState.id);
-
-                if (!bullet) {
-                    // Create new bullet using pool (Phase 2 optimization)
-                    // Calculate 'to' position from velocity for constructor
-                    const to = {
-                        x: bulletState.x + bulletState.velocityX,
-                        y: bulletState.y + bulletState.velocityY
-                    };
-
-                    bullet = this.bulletPool.acquire(
-                        { x: bulletState.x, y: bulletState.y },
-                        to,
-                        bulletState.power
-                    );
-
-                    // Override pool-generated ID with network state ID for sync
-                    bullet.id = bulletState.id;
-
-                    this.playerBulletGroup.add(bullet);
-                    this.syncedBullets.set(bulletState.id, bullet);
-                } else {
-                    // Update existing bullet position and velocity
-                    bullet.setPosition(bulletState.x, bulletState.y);
-                    if (bullet.body) {
-                        bullet.body.velocity.x = bulletState.velocityX;
-                        bullet.body.velocity.y = bulletState.velocityY;
-                    }
-                }
-            });
-
-            // Remove bullets that are no longer in the state
-            this.syncedBullets.forEach((bullet, id) => {
-                if (!this.bulletIdCache.has(id)) {
-                    // Release to pool instead of destroying (Phase 2 optimization)
-                    this.playerBulletGroup.remove(bullet, false, false);
-                    this.bulletPool.release(bullet);
-                    this.syncedBullets.delete(id);
-                }
-            });
-        }
-
         // Sync enemy bullets from host
         if (state.enemyBullets && Array.isArray(state.enemyBullets)) {
             this.enemyBulletIdCache.clear();
@@ -710,9 +654,6 @@ export class GameScene extends Scene
         this.playerBulletGroup = this.add.group();
         this.enemyBulletDestroyersGroup = this.add.group();
         this.wallGroup = this.add.group();
-
-        // Initialize bullet pool (Phase 2 optimization)
-        this.bulletPool = new BulletPool(this, 200);  // Pool size: 200 bullets
 
         // Only set up collisions for single player mode
         if (!this.networkEnabled && this.player) {
@@ -953,35 +894,6 @@ export class GameScene extends Scene
 
         // Enemies will now spawn based off of data in the map. 
 
-    }
-
-    fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
-        const stats = this.bulletPool.getStats();
-        console.log(`Game.fireBullet: Acquiring bullet (pool: active=${stats.active}, pooled=${stats.pooled})`);
-
-        const bullet = this.bulletPool.acquire(from, to, 1);
-        this.playerBulletGroup.add(bullet);
-
-        console.log(`Game.fireBullet: Bullet acquired, ID=${bullet.id}`);
-    }
-
-    fireBulletWithFalloff(
-        from: {x: number, y: number},
-        to: {x: number, y: number},
-        baseDamage: number,
-        minDamage: number,
-        falloffStart: number,
-        falloffEnd: number
-    ) {
-        const bullet = this.bulletPool.acquire(from, to, 1);
-        bullet.setFalloff(baseDamage, minDamage, falloffStart, falloffEnd);
-        this.playerBulletGroup.add(bullet);
-    }
-
-    removeBullet(bullet: PlayerBullet) {
-        // Release bullet back to pool instead of destroying 
-        this.playerBulletGroup.remove(bullet, false, false);  // Don't destroy, just remove from group
-        this.bulletPool.release(bullet);
     }
 
     fireEnemyBullet(x: number, y: number, power: number, targetX?: number, targetY?: number) {

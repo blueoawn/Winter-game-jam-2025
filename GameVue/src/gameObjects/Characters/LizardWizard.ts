@@ -1,6 +1,6 @@
 import { PlayerController } from '../../../managers/PlayerController';
 import { GameScene } from '../../scenes/Game';
-import { MagicMissile } from './MagicMissile';
+import { MagicMissile } from '../Projectile/MagicMissile';
 
 export class LizardWizard extends PlayerController {
     private missiles: Set<MagicMissile> = new Set();

@@ -2,8 +2,10 @@ import { PlayerController } from '../../../managers/PlayerController';
 import { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import Graphics = Phaser.GameObjects.Graphics;
+import { ShotgunPellet } from '../Projectile/ShotgunPellet';
 
 export class BoomStick extends PlayerController {
+    private pellets: Set<ShotgunPellet> = new Set();
     // Ability 1 - Boomstick Blast config
     spreadAngle = Math.PI / 4;
     pelletCount = 7;
@@ -41,6 +43,8 @@ export class BoomStick extends PlayerController {
                 this.muzzleFlash.destroy();
                 this.muzzleFlash = null;
             }
+            this.pellets.forEach(pellet => pellet.destroy());
+            this.pellets.clear();
         });
     }
 
@@ -80,14 +84,27 @@ export class BoomStick extends PlayerController {
             const targetX = this.x + Math.cos(angle) * this.maxRange;
             const targetY = this.y + Math.sin(angle) * this.maxRange;
 
-            this.gameScene.fireBulletWithFalloff(
-                { x: this.x, y: this.y },
-                { x: targetX, y: targetY },
+            const pellet = new ShotgunPellet(
+                this.gameScene,
+                this.x,
+                this.y,
+                targetX,
+                targetY,
                 this.baseDamage,
                 this.minDamageMultiplier,
                 this.falloffStart,
                 this.falloffEnd
             );
+
+            this.pellets.add(pellet);
+
+            // Remove from set when destroyed
+            pellet.once('destroy', () => {
+                this.pellets.delete(pellet);
+            });
+
+            // Add to player bullet group for collision detection
+            this.gameScene.playerBulletGroup.add(pellet);
         }
 
         this.showMuzzleFlash(baseAngle);

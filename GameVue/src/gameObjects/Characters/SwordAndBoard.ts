@@ -2,8 +2,10 @@ import { PlayerController } from '../../../managers/PlayerController';
 import { GameScene } from '../../scenes/Game';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import TimerEvent = Phaser.Time.TimerEvent;
+import { NinjaStar } from '../Projectile/NinjaStar';
 
 export class SwordAndBoard extends PlayerController {
+    private slashes: Set<NinjaStar> = new Set();
     shield: Rectangle | null;
     shieldTimer: TimerEvent | null;
     constructor(scene: GameScene, x: number, y: number) {
@@ -20,6 +22,8 @@ export class SwordAndBoard extends PlayerController {
         this.on('destroy', () => {
             this.removeShield();
             this.removeShieldTimer();
+            this.slashes.forEach(slash => slash.destroy());
+            this.slashes.clear();
         })
     }
 
@@ -30,10 +34,27 @@ export class SwordAndBoard extends PlayerController {
 
     protected ability1(): void {
         if (!this.canUseAbility1()) return;
-        this.gameScene.fireBullet(
-            {x: this.x, y: this.y},
-            {x: this.currentAim.x, y: this.currentAim.y}
+
+        // Create sword slash projectile
+        const slash = new NinjaStar(
+            this.gameScene,
+            this.x,
+            this.y,
+            this.currentAim.x,
+            this.currentAim.y,
+            2 // Damage
         );
+
+        this.slashes.add(slash);
+
+        // Remove from set when destroyed
+        slash.once('destroy', () => {
+            this.slashes.delete(slash);
+        });
+
+        // Add to player bullet group for collision detection
+        this.gameScene.playerBulletGroup.add(slash);
+
         this.startAbility1Cooldown();
     }
 
