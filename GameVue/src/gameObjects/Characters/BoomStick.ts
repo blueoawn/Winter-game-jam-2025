@@ -128,13 +128,14 @@ export class BoomStick extends PlayerController {
         this.isBursting = true;
         this.burstStartTime = this.gameScene.time.now;
 
-        const dx = this.currentAim.x - this.x;
-        const dy = this.currentAim.y - this.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        this.burstDirX = dx / len;
-        this.burstDirY = dy / len;
+        if (this.body) {
+            const dx = this.body?.velocity.x;
+            const dy = this.body?.velocity.y;
 
-        this.setMaxVelocity(this.burstSpeed);
+            this.burstDirX = dx;
+            this.burstDirY = dy;
+            this.setMaxVelocity(this.burstSpeed);
+        }
     }
 
     updateBurst(time: number): void {
