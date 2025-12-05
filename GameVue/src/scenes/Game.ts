@@ -20,6 +20,7 @@ import PlayerBullet from "../gameObjects/PlayerBullet.ts";
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/EnemyFlying.ts";
+import EnemyLizardWizard from "../gameObjects/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 
 import NetworkManager from '../../network/NetworkManager';
@@ -145,12 +146,12 @@ export class GameScene extends Scene
             this.updateSinglePlayer();
         }
 
+        // DISABLED: EnemyFlying has bugs - using EnemyLizardWizard instead
         // Limit enemy spawning in multiplayer to avoid overwhelming network
-        const maxActiveEnemies = this.networkEnabled ? 30 : 100;  // Cap at 30 enemies in multiplayer
-        const canSpawn = this.enemyGroup.getChildren().length < maxActiveEnemies;
-
-        if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
-        else if (canSpawn) this.addFlyingGroup();
+        // const maxActiveEnemies = this.networkEnabled ? 30 : 100;  // Cap at 30 enemies in multiplayer
+        // const canSpawn = this.enemyGroup.getChildren().length < maxActiveEnemies;
+        // if (this.spawnEnemyCounter > 0) this.spawnEnemyCounter--;
+        // else if (canSpawn) this.addFlyingGroup();
     }
 
     initVariables() {
@@ -785,10 +786,15 @@ export class GameScene extends Scene
     startGame() {
         this.gameStarted = true;
         this.tutorialText.setVisible(false);
-        
-        //TODO This is broken in multiplayer and I'm working on fixing it. 
+
+        //TODO This is broken in multiplayer and I'm working on fixing it.
         // You can comment it out if you want to just see multiple ships flying around without enemies
-        //this.addFlyingGroup(); 
+        //this.addFlyingGroup();
+
+        // Spawn LizardWizard enemy in the center of Summoner's Rift
+        const mapCenterX = this.currentMap.width / 2;
+        const mapCenterY = this.currentMap.height / 2;
+        this.addLizardWizardEnemy(mapCenterX, mapCenterY);
     }
 
     fireBullet(from: {x: number, y: number}, to: {x: number, y: number}) {
@@ -815,8 +821,8 @@ export class GameScene extends Scene
         this.bulletPool.release(bullet);
     }
 
-    fireEnemyBullet(x: number, y: number, power: number) {
-        const bullet = new EnemyBullet(this, x, y, power);
+    fireEnemyBullet(x: number, y: number, power: number, targetX?: number, targetY?: number) {
+        const bullet = new EnemyBullet(this, x, y, power, targetX, targetY);
         this.enemyBulletGroup.add(bullet);
     }
 
@@ -862,6 +868,12 @@ export class GameScene extends Scene
     addEnemy(shipId: number, pathId: number, speed: number, power: number) {
         const enemy = new EnemyFlying(this, shipId, pathId, speed, power);
         this.enemyGroup.add(enemy);
+    }
+
+    addLizardWizardEnemy(x: number, y: number) {
+        const enemy = new EnemyLizardWizard(this, x, y);
+        this.enemyGroup.add(enemy);
+        return enemy;
     }
 
     removeEnemy(enemy: EnemyController) {

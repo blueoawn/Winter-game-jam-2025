@@ -8,7 +8,14 @@ export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
     gameScene: GameScene;
     private static nextId = 0;  // Static counter for generating unique IDs
 
-    constructor(scene: GameScene, x: number, y: number, power: number) {
+    constructor(
+        scene: GameScene,
+        x: number,
+        y: number,
+        power: number,
+        targetX?: number,
+        targetY?: number
+    ) {
         const tileId = 11;
         super(scene, x, y, ASSETS.spritesheet.tiles.key, tileId + power);
 
@@ -20,10 +27,23 @@ export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
 
         this.power = power;
         this.setSize(16, 24); // resize hitbox to correctly fit image instead of using the entire tile size
-        this.setFlipY(true); // flip image vertically to point downwards
         this.setDepth(10);
         this.gameScene = scene;
-        this.setVelocityY(this.moveVelocity * power * 0.5); // bullet vertical speed
+
+        // If target coordinates provided, fire towards target (for aimed bullets)
+        if (targetX !== undefined && targetY !== undefined) {
+            const angle = Phaser.Math.Angle.Between(x, y, targetX, targetY);
+            this.setVelocity(
+                Math.cos(angle) * this.moveVelocity,
+                Math.sin(angle) * this.moveVelocity
+            );
+            // Rotate bullet to face direction of travel
+            this.setRotation(angle + Math.PI / 2);
+        } else {
+            // Default behavior: fire straight down (for legacy enemies)
+            this.setFlipY(true); // flip image vertically to point downwards
+            this.setVelocityY(this.moveVelocity * power * 0.5); // bullet vertical speed
+        }
     }
 
     preUpdate(time: number, delta: number) {
