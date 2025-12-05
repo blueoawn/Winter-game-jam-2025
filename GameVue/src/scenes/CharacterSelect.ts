@@ -119,10 +119,47 @@ export class CharacterSelectScene extends Scene {
     private rightArrow!: Phaser.GameObjects.Text;
 
     // Unlocked characters - only these can be selected
-    private unlockedCharacters: Set<CharacterIdsEnum> = new Set([CharacterIdsEnum.LizardWizard, CharacterIdsEnum.BigSword]);
+    private unlockedCharacters: Set<string> = new Set();
+    private static readonly STORAGE_KEY = 'unlockedCharacters';
+    // TODO modify this variable to have less characters when the game is ready
+    private static readonly DEFAULT_UNLOCKED: string[] = [
+        CharacterIdsEnum.LizardWizard,
+        CharacterIdsEnum.BigSword,
+        CharacterIdsEnum.SwordAndBoard,
+        CharacterIdsEnum.BoomStick,
+        CharacterIdsEnum.CheeseTouch,
+
+    ];
 
     constructor() {
         super('CharacterSelectScene');
+        this.loadUnlockedCharacters();
+    }
+
+    private loadUnlockedCharacters(): void {
+        try {
+            const stored = localStorage.getItem(CharacterSelectScene.STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored) as string[];
+                this.unlockedCharacters = new Set(parsed);
+            } else {
+                // First time - set defaults
+                this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+                this.saveUnlockedCharacters();
+            }
+        } catch (e) {
+            console.warn('Failed to load unlocked characters from storage:', e);
+            this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+        }
+    }
+
+    private saveUnlockedCharacters(): void {
+        try {
+            const data = Array.from(this.unlockedCharacters);
+            localStorage.setItem(CharacterSelectScene.STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.warn('Failed to save unlocked characters to storage:', e);
+        }
     }
 
     init(data: any): void {
@@ -380,8 +417,32 @@ export class CharacterSelectScene extends Scene {
     }
 
     public unlockCharacter(characterId: string): void {
-        this.unlockedCharacters.add(characterId);
-        // Could refresh the card display here if needed
+        if (!this.unlockedCharacters.has(characterId)) {
+            this.unlockedCharacters.add(characterId);
+            this.saveUnlockedCharacters();
+        }
+    }
+
+    public lockCharacter(characterId: string): void {
+        // Don't allow locking default characters
+        if ((CharacterSelectScene.DEFAULT_UNLOCKED as string[]).includes(characterId)) {
+            console.warn('Cannot lock default character:', characterId);
+            return;
+        }
+        if (this.unlockedCharacters.has(characterId)) {
+            this.unlockedCharacters.delete(characterId);
+            this.saveUnlockedCharacters();
+        }
+    }
+
+    public unlockAllCharacters(): void {
+        this.characters.forEach(c => this.unlockedCharacters.add(c.id));
+        this.saveUnlockedCharacters();
+    }
+
+    public resetUnlockedCharacters(): void {
+        this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+        this.saveUnlockedCharacters();
     }
 
     private createCharacterCard(character: CharacterData, x: number, y: number, cardWidth: number = 300, cardHeight: number = 450, index: number = 0): Phaser.GameObjects.Container {
