@@ -784,6 +784,9 @@ export class GameScene extends Scene
     }
 
     startGame() {
+        // Prevent double-spawning if startGame is called multiple times
+        if (this.gameStarted) return;
+
         this.gameStarted = true;
         this.tutorialText.setVisible(false);
 
