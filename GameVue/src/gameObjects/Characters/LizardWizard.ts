@@ -1,7 +1,10 @@
 import { PlayerController } from '../../../managers/PlayerController';
 import { GameScene } from '../../scenes/Game';
+import { MagicMissile } from './MagicMissile';
 
 export class LizardWizard extends PlayerController {
+    private missiles: Set<MagicMissile> = new Set();
+
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 0);  // Frame 0 for LizardWizard
 
@@ -12,6 +15,12 @@ export class LizardWizard extends PlayerController {
         this.health = this.maxHealth;
         this.ability1Rate = 10;   // Fast fire rate
         this.ability2Rate = 120;  // Special ability every 2 seconds
+
+        // Cleanup missiles on destroy
+        this.on('destroy', () => {
+            this.missiles.forEach(missile => missile.destroy());
+            this.missiles.clear();
+        });
     }
 
     protected ability1(): void {
@@ -20,13 +29,27 @@ export class LizardWizard extends PlayerController {
             return;
         }
 
-        console.log(`LizardWizard: Firing ability1`);
+        console.log(`LizardWizard: Firing Magic Missile`);
 
-        // Fire projectile using stored aim position (works for both local and network input)
-        this.gameScene.fireBullet(
-            {x: this.x, y: this.y},
-            {x: this.currentAim.x, y: this.currentAim.y}
+        // Create magic missile
+        const missile = new MagicMissile(
+            this.gameScene,
+            this.x,
+            this.y,
+            this.currentAim.x,
+            this.currentAim.y,
+            1 // Base damage
         );
+
+        this.missiles.add(missile);
+
+        // Remove from set when destroyed
+        missile.once('destroy', () => {
+            this.missiles.delete(missile);
+        });
+
+        // Add to player bullet group for collision detection
+        this.gameScene.playerBulletGroup.add(missile);
 
         this.startAbility1Cooldown();
     }
@@ -34,6 +57,7 @@ export class LizardWizard extends PlayerController {
     // Higher the spread value the tighter the spread
     protected ability2(spread = 6, amountOfProjectiles = 3): void {
         if (!this.canUseAbility2()) return;
+
         const yDifference = this.currentAim.y - this.y;
         const xDifference = this.currentAim.x - this.x;
         const distance = Math.sqrt(Math.pow(xDifference, 2) + Math.pow(yDifference, 2));
@@ -43,23 +67,29 @@ export class LizardWizard extends PlayerController {
         const anglePerProjectile = totalSpreadAngle / (amountOfProjectiles - 1);
         const startAngle = rotation - (totalSpreadAngle / 2);
 
-        const projectileTrajectories = [];
+        // Fire spread of magic missiles
         for(let i = 0; i < amountOfProjectiles; i++) {
             const currentAngle = startAngle + (i * anglePerProjectile);
             const xLeftTo = this.x + (distance * Math.cos(currentAngle));
             const yLeftTo = this.y + (distance * Math.sin(currentAngle));
-            projectileTrajectories.push({
-                x: xLeftTo,
-                y: yLeftTo
-            })
-        }
 
-        projectileTrajectories.forEach((trajectory) => {
-            this.gameScene.fireBullet(
-                {x: this.x, y: this.y},
-                {x: trajectory.x, y: trajectory.y}
+            const missile = new MagicMissile(
+                this.gameScene,
+                this.x,
+                this.y,
+                xLeftTo,
+                yLeftTo,
+                1 // Base damage
             );
-        })
+
+            this.missiles.add(missile);
+
+            missile.once('destroy', () => {
+                this.missiles.delete(missile);
+            });
+
+            this.gameScene.playerBulletGroup.add(missile);
+        }
 
         this.startAbility2Cooldown();
     }
