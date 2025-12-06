@@ -1,4 +1,4 @@
-import { PlayerController } from '../../../managers/PlayerController';
+import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import Graphics = Phaser.GameObjects.Graphics;

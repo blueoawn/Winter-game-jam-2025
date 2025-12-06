@@ -1,3 +1,5 @@
+import { LizardWizard } from "./gameObjects/Characters/LizardWizard";
+
 export default {
     audio: {
         cheeseEat: {
@@ -15,6 +17,10 @@ export default {
             key: 'cookie-cutter-wall',
             args: ['assets/Sprites/cookiecutterwall.png']
         },
+        lizardWizard: {
+            key: 'lizard-wizard',
+            args: ['assets/Sprites/Wizard_Lizard_2.png']
+        }
     },
     spritesheet: {
         ships: {
@@ -24,7 +30,7 @@ export default {
                 frameHeight: 64,
             }]
         },
-        tiles: {
+            tiles: {
             key: 'tiles',
             args: ['assets/tiles.png', {
                 frameWidth: 32,

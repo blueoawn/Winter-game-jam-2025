@@ -1,4 +1,4 @@
-import { PlayerController } from '../../../managers/PlayerController';
+import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/Game';
 import { MagicMissile } from '../Projectile/MagicMissile';
 
@@ -25,11 +25,11 @@ export class LizardWizard extends PlayerController {
 
     protected ability1(): void {
         if (!this.canUseAbility1()) {
-            console.log(`LizardWizard: ability1 blocked by cooldown (${this.ability1Cooldown} frames remaining)`);
+            //console.log(`LizardWizard: ability1 blocked by cooldown (${this.ability1Cooldown} frames remaining)`);
             return;
         }
 
-        console.log(`LizardWizard: Firing Magic Missile`);
+        //console.log(`LizardWizard: Firing Magic Missile`);
 
         // Create magic missile
         const missile = new MagicMissile(

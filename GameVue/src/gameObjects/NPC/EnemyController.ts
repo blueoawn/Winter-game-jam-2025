@@ -1,7 +1,9 @@
-import ASSETS from '../src/assets.js';
-import type { GameScene } from '../src/scenes/Game.ts';
-import { Depth } from '../src/constants.ts';
+import ASSETS from '../../assets.js';
+import type { GameScene } from '../../scenes/Game.ts';
+import { Depth } from '../../constants.ts';
 import Container = Phaser.GameObjects.Container;
+
+//TODO - Add stuff in here for network sync/rollback
 
 export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite {
     health: number = 1;
