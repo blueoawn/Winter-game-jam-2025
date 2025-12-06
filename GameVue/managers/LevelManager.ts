@@ -213,7 +213,11 @@ export function addSlimeEnemy(scene: GameScene, x: number, y: number): EnemySlim
         const enemy = new EnemySlime(scene, x, y);
         scene.enemyGroup.add(enemy);
         return enemy;
+    } catch (err) {
+        console.error('[LEVEL] Error adding slime enemy:', err);
+        return null as any;
     }
+}
 
 /**
  * Remove enemy
