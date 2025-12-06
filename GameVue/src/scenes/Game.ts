@@ -19,28 +19,21 @@ import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
 import EnemyBullet from "../gameObjects/Projectile/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
-import { MagicMissile } from "../gameObjects/Projectile/MagicMissile.ts";
-import { ShotgunPellet } from "../gameObjects/Projectile/ShotgunPellet.ts";
-import { NinjaStar } from "../gameObjects/Projectile/NinjaStar.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
-import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
-import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../managers/NetworkManager.ts';
 import { DeltaDeserializer } from '../../network/DeltaDeserializer';
 import { updateHost, updateClient } from '../../network/MultiplayerUpdates';
+import { applyDeltaState } from '../../network/Sync';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { SceneManager } from '../../managers/SceneManager.ts';
+import * as LevelManager from '../../managers/LevelManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
 import { audioManager } from '../../managers/AudioManager';
 import { CharacterIdsEnum, CharacterNamesEnum } from "../gameObjects/Characters/CharactersEnum.ts";
-import { AggressiveBehavior } from "../behaviorScripts/Aggressive.ts";
-import { IBehavior } from "../behaviorScripts/Behavior.ts";
-import { TerritorialBehavior } from "../behaviorScripts/Territorial.ts";
-import { PacifistBehavior } from "../behaviorScripts/Pacifist.ts";
 import {
     initVariables,
     initBackground,
@@ -176,6 +169,13 @@ export class GameScene extends Scene
 
             initInput(this);
             initPhysics(this);
+
+            // Create all game object groups BEFORE using them in Level Manager
+            this.enemyGroup = this.add.group();
+            this.enemyBulletGroup = this.add.group();
+            this.playerBulletGroup = this.add.group();
+            this.enemyBulletDestroyersGroup = this.add.group();
+            this.wallGroup = this.add.group();
 
             // Set up multiplayer wall collisions after physics is initialized
             if (this.networkEnabled) {
@@ -367,11 +367,7 @@ export class GameScene extends Scene
         NetworkManager.onStorageKey('lastStateDelta', (delta: any) => {
             //console.log(`[NETWORK] Storage listener fired for lastStateDelta`); //Debug
             if (delta) {
-                try {
-                    this.applyDeltaState(delta);
-                } catch (err) {
-                    console.error('[NETWORK] Error applying delta state:', err);
-                }
+                applyDeltaState(this, delta);
             }
         });
 
@@ -424,452 +420,7 @@ export class GameScene extends Scene
         updateClient(this, this.playerManager, this.buttonMapper);
     }
 
-    // Apply delta state updates from host
-    applyDeltaState(delta: any) {
-        //console.log(`[CLIENT] Received delta tick ${delta.tick}`); //Debug
-        
-        try {
-            if (!delta || typeof delta.tick !== 'number') {
-                console.error('[NETWORK] Invalid delta received:', delta);
-                return;
-            }
 
-            // Detect missing packets (desync detection)
-            const tickDiff = delta.tick - this.lastReceivedTick;
-
-            if (tickDiff > 5 && this.lastReceivedTick > 0) {
-                // Missing more than 5 ticks = desync
-                console.warn(`⚠️ Desync detected: missing ${tickDiff} ticks`);
-                NetworkManager.sendRequest('snapshot');
-                return;
-            }
-
-            this.lastReceivedTick = delta.tick;
-
-            // Reconstruct full state from delta
-            const fullState = this.deltaDeserializer.applyDelta(delta);
-            
-            // Debug: Log player state structure once per 5 ticks
-            if (this.tick % 5 === 0 && Object.keys(fullState.players).length > 0) {
-                console.log('[DEBUG] Player state structure:', Object.entries(fullState.players).slice(0, 1).map(([id, state]) => ({ id, ...state })));
-            }
-
-            // Apply player states
-            if (fullState.players && Object.keys(fullState.players).length > 0) {
-                this.playerManager?.applyPlayerState(Object.values(fullState.players));
-            }
-            // Apply meta state
-            if (fullState.meta) {
-                try {
-                    if (fullState.meta.score !== undefined) {
-                        this.score = fullState.meta.score;
-                        this.scoreText.setText(`Score: ${this.score}`);
-                    }
-                    if (fullState.meta.scrollMovement !== undefined) {
-                        this.scrollMovement = fullState.meta.scrollMovement;
-                    }
-                    if (fullState.meta.spawnEnemyCounter !== undefined) {
-                        this.spawnEnemyCounter = fullState.meta.spawnEnemyCounter;
-                    }
-                    if (fullState.meta.gameStarted !== undefined) {
-                        this.gameStarted = fullState.meta.gameStarted;
-                    }
-                } catch (err) {
-                    console.error('[NETWORK] Error applying meta state:', err);
-                }
-            }
-
-            // Sync enemies
-            if (fullState.enemies) {
-                this.syncEnemies(fullState.enemies);
-            }
-
-            // Sync projectiles
-            if (fullState.projectiles) {
-                this.syncProjectiles(fullState.projectiles);
-            }
-
-            // Sync walls
-            if (fullState.walls) {
-                this.syncWalls(fullState.walls);
-            }
-        } catch (err) {
-            console.error('[NETWORK] Error in applyDeltaState:', err);
-        }
-    }
-
-    // Helper method to sync enemies
-    private syncEnemies(enemies: Record<string, any>) {
-        try {
-            this.enemyIdCache.clear();
-
-            Object.entries(enemies).forEach(([id, enemyState]) => {
-                if (enemyState === null) return; // Removed enemy
-
-                if (!id || typeof id !== 'string') {
-                    console.warn('[NETWORK] Invalid enemy ID:', id);
-                    return;
-                }
-
-                this.enemyIdCache.add(id);
-
-                let enemy = this.syncedEnemies.get(id);
-
-                if (!enemy) {
-                    // Create correct enemy type
-                    try {
-                        if (enemyState.enemyType === 'EnemyLizardWizard') {
-                            const lizardEnemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
-                            (lizardEnemy as any).enemyId = id;
-                            // Cast to EnemyFlying for storage (type mismatch handled)
-                            this.syncedEnemies.set(id, lizardEnemy as any);
-                        } else {
-                            enemy = new EnemyFlying(
-                                this,
-                                enemyState.shipId,
-                                0,
-                                0,
-                                enemyState.power
-                            );
-                            (enemy as any).enemyId = id;
-                            (enemy as any).pathIndex = 999; // Disable path following
-                            enemy.setPosition(enemyState.x, enemyState.y);
-                            this.enemyGroup.add(enemy);
-                            this.syncedEnemies.set(id, enemy);
-                        }
-                    } catch (err) {
-                        console.error(`[NETWORK] Error creating enemy ${id}:`, err);
-                    }
-                } else {
-                    // Update existing enemy
-                    try {
-                        if (typeof enemyState.x === 'number' && typeof enemyState.y === 'number') {
-                            enemy.setPosition(enemyState.x, enemyState.y);
-                        }
-                        if (typeof enemyState.health === 'number') {
-                            (enemy as any).health = enemyState.health;
-                        }
-                    } catch (err) {
-                        console.error(`[NETWORK] Error updating enemy ${id}:`, err);
-                    }
-                }
-            });
-        } catch (err) {
-            console.error('[NETWORK] Error in syncEnemies:', err);
-        }
-
-        // Remove enemies no longer in state
-        this.syncedEnemies.forEach((enemy, id) => {
-            if (!this.enemyIdCache.has(id)) {
-                if (enemy) {
-                    enemy.destroy();
-                }
-                this.syncedEnemies.delete(id);
-            }
-        });
-    }
-
-    // Helper method to sync projectiles
-    private syncProjectiles(projectiles: Record<string, any>) {
-        try {
-            const projectileIdCache = new Set<string>();
-
-            Object.entries(projectiles).forEach(([id, projState]) => {
-                if (projState === null) return; // Removed projectile
-
-                if (!id || typeof id !== 'string') {
-                    console.warn('[NETWORK] Invalid projectile ID:', id);
-                    return;
-                }
-
-                projectileIdCache.add(id);
-
-                try {
-                    const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === id);
-
-                    if (!existing) {
-                        const projectile = this.createProjectileFromState(projState);
-                        if (projectile) {
-                            this.playerBulletGroup.add(projectile);
-                        }
-                    } else {
-                        if ((existing as any).updateFromNetworkState) {
-                            (existing as any).updateFromNetworkState(projState);
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[NETWORK] Error syncing projectile ${id}:`, err);
-                }
-            });
-
-            // Remove projectiles no longer in state
-            this.playerBulletGroup.getChildren().forEach((projectile: any) => {
-                if (projectile.id && !projectileIdCache.has(projectile.id)) {
-                    projectile.destroy();
-                }
-            });
-        } catch (err) {
-            console.error('[NETWORK] Error in syncProjectiles:', err);
-        }
-    }
-
-    // Helper method to sync walls
-    private syncWalls(walls: Record<string, any>) {
-        try {
-            Object.entries(walls).forEach(([id, wallState]) => {
-                if (wallState === null) return; // Removed wall
-
-                if (!id || typeof id !== 'string') {
-                    console.warn('[NETWORK] Invalid wall ID:', id);
-                    return;
-                }
-
-                try {
-                    const wall = this.syncedWalls.get(id);
-                    if (wall && wall.updateFromNetworkState) {
-                        wall.updateFromNetworkState(wallState);
-                    }
-                } catch (err) {
-                    console.error(`[NETWORK] Error syncing wall ${id}:`, err);
-                }
-            });
-        } catch (err) {
-            console.error('[NETWORK] Error in syncWalls:', err);
-        }
-    }
-
-    // Legacy method - kept for backwards compatibility
-    applyNetworkState(state: any) {
-        // Apply player states
-        if (state.players && this.playerManager) {
-            this.playerManager.applyPlayerState(state.players);
-        }
-
-        // Apply game state
-        if (state.gameState) {
-            this.score = state.gameState.score;
-            this.scrollMovement = state.gameState.scrollMovement;
-            this.spawnEnemyCounter = state.gameState.spawnEnemyCounter;
-            this.gameStarted = state.gameState.gameStarted;
-
-            this.scoreText.setText(`Score: ${this.score}`);
-        }
-
-        // Sync enemy bullets from server
-        if (state.enemyBullets && Array.isArray(state.enemyBullets)) {
-            this.enemyBulletIdCache.clear();
-
-            state.enemyBullets.forEach((bulletState: any) => {
-                this.enemyBulletIdCache.add(bulletState.id);
-
-                // Check if enemy bullet already exists
-                let bullet = this.syncedEnemyBullets.get(bulletState.id);
-
-                if (!bullet) {
-                    // Create new enemy bullet
-                    bullet = new EnemyBullet(
-                        this,
-                        bulletState.x,
-                        bulletState.y,
-                        bulletState.power
-                    );
-
-                    // Override generated ID with network state ID for sync
-                    bullet.id = bulletState.id;
-
-                    // Set velocity from network state
-                    if (bullet.body) {
-                        bullet.body.velocity.x = bulletState.velocityX;
-                        bullet.body.velocity.y = bulletState.velocityY;
-                    }
-
-                    this.enemyBulletGroup.add(bullet);
-                    this.syncedEnemyBullets.set(bulletState.id, bullet);
-                } else {
-                    // Update existing enemy bullet position and velocity
-                    bullet.setPosition(bulletState.x, bulletState.y);
-                    if (bullet.body) {
-                        bullet.body.velocity.x = bulletState.velocityX;
-                        bullet.body.velocity.y = bulletState.velocityY;
-                    }
-                }
-            });
-
-            // Remove enemy bullets that are no longer in the state
-            this.syncedEnemyBullets.forEach((bullet, id) => {
-                if (!this.enemyBulletIdCache.has(id)) {
-                    this.enemyBulletGroup.remove(bullet, true, true);
-                    this.syncedEnemyBullets.delete(id);
-                }
-            });
-        }
-
-        // Sync enemies from Server
-        if (state.enemies && Array.isArray(state.enemies)) {
-            this.enemyIdCache.clear();
-
-            state.enemies.forEach((enemyState: any) => {
-                this.enemyIdCache.add(enemyState.id);
-
-                // Check if enemy already exists
-                let enemy = this.syncedEnemies.get(enemyState.id);
-
-                if (!enemy) {
-                    // Create correct enemy type based on network state
-                    if (enemyState.enemyType === 'EnemyLizardWizard') {
-                        // Create EnemyLizardWizard
-                        const lizardWizard = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
-
-                        // Set ID for tracking
-                        (lizardWizard as any).enemyId = enemyState.id;
-
-                        // Cast to common type for storage
-                        enemy = lizardWizard as any as EnemyFlying;
-                    } else {
-                        // Create EnemyFlying (default/fallback)
-                        enemy = new EnemyFlying(
-                            this,
-                            enemyState.shipId,
-                            0,  // pathId 0 (will be overridden by network position)
-                            0,  // speed 0 (not following path, position synced from host)
-                            enemyState.power
-                        );
-
-                        // Set ID for tracking
-                        (enemy as any).enemyId = enemyState.id;
-
-                        // Disable path following for network-synced enemies
-                        (enemy as any).pathIndex = 999;  // Set > 1 to stop path updates (see preUpdate line 44)
-
-                        // Set initial position from network state
-                        enemy.setPosition(enemyState.x, enemyState.y);
-
-                        this.enemyGroup.add(enemy);
-                    }
-
-                    if (enemy) {
-                        this.syncedEnemies.set(enemyState.id, enemy);
-                    }
-                } else {
-                    // Update existing enemy position from host
-                    enemy.setPosition(enemyState.x, enemyState.y);
-                    (enemy as any).health = enemyState.health;
-                }
-            });
-
-            // Remove enemies that are no longer in the state
-            this.syncedEnemies.forEach((enemy, id) => {
-                if (!this.enemyIdCache.has(id)) {
-                    enemy.destroy();
-                    this.syncedEnemies.delete(id);
-                }
-            });
-        }
-
-        // Sync projectiles from host (character-specific: MagicMissile, ShotgunPellet, NinjaStar)
-        if (state.projectiles && Array.isArray(state.projectiles)) {
-            const projectileIdCache: Set<string> = new Set();
-
-            state.projectiles.forEach((projState: any) => {
-                projectileIdCache.add(projState.id);
-
-                // Check if projectile already exists in playerBulletGroup
-                const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === projState.id);
-
-                if (!existing) {
-                    // Create new projectile based on type
-                    const projectile = this.createProjectileFromState(projState);
-                    if (projectile) {
-                        this.playerBulletGroup.add(projectile);
-                    }
-                } else {
-                    // Update existing projectile
-                    if ((existing as any).updateFromNetworkState) {
-                        (existing as any).updateFromNetworkState(projState);
-                    }
-                }
-            });
-
-            // Remove projectiles that are no longer in the state
-            this.playerBulletGroup.getChildren().forEach((projectile: any) => {
-                if (projectile.id && !projectileIdCache.has(projectile.id)) {
-                    projectile.destroy();
-                }
-            });
-        }
-
-        // Sync walls from host
-        if (state.walls && Array.isArray(state.walls)) {
-            state.walls.forEach((wallState: any) => {
-                // Check if wall already exists
-                let wall = this.syncedWalls.get(wallState.id);
-
-                if (wall) {
-                    // Update existing wall
-                    wall.updateFromNetworkState(wallState);
-                }
-                // Note: Walls are created from map data, not network state
-                // So we only update existing walls, never create new ones here
-            });
-        }
-    }
-
-    // Helper method to create projectiles from network state
-    private createProjectileFromState(state: any): any {
-        let projectile: any = null;
-
-        switch (state.type) {
-            case 'MagicMissile':
-                projectile = new MagicMissile(
-                    this,
-                    state.x,
-                    state.y,
-                    state.x + (state.velocityX || 0),
-                    state.y + (state.velocityY || 0),
-                    state.damage || 1
-                );
-                break;
-            case 'ShotgunPellet':
-                projectile = new ShotgunPellet(
-                    this,
-                    state.x,
-                    state.y,
-                    state.x + (state.velocityX || 0),
-                    state.y + (state.velocityY || 0),
-                    state.baseDamage || 3,
-                    state.minDamageMultiplier || 0.2,
-                    state.falloffStart || 80,
-                    state.falloffEnd || 220
-                );
-                // Set start position for damage falloff
-                if (state.startX !== undefined) (projectile as any).startX = state.startX;
-                if (state.startY !== undefined) (projectile as any).startY = state.startY;
-                break;
-            case 'NinjaStar':
-                projectile = new NinjaStar(
-                    this,
-                    state.x,
-                    state.y,
-                    state.x + (state.velocityX || 0),
-                    state.y + (state.velocityY || 0),
-                    state.damage || 2
-                );
-                break;
-            default:
-                console.warn(`Unknown projectile type: ${state.type}`);
-                return null;
-        }
-
-        if (projectile) {
-            // Override generated ID with network ID
-            projectile.id = state.id;
-
-            // Apply full network state
-            projectile.updateFromNetworkState(state);
-        }
-
-        return projectile;
-    }
 
     initGameUi() {
         // Create tutorial text
@@ -915,12 +466,8 @@ export class GameScene extends Scene
     }
 
     initPhysics() {
-        this.enemyGroup = this.add.group();
-        this.enemyBulletGroup = this.add.group();
-        this.playerBulletGroup = this.add.group();
-        this.enemyBulletDestroyersGroup = this.add.group();
-        this.wallGroup = this.add.group();
-
+        // Groups are now created earlier in create() before LevelManager functions use them
+        
         // Only set up collisions for single player mode
         if (!this.networkEnabled && this.player) {
             // This overlap should come before checking if the bullet hit the player
@@ -982,104 +529,27 @@ export class GameScene extends Scene
 
     /**
      * Initialize spawners from current map configuration
-     * Creates Spawner instances based on map's spawners array
+     * Delegates to LevelManager
      */
     initSpawners(): void {
-        if (!this.currentMap.spawners) {
-            console.log('No spawners defined for current map');
-            return;
-        }
-
-        // Create spawner instances from map config
-        this.currentMap.spawners.forEach(config => {
-            // Create behavior if specified
-            let behavior: IBehavior | undefined;
-
-            if (config.behaviorType) {
-                const behaviorType = String(config.behaviorType);
-                switch (behaviorType) {
-                    case 'Aggressive':
-                        behavior = new AggressiveBehavior(config.behaviorOptions);
-                        break;
-                    case 'Territorial':
-                        behavior = new TerritorialBehavior(
-                            config.x,
-                            config.y,
-                            config.behaviorOptions
-                        );
-                        break;
-                    case 'Pacifist':
-                        behavior = new PacifistBehavior(
-                            config.x,
-                            config.y,
-                            config.behaviorOptions
-                        );
-                        break;
-                }
-            }
-
-            const spawner = new Spawner(
-                this,
-                config.x,
-                config.y,
-                config.totalEnemies,
-                config.spawnRate,
-                config.timeOffset,
-                config.enemyType,
-                behavior
-            );
-
-            this.spawners.push(spawner);
-        });
-
-        console.log(`Initialized ${this.spawners.length} spawner(s)`);
+        LevelManager.initSpawners(this);
     }
 
     /**
      * Initialize walls from current map configuration
-     * Creates Wall instances based on map's walls array
+     * Delegates to LevelManager
      */
     initWalls(): void {
-        if (!this.currentMap.walls) {
-            console.log('No walls defined for current map');
-            return;
-        }
-
-        // Create wall instances from map config
-        this.currentMap.walls.forEach(wallData => {
-            const wall = new Wall(
-                this,
-                wallData.x,
-                wallData.y,
-                wallData.spriteKey,
-                wallData.frame || 0,
-                wallData.health
-            );
-
-            this.addWall(wall);
-
-            // Track destructible walls for network sync
-            if (!wall.isIndestructible) {
-                this.syncedWalls.set(wall.wallId, wall);
-            }
-        });
-
-        console.log(`Initialized ${this.currentMap.walls.length} wall(s)`);
+        LevelManager.initWalls(this);
     }
 
-    // Probably still keep this for client prediction, but needs refactoring
     /**
      * Update all active spawners 
      * Called every frame from updateHost()
+     * Delegates to LevelManager
      */
     updateSpawners(): void {
-        // Only host updates spawners (clients receive enemies via network sync)
-        if (!this.isHost && this.networkEnabled) return;
-
-        // Update all active spawners
-        for (let i = 0; i < this.spawners.length; i++) {
-            this.spawners[i].update();
-        }
+        LevelManager.updateSpawners(this);
     }
 
     // initPlayer() removed - now using initSinglePlayer() and initMultiplayer() with character classes
@@ -1158,74 +628,59 @@ export class GameScene extends Scene
     }
 
     fireEnemyBullet(x: number, y: number, power: number, targetX?: number, targetY?: number) {
-        const bullet = new EnemyBullet(this, x, y, power, targetX, targetY);
-        this.enemyBulletGroup.add(bullet);
+        LevelManager.fireEnemyBullet(this, x, y, power, targetX, targetY);
     }
 
     removeEnemyBullet(bullet: EnemyBullet) {
-        this.enemyBulletGroup.remove(bullet, true, true);
+        LevelManager.removeEnemyBullet(this, bullet);
     }
 
     addEnemyBulletDestroyer(destroyer: Rectangle) {
-        this.enemyBulletDestroyersGroup.add(destroyer);
+        LevelManager.addEnemyBulletDestroyer(this, destroyer);
     }
 
     removeEnemyBulletDestroyer(destroyer: Rectangle) {
-        this.playerBulletGroup.remove(destroyer, true, true);
+        LevelManager.removeEnemyBulletDestroyer(this, destroyer);
     }
 
     addEnemy(shipId: number, pathId: number, speed: number, power: number) {
-        const enemy = new EnemyFlying(this, shipId, pathId, speed, power);
-        this.enemyGroup.add(enemy);
+        return LevelManager.addEnemy(this, shipId, pathId, speed, power);
     }
 
     addLizardWizardEnemy(x: number, y: number) {
-        const enemy = new EnemyLizardWizard(this, x, y);
-        this.enemyGroup.add(enemy);
-        return enemy;
+        return LevelManager.addLizardWizardEnemy(this, x, y);
     }
 
     removeEnemy(enemy: EnemyController) {
-        this.enemyGroup.remove(enemy, true, true);
+        LevelManager.removeEnemy(this, enemy);
     }
 
     addWall(wall: Wall) {
-        this.wallGroup.add(wall);
+        LevelManager.addWall(this, wall);
     }
 
     removeWall(wall: Wall) {
-        this.wallGroup.remove(wall, true, true);
+        LevelManager.removeWall(this, wall);
     }
 
     addExplosion(x: number, y: number) {
-        new Explosion(this, x, y);
+        LevelManager.addExplosion(this, x, y);
     }
 
     hitPlayer(player: PlayerController, obstacle: EnemyBullet) {
-        this.addExplosion(player.x, player.y);
-        player.hit(obstacle.getPower());
-        obstacle.die();
-        if (player.health <= 0) {
-            this.GameOver();
-        }
+        LevelManager.hitPlayer(this, player, obstacle);
     }
 
     hitEnemy(bullet: any, enemy: EnemyFlying) {
-        this.updateScore(10);
-        bullet.remove();
-        enemy.hit(bullet.getPower());
+        LevelManager.hitEnemy(this, bullet, enemy);
     }
 
     hitWall(bullet: any, wall: Wall) {
-        // Only damage destructible walls
-        if (!wall.isIndestructible) {
-            wall.hit(bullet.getPower());
-        }
-        bullet.remove();
+        LevelManager.hitWall(this, bullet, wall);
     }
 
     destroyEnemyBullet(_bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
-        this.removeEnemyBullet(enemyBullet);
+        LevelManager.destroyEnemyBullet(this, _bulletDestroyer, enemyBullet);
     }
 
     updateScore(points: number) {
