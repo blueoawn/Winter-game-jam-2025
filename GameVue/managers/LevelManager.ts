@@ -17,6 +17,7 @@ import { TerritorialBehavior } from '../src/behaviorScripts/Territorial';
 import { PacifistBehavior } from '../src/behaviorScripts/Pacifist';
 import type { IBehavior } from '../src/behaviorScripts/Behavior';
 import Rectangle = Phaser.GameObjects.Rectangle;
+import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
 
 /**
  * Initialize spawners from map data
@@ -203,6 +204,16 @@ export function addLizardWizardEnemy(scene: GameScene, x: number, y: number): En
         return null as any;
     }
 }
+
+/**
+ * Create slime enemy
+ */
+export function addSlimeEnemy(scene: GameScene, x: number, y: number): EnemySlime {
+    try {
+        const enemy = new EnemySlime(scene, x, y);
+        scene.enemyGroup.add(enemy);
+        return enemy;
+    }
 
 /**
  * Remove enemy
