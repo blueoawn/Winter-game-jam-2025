@@ -27,10 +27,11 @@ import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
 import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
-import NetworkManager from '../../network/NetworkManager';
+import NetworkManager from '../../managers/NetworkManager.ts';
 import { DeltaDeserializer } from '../../network/DeltaDeserializer';
 import { updateHost, updateClient } from '../../network/MultiplayerUpdates';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
+import { SceneManager } from '../../managers/SceneManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
@@ -1152,18 +1153,8 @@ export class GameScene extends Scene
     }
 
     startGame() {
-        // Prevent double-spawning if startGame is called multiple times
-        if (this.gameStarted) return;
-
-        this.gameStarted = true;
-        
-        // Safely hide tutorial text if it exists
-        if (this.tutorialText) {
-            this.tutorialText.setVisible(false);
-        }
-
-        // Enemies will now spawn based off of data in the map. 
-
+        // Delegate to SceneManager for consistent game lifecycle management
+        SceneManager.startGameSession(this);
     }
 
     fireEnemyBullet(x: number, y: number, power: number, targetX?: number, targetY?: number) {
@@ -1243,11 +1234,7 @@ export class GameScene extends Scene
     }
 
     GameOver() {
-        this.gameStarted = false;
-        this.cameras.main.fade(1000, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-            if (progress === 1) {
-                this.scene.start('GameOver');
-            }
-        });
+        // Delegate to SceneManager for consistent scene transitions
+        SceneManager.endGameSession(this);
     }
 }

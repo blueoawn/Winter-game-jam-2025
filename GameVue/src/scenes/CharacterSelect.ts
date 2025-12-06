@@ -1,6 +1,6 @@
 import { Scene } from 'phaser';
 import ASSETS from '../assets';
-import NetworkManager from '../../network/NetworkManager';
+import NetworkManager from '../../managers/NetworkManager.ts';
 import { CharacterIdsEnum } from "../gameObjects/Characters/CharactersEnum.ts";
 
 interface CharacterData {

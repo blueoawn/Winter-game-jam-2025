@@ -1,4 +1,4 @@
-import NetworkManager from '../../network/NetworkManager';
+import NetworkManager from '../../managers/NetworkManager';
 import { LobbyUI } from '../ui/LobbyUI';
 
 interface LobbyInitData {

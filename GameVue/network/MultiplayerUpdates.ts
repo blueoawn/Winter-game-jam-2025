@@ -4,7 +4,7 @@
  * Handles host and client state synchronization, input transmission, and state broadcasting
  */
 
-import NetworkManager from './NetworkManager';
+import NetworkManager from '../managers/NetworkManager';
 import { DeltaSerializer } from './StateSerializer';
 import type { GameScene } from '../src/scenes/Game';
 import type { PlayerManager } from '../managers/MultiplayerManager';
