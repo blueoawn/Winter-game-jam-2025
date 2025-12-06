@@ -48,6 +48,11 @@ export class SwordAndBoard extends PlayerController {
     public preUpdate(time: number, delta: number) {
         super.preUpdate(time, delta);
         this.updateShieldPositionAndRotation();
+
+        // Update slash animation if currently slashing
+        if (this.isSlashing) {
+            this.updateSlash(time);
+        }
     }
     
     startSlash(): void {
