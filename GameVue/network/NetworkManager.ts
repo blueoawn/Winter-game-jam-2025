@@ -9,7 +9,7 @@ export class NetworkManager {
     private socket: PlaySocket | null = null;
     private localPlayerId: string | null = null;
     private roomCode: string | null = null;
-    private storageUpdateHandler: StorageUpdateHandler | null = null; //update when player joins or leaves the lobby via disconnect
+    private storageUpdateHandlers: StorageUpdateHandler[] = []; // Changed to array
     private isHost = false;
 
     private playerJoinedHandler?: PlayerEventHandler;
@@ -17,6 +17,8 @@ export class NetworkManager {
 
     private connectedPlayers = new Set<string>();
     private storage: any = null;
+    private heartbeatInterval: NodeJS.Timeout | null = null;
+    private storageListenerAttached = false;
 
     private constructor() {}
 
@@ -37,6 +39,7 @@ export class NetworkManager {
         this.localPlayerId = await this.socket.init();
 
         this.registerCoreEvents();
+        this.startHeartbeat();
 
         return this.localPlayerId!; // Non-null assertion since init() always returns a string
     }
@@ -56,57 +59,114 @@ export class NetworkManager {
         });
     }
 
+    private startHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+        }
+
+        // Send heartbeat every 10 seconds (server timeout is 30 seconds)
+        this.heartbeatInterval = setInterval(() => {
+            if (this.socket) {
+                this.socket.sendRequest('heartbeat');
+            }
+        }, 10000);
+    }
+
+    private stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+    }
+
     async hostGame(): Promise<string> {
         if (!this.socket) throw new Error('Network not initialized');
 
-        const initialStorage = {
-            hostId: this.localPlayerId,
-            players: [this.localPlayerId],
-            inputs: {},
-            isGameStarted: false,
-            startGameData: null,
-            meta: { started: false }
-        };
+        try {
+            const initialStorage = {
+                hostId: this.localPlayerId,
+                players: [this.localPlayerId],
+                inputs: {},
+                characterSelections: {},
+                allPlayersReady: false,
+                characterSelectionInProgress: false,
+                readyToStartGame: false,
+                isGameStarted: false,
+                startGameData: null,
+                lastStateDelta: null,
+                meta: { started: false }
+            };
 
-        const roomCode = await this.socket.createRoom(initialStorage);
+            const roomCode = await this.socket.createRoom(initialStorage);
 
-        this.roomCode = roomCode;
-        this.isHost = true;
-        this.storage = initialStorage;
-        this.connectedPlayers.add(this.localPlayerId!);
+            this.roomCode = roomCode;
+            this.isHost = true;
+            this.storage = initialStorage;
+            this.connectedPlayers.add(this.localPlayerId!);
 
-        return roomCode;
+            console.log('Hosting game with room code:', roomCode);
+            return roomCode;
+        } catch (error) {
+            console.error('Failed to create room:', error);
+            throw error;
+        }
     }
 
-    async joinGame(room: string) {
-        if (!this.socket) throw new Error('Network not initialized');
-
-        this.roomCode = room;
-        this.isHost = false;
-        await this.socket.joinRoom(room);
-
-        // Get current room storage
-        this.storage = this.socket.getStorage;
-
-        // Add self to players list
-        if (Array.isArray(this.storage?.players)) {
-            if (!this.storage.players.includes(this.localPlayerId)) {
-                this.storage.players.push(this.localPlayerId);
-            }
+    // Join an existing game session
+    async joinGame(roomCode: string): Promise<void> {
+        if (!this.socket) {
+            throw new Error('NetworkManager not initialized');
         }
 
-        this.socket.updateStorage(`players`, 'array-add-unique', this.localPlayerId);
+        try {
+            this.roomCode = roomCode;
+            this.isHost = false;
+
+            console.log('Joining room:', roomCode);
+            await this.socket.joinRoom(roomCode);
+
+            // Add self to players list in storage
+            this.socket.updateStorage('players', 'array-add-unique', this.localPlayerId);
+
+            console.log('Successfully joined room');
+        } catch (error) {
+            console.error('Failed to join room:', error);
+            throw error;
+        }
     }
 
-    //input update
+    // (Deprecated) updatePlayerInput removed - use sendInput which includes seq
+
+    // (Removed duplicate joinGame)
+
+    // Send input update (adds seq and timestamp)
     sendInput(input: any) {
-        if (!this.socket || !this.localPlayerId) return;
+        if (!this.socket) {
+            console.warn(`[NetworkManager] sendInput: socket is null! NetworkManager not properly initialized`);
+            return;
+        }
+        if (!this.localPlayerId) {
+            console.warn(`[NetworkManager] sendInput: localPlayerId is null!`);
+            return;
+        }
 
-        this.socket.updateStorage(`inputs.${this.localPlayerId}`, 'set', {
+        // Initialize seq counter if missing
+        if ((this as any).inputSeq === undefined) {
+            (this as any).inputSeq = 0;
+        }
+        const seq = ++(this as any).inputSeq;
+
+        const payload = {
             ...input,
-            t: Date.now()
-        });
+            t: Date.now(),
+            seq
+        };
+
+        //console.log(`[NetworkManager] sendInput: writing inputs.${this.localPlayerId} seq=${seq}, payload keys:`, Object.keys(payload)); //Debug
+        console.log(`[NetworkManager] sendInput: full payload:`, payload); //Debug
+        this.socket.updateStorage(`inputs.${this.localPlayerId}`, 'set', payload);
     }
+
 
     // Volatile state broadcasting (host)
     sendVolatileState(state: any) {
@@ -136,25 +196,30 @@ export class NetworkManager {
 
     // Listen for general storage updates
     onStorageUpdate(handler: StorageUpdateHandler) {
-        this.storageUpdateHandler = handler;
+        // Add handler to list instead of replacing
+        this.storageUpdateHandlers.push(handler);
 
         // If we already have storage, invoke immediately
         if (this.storage) {
             handler(this.storage);
         }
 
-        // Listen to storage updates from PlaySocket
-        if (this.socket) {
+        // Attach listener to socket only once
+        if (!this.storageListenerAttached && this.socket) {
             this.socket.onEvent('storageUpdated', (storage: any) => {
                 this.storage = storage;
-                this.storageUpdateHandler?.(storage);
+                // Call ALL registered handlers
+                for (const h of this.storageUpdateHandlers) {
+                    h(storage);
+                }
             });
+            this.storageListenerAttached = true;
         }
     }
 
     // Stop listening to storage updates
     offStorageUpdate() {
-        this.storageUpdateHandler = null;
+        this.storageUpdateHandlers = [];
     }
 
     onPlayerJoined(handler: PlayerEventHandler) {
@@ -217,13 +282,49 @@ export class NetworkManager {
     }
 
     destroy() {
+        this.stopHeartbeat();
         this.socket?.destroy();
         this.socket = null;
         this.connectedPlayers.clear();
         this.roomCode = null;
         this.localPlayerId = null;
         this.isHost = false;
+        this.storageListenerAttached = false;
+        this.storageUpdateHandlers = [];
     }
 }
 
-export default NetworkManager.getInstance();
+// Lazy singleton export - prevents early instantiation before initialize() is called
+let instanceExport: NetworkManager | null = null;
+
+export default {
+    getInstance(): NetworkManager {
+        if (!instanceExport) {
+            instanceExport = NetworkManager.getInstance();
+        }
+        return instanceExport;
+    },
+    // Proxy common methods for convenience
+    initialize: (...args: any[]) => NetworkManager.getInstance().initialize(...args),
+    hostGame: (...args: any[]) => NetworkManager.getInstance().hostGame(...args),
+    joinGame: (...args: any[]) => NetworkManager.getInstance().joinGame(...args),
+    sendInput: (...args: any[]) => NetworkManager.getInstance().sendInput(...args),
+    sendRequest: (...args: any[]) => NetworkManager.getInstance().sendRequest(...args),
+    sendVolatileState: (...args: any[]) => NetworkManager.getInstance().sendVolatileState(...args),
+    onStorageKey: (...args: any[]) => NetworkManager.getInstance().onStorageKey(...args),
+    onStorageUpdate: (...args: any[]) => NetworkManager.getInstance().onStorageUpdate(...args),
+    offStorageUpdate: (...args: any[]) => NetworkManager.getInstance().offStorageUpdate(...args),
+    onPlayerJoined: (...args: any[]) => NetworkManager.getInstance().onPlayerJoined(...args),
+    onPlayerLeft: (...args: any[]) => NetworkManager.getInstance().onPlayerLeft(...args),
+    onPlayerJoin: (...args: any[]) => NetworkManager.getInstance().onPlayerJoin(...args),
+    onPlayerLeave: (...args: any[]) => NetworkManager.getInstance().onPlayerLeave(...args),
+    getPlayerId: (...args: any[]) => NetworkManager.getInstance().getPlayerId(...args),
+    getRoomCode: (...args: any[]) => NetworkManager.getInstance().getRoomCode(...args),
+    getConnectedPlayers: (...args: any[]) => NetworkManager.getInstance().getConnectedPlayers(...args),
+    getIsHost: (...args: any[]) => NetworkManager.getInstance().getIsHost(...args),
+    getStorage: (...args: any[]) => NetworkManager.getInstance().getStorage(...args),
+    getStats: (...args: any[]) => NetworkManager.getInstance().getStats(...args),
+    getSocket: (...args: any[]) => NetworkManager.getInstance().getSocket(...args),
+    destroy: (...args: any[]) => NetworkManager.getInstance().destroy(...args)
+} as any;
+

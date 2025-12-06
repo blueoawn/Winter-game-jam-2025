@@ -125,8 +125,8 @@ export class LobbyUI {
         this.elements.startButton = this.createButton(
             centerX,
             height - 100,
-            'Start Game',
-            () => this.lobbyScene.onStartGame()
+            'Select Characters with this lobby',
+            () => this.lobbyScene.selectCharacters()
         );
         this.elements.startButton.setVisible(false);
 

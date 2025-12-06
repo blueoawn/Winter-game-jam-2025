@@ -3,155 +3,209 @@
 
 import PlaySocketServer from 'playsocketjs/server';
 
-const server = new PlaySocketServer({ 
+const server = new PlaySocketServer({
     port: 3001,
-    rateLimit: 2000  // Increased from default 20 to handle game state updates
+    rateLimit: 2000
 });
 
-console.log("🚀 PlaySocketJS Server Booted on port 3001");
+console.log('🚀 PlaySocketJS Server Booted on port 3001');
 
-// Room metadata we track server-side
+// Per-room metadata
+// roomId -> { hostId: string|null, lastTick: number, heartbeats: Map<clientId, timestamp>, lastInputSeq: Map<clientId, seq> }
 const roomData = new Map();
-// roomId → { hostId, lastTick, lastHeartbeat: Map<clientId, timestamp> }
 
-//----------------------------------------------------------
-// Utility
-//----------------------------------------------------------
-function now() {
-    return Date.now();
-}
+function now() { return Date.now(); }
 
-//----------------------------------------------------------
-// Event: Client Registered
-//----------------------------------------------------------
-server.onEvent('clientRegistered', (clientId, custom) => {
-    console.log(`Registered client: ${clientId}`);
+server.onEvent('clientRegistered', (clientId) => {
+    console.log(`✅ Client registered: ${clientId}`);
 });
 
-//----------------------------------------------------------
-// Event: Room Created
-//----------------------------------------------------------
 server.onEvent('roomCreated', (roomId) => {
-    console.log(`Room created: ${roomId}`);
-
+    console.log(`🏠 Room created: ${roomId}`);
     roomData.set(roomId, {
         hostId: null,
         lastTick: 0,
         heartbeats: new Map(),
+        lastInputSeq: new Map()
     });
 });
 
-//----------------------------------------------------------
-// Event: Client Joined Room
-//----------------------------------------------------------
 server.onEvent('clientJoinedRoom', (clientId, roomId) => {
-    console.log(`Client ${clientId} joined room ${roomId}`);
+    console.log(`👋 Client ${clientId} joined room ${roomId}`);
+    const meta = roomData.get(roomId);
+    if (!meta) return;
 
-    const data = roomData.get(roomId);
-    if (!data) return;
-
-    // If no host yet, first client becomes host
-    if (!data.hostId) {
-        data.hostId = clientId;
-        console.log(`${clientId} is now the HOST of ${roomId}`);
+    if (!meta.hostId) {
+        meta.hostId = clientId;
+        console.log(`👑 ${clientId} is now the HOST of ${roomId}`);
     }
 
-    // Track heartbeat
-    data.heartbeats.set(clientId, now());
+    meta.heartbeats.set(clientId, now());
 });
 
-//----------------------------------------------------------
-// Event: Client Disconnected
-//----------------------------------------------------------
 server.onEvent('clientDisconnected', (clientId, roomId) => {
     console.log(`❌ Client disconnected: ${clientId}`);
-
     if (!roomId) return;
-    const data = roomData.get(roomId);
-    if (!data) return;
+    const meta = roomData.get(roomId);
+    if (!meta) return;
 
-    data.heartbeats.delete(clientId);
+    meta.heartbeats.delete(clientId);
+    meta.lastInputSeq.delete(clientId);
 
-    // If host left → elect a new one
-    if (clientId === data.hostId) {
-        const next = [...data.heartbeats.keys()][0] || null;
-        data.hostId = next;
-        console.log(`Host left. New host in ${roomId}: ${next}`);
-
-        if (!next) console.log(`⚠️ Room ${roomId} now has no host.`);
+    if (clientId === meta.hostId) {
+        const next = [...meta.heartbeats.keys()][0] || null;
+        meta.hostId = next;
+        console.log(`Host left. New host for ${roomId}: ${next}`);
     }
 });
 
-//----------------------------------------------------------
-// Event: Client → Server Custom Requests (Heartbeat, State, Snapshots)
-//----------------------------------------------------------
+// Handle custom requests from clients (heartbeat, state, snapshot)
 server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
-    const roomData_entry = roomData.get(roomId);
-    if (!roomData_entry) return;
+    const meta = roomData.get(roomId);
+    if (!meta) return;
 
-    // Handle heartbeat requests
     if (requestName === 'heartbeat') {
-        roomData_entry.heartbeats.set(clientId, Date.now());
+        meta.heartbeats.set(clientId, now());
         return;
     }
 
-    // Handle delta state updates from ANY client (server validates sequence)
     if (requestName === 'state') {
+        // Host or authoritative client may send a state delta; server will validate tick
         const delta = data;
-        if (!delta || delta.tick === undefined) {
-            console.log(`⛔ Invalid state update from ${clientId}: missing tick`);
+        if (!delta || typeof delta.tick !== 'number') {
+            console.warn(`⛔ Invalid state request from ${clientId} in ${roomId}`);
             return;
         }
 
-        // Server validates tick sequence
-        if (delta.tick > roomData_entry.lastTick) {
-            // Valid tick - advance server state and broadcast to all clients
-            roomData_entry.lastTick = delta.tick;
+        if (delta.tick > meta.lastTick) {
+            meta.lastTick = delta.tick;
             const storage = server.getRoomStorage(roomId);
             if (storage) {
                 storage.lastStateDelta = delta;
-                console.log(`📡 Client ${clientId} sent state update for tick ${delta.tick} (accepted - broadcast to all)`);
+                console.log(`📡 Accepted state tick=${delta.tick} from ${clientId} in ${roomId}`);
             }
-        } else if (delta.tick === roomData_entry.lastTick) {
-            // Duplicate tick - ignore
-            console.log(`↩️  Client ${clientId} sent duplicate tick ${delta.tick} (ignored)`);
+        } else if (delta.tick === meta.lastTick) {
+            // duplicate - ignore
         } else {
-            // Old tick - client needs to resync
-            console.log(`⚠️  Client ${clientId} sent old tick ${delta.tick} (server at ${roomData_entry.lastTick}) - requesting snapshot`);
-            // Client should request snapshot to resync
+            console.log(`⚠️ Out-of-order state tick=${delta.tick} from ${clientId} (server ${meta.lastTick})`);
         }
+
         return;
     }
 
-    // Handle snapshot requests
-    if (requestName === 'requestSnapshot') {
-        const storage = server.getRoomStorage(roomId);
-        if (!storage) return;
-
+    if (requestName === 'snapshot') {
         console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
+        // TODO: Implement snapshot response (e.g., send via request response or update storage)
         return;
     }
 });
 
-//----------------------------------------------------------
-// Event: Client → Server Heartbeat (Volatile)
-//----------------------------------------------------------
+// Storage validation: enforce who can write which keys and validate input sequence numbers
+server.onEvent('storageUpdateRequested', (params) => {
+    // Extract from the nested update structure
+    const clientId = params?.clientId;
+    const roomId = params?.roomId;
+    const key = params?.update?.key;  // Key is nested in update object
+    const operation = params?.update?.operation;  // Operation is also nested
+    const storage = params?.storage;
+    
+    // For value, we need to extract from the operation.data if it exists
+    let value;
+    if (operation && typeof operation === 'object' && 'data' in operation) {
+        value = operation.data;
+    }
 
-//----------------------------------------------------------
-// Server-side periodic cleanup (dead clients)
-//----------------------------------------------------------
+    // Log problematic calls
+    if (!key) {
+        console.warn('(server) Invalid storage update: missing key');
+        console.log(`(server) DEBUG - clientId: ${clientId}, params:`, params);
+        return false;
+    }
+
+    // Allow server-side writes (clientId === null)
+    if (!clientId) return true;
+
+    console.log(`(server) Storage write attempt: key="${key}" from ${clientId} (operation type: ${typeof operation}, value type: ${typeof value})`);
+
+
+    // Allow players list management
+    if (key === 'players' || key.startsWith('players.')) {
+        console.log(`(server) ✅ Allowing players list write`);
+        return true;
+    }
+
+    // Character selections and simple metadata (but NOT lastStateDelta from clients)
+    if (key === 'characterSelections' || key.startsWith('characterSelections.') ||
+            key === 'characterSelectionInProgress' || key === 'readyToStartGame' ||
+            key === 'isGameStarted' || key === 'startGameData' ||
+            key === 'allPlayersReady' || key === 'hostId' || key === 'meta') {
+        console.log(`(server) ✅ Allowing metadata write: ${key}=${JSON.stringify(value)}`);
+        return true;
+    }
+
+    // Inputs per-player: 'inputs.<playerId>' -> ensure client writes only own key and seq increases
+    if (key.startsWith('inputs.')) {
+        const parts = key.split('.');
+        const owner = parts[1];
+        if (owner !== clientId) {
+            console.warn(`❌ ${clientId} attempted to write inputs for ${owner} in ${roomId}`);
+            return false;
+        }
+
+        // Expect the value to contain a seq number
+        const seq = value?.seq;
+        if (typeof seq !== 'number') {
+            console.warn(`❌ Missing seq in inputs from ${clientId} in ${roomId}`);
+            console.warn(`   - value type: ${typeof value}`);
+            console.warn(`   - value: ${JSON.stringify(value)}`);
+            console.warn(`   - operation: ${JSON.stringify(operation)}`);
+            return false;
+        }
+
+        const meta = roomData.get(roomId);
+        if (!meta) return false;
+        const last = meta.lastInputSeq.get(clientId) || 0;
+        if (seq <= last) {
+            console.warn(`❌ Rejected stale seq=${seq} from ${clientId} (last=${last}) in ${roomId}`);
+            return false;
+        }
+
+        meta.lastInputSeq.set(clientId, seq);
+        console.log(`✅ Accepted inputs.${clientId} seq=${seq} in ${roomId}`);
+        return true;
+    }
+
+    // Block writes to authoritative state keys
+    if (key.startsWith('game') || key.startsWith('entities') || key.startsWith('enemies') ||
+            key.startsWith('projectiles') || key.startsWith('walls') || key === 'lastStateDelta') {
+        console.warn(`⛔ Blocked unauthorized storage write by ${clientId} to ${key}`);
+        return false;
+    }
+
+    // Default deny
+    console.warn(`(server) Denying storage write to ${key} by ${clientId} in room ${roomId}`);
+    return false;
+});
+
+// Log when storage updates are applied to clients
+server.onEvent('storageUpdated', ({ roomId, clientId, update, storage }) => {
+    if (update && update.key === 'characterSelectionInProgress') {
+        console.log(`📡 Storage updated: characterSelectionInProgress=${storage.characterSelectionInProgress} (from ${clientId})`);
+    }
+});
+
+// Periodic cleanup of dead clients
 setInterval(() => {
-    const cutoff = now() - 30000; // 30 seconds without heartbeat → dead
-
-    for (const [roomId, data] of roomData) {
-        for (const [clientId, last] of data.heartbeats) {
-            if (last < cutoff) {
-                console.log(`💀 Removing dead client ${clientId} from room ${roomId}`);
-                data.heartbeats.delete(clientId);
-
-                if (clientId === data.hostId) {
-                    const next = [...data.heartbeats.keys()][0] || null;
-                    data.hostId = next;
+    const cutoff = now() - 30000;
+    for (const [roomId, meta] of roomData) {
+        for (const [clientId, ts] of meta.heartbeats) {
+            if (ts < cutoff) {
+                console.log(`💀 Removing dead client ${clientId} from ${roomId}`);
+                meta.heartbeats.delete(clientId);
+                meta.lastInputSeq.delete(clientId);
+                if (clientId === meta.hostId) {
+                    const next = [...meta.heartbeats.keys()][0] || null;
+                    meta.hostId = next;
                     console.log(`👑 Host replaced: ${next}`);
                 }
             }
@@ -159,86 +213,4 @@ setInterval(() => {
     }
 }, 4000);
 
-//----------------------------------------------------------
-// Log storage updates (debug)
-//----------------------------------------------------------
-server.onEvent('storageUpdated', ({ roomId, clientId, update }) => {
-    // uncomment for debugging
-    // console.log(` Storage updated in ${roomId} by ${clientId}:`, update);
-});
-
-server.onEvent('storageUpdateRequested', ({
-    roomId,
-    clientId,
-    update,
-    storage
-}) => {
-    // Allow server-side updates (PlaySocket uses null clientId)
-    if (!clientId) return true;
-
-    // update object contains the key and value information
-    // For array operations: { key, operation, value, updateValue }
-    // For set operations: { key, value }
-    if (!update || !update.key) {
-        console.warn('Invalid storage update: missing key');
-        return false;
-    }
-
-    const key = update.key;
-    const operation = update.operation;
-    const value = update.value;
-
-    /**
-     * ✅ ALLOWED: Player list management
-     * e.g. players (direct) or players.<playerId>
-     */
-    if (key === 'players' || key.startsWith('players.')) {
-        return true;
-    }
-
-    /**
-     * ✅ ALLOWED: Character selections and game state metadata
-     */
-    if (key === 'characterSelections' || key.startsWith('characterSelections.') || 
-        key === 'allPlayersReady' || key === 'isGameStarted' || key === 'startGameData' || 
-        key === 'gameStarting' || key === 'lastStateDelta') {
-        return true;
-    }
-
-    /**
-     * ✅ ALLOWED: Player input updates
-     * e.g. inputs.<playerId>
-     */
-    if (key.startsWith('inputs.')) {
-        const inputOwner = key.split('.')[1];
-
-        // Clients may ONLY write their own input
-        if (inputOwner !== clientId) {
-            console.warn(`❌ ${clientId} tried to write input for ${inputOwner}`);
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * ❌ DISALLOWED: Any authoritative game state
-     */
-    if (
-        key.startsWith('game') ||
-        key.startsWith('entities') ||
-        key.startsWith('enemies') ||
-        key.startsWith('projectiles') ||
-        key.startsWith('walls')
-    ) {
-        console.warn(
-            `⛔ Blocked unauthorized storage write by ${clientId} to ${key}`
-        );
-        return false;
-    }
-
-    /**
-     * ❌ Default deny
-     */
-    return false;
-});
+console.log('📡 Server ready');
