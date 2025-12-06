@@ -28,8 +28,8 @@ import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../network/NetworkManager';
-import { DeltaSerializer } from '../../network/StateSerializer';
 import { DeltaDeserializer } from '../../network/DeltaDeserializer';
+import { updateHost, updateClient } from '../../network/MultiplayerUpdates';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
@@ -40,6 +40,16 @@ import { AggressiveBehavior } from "../behaviorScripts/Aggressive.ts";
 import { IBehavior } from "../behaviorScripts/Behavior.ts";
 import { TerritorialBehavior } from "../behaviorScripts/Territorial.ts";
 import { PacifistBehavior } from "../behaviorScripts/Pacifist.ts";
+import {
+    initVariables,
+    initBackground,
+    initWorldBounds,
+    initCamera,
+    initGameUi,
+    initAnimations,
+    initInput,
+    initPhysics
+} from '../init';
 
 
 export class GameScene extends Scene
@@ -120,25 +130,51 @@ export class GameScene extends Scene
             // Initialize audio manager
             audioManager.init(this);
 
-            this.initVariables();
-            this.initBackground();  // Add Summoners Rift map background
-            this.initGameUi();
-            this.initAnimations();
+            // Load current map (default to Summoners Rift)
+            this.currentMap = getDefaultMap();
+
+            // Initialize variables using extracted init function
+            const vars = initVariables(this, this.currentMap);
+            this.score = vars.score;
+            this.centreX = vars.centreX;
+            this.centreY = vars.centreY;
+            this.tileSize = vars.tileSize;
+            this.mapOffset = vars.mapOffset;
+            this.mapTop = vars.mapTop;
+            this.mapHeight = vars.mapHeight;
+            this.mapWidth = vars.mapWidth;
+            this.spawnEnemyCounter = vars.spawnEnemyCounter;
+            this.stateSyncRate = vars.stateSyncRate;
+            this.inputSendRate = vars.inputSendRate;
+            this.tick = vars.tick;
+            this.lastStateSyncTime = 0;
+            this.lastInputSendTime = 0;
+            this.tiles = [50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 36, 48, 60, 72, 84];
+
+            // Initialize scene UI
+            initBackground(this, this.currentMap);
+            const ui = initGameUi(this);
+            this.tutorialText = ui.tutorialText;
+            this.scoreText = ui.scoreText;
+            this.gameOverText = ui.gameOverText;
+
+            initAnimations(this);
 
             // Initialize ButtonMapper for input
             this.buttonMapper = new ButtonMapper(this);
 
             // Set world bounds before creating players
-            this.initWorldBounds();
+            initWorldBounds(this, this.currentMap);
 
+            // Create player(s) based on game mode
             if (this.networkEnabled) {
                 this.initMultiplayer();
             } else {
                 this.initSinglePlayer();
             }
 
-            this.initInput();
-            this.initPhysics();
+            initInput(this);
+            initPhysics(this);
 
             // Set up multiplayer wall collisions after physics is initialized
             if (this.networkEnabled) {
@@ -147,10 +183,10 @@ export class GameScene extends Scene
 
             this.initSpawners();  // Initialize enemy spawners from map config
             this.initWalls();     // Initialize walls from map config
-            // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
 
             // Setup camera after players are created
-            this.initCamera();
+            const playerToFollow = this.networkEnabled ? this.playerManager?.getLocalPlayer() : this.player;
+            initCamera(this, this.currentMap, playerToFollow || undefined);
 
             // Auto-start for now
             this.startGame();
@@ -169,74 +205,6 @@ export class GameScene extends Scene
             this.updateSinglePlayer();
         }
 
-    }
-
-    initVariables() {
-        // Load current map (default to Summoners Rift)
-        this.currentMap = getDefaultMap();
-
-        this.score = 0;
-        this.centreX = this.scale.width * 0.5;
-        this.centreY = this.scale.height * 0.5;
-
-        // list of tile ids in tiles.png
-        // items nearer to the beginning of the array have a higher chance of being randomly chosen when using weighted()
-        this.tiles = [50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 36, 48, 60, 72, 84];
-        this.tileSize = 32; // width and height of a tile in pixels
-
-        this.mapOffset = 10; // offset (in tiles) to move the map above the top of the screen
-        this.mapTop = -this.mapOffset * this.tileSize; // offset (in pixels) to move the map above the top of the screen
-        this.mapHeight = Math.ceil(this.scale.height / this.tileSize) + this.mapOffset + 1; // height of the tile map (in tiles)
-        this.mapWidth = Math.ceil(this.scale.width / this.tileSize); // width of the tile map (in tiles)
-        //this.scrollSpeed = 1; // background scrolling speed (in pixels) DISABLED FOR NOW
-        // this.scrollMovement = 0; // current scroll amount DISABLED FOR NOW
-        this.spawnEnemyCounter = 0; // timer before spawning next group of enemies
-
-        // Network variables
-        this.stateSyncRate = 1000 / 15;  // 15 times per second
-        this.lastStateSyncTime = 0;
-        this.inputSendRate = 1000 / 30;  // 30 times per second (optimized from 60)
-        this.lastInputSendTime = 0;
-        this.tick = 0;
-    }
-
-    initBackground() {
-        // Add background image centered in world
-        this.add.image(
-            this.currentMap.width / 2,
-            this.currentMap.height / 2,
-            this.currentMap.assetKey
-        )
-            .setOrigin(0.5, 0.5)
-            .setDepth(0);  // Behind all game objects
-    }
-
-    initWorldBounds() {
-        // Set physics world bounds to map size
-        this.physics.world.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
-    }
-
-    initCamera() {
-        const camera = this.cameras.main;
-
-        // Set camera bounds to prevent showing black areas
-        camera.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
-
-        // Determine which player to follow
-        let playerToFollow = null;
-
-        if (this.networkEnabled && this.playerManager) {
-            // Multiplayer: Follow local player
-            playerToFollow = this.playerManager.getLocalPlayer();
-        } else if (this.player) {
-            // Single player: Follow the player
-            playerToFollow = this.player;
-        }
-
-        // Start following with smooth camera
-        if (playerToFollow) {
-            camera.startFollow(playerToFollow, true, 0.1, 0.1);
-        }
     }
 
     initSinglePlayer() {
@@ -392,18 +360,22 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        console.log('[NETWORK] Setting up network handlers');
+        //console.log('[NETWORK] Setting up network handlers'); //Debug
         
         // ALL clients listen for delta state updates from the server (server is source of truth)
         NetworkManager.onStorageKey('lastStateDelta', (delta: any) => {
-            console.log(`[NETWORK] Storage listener fired for lastStateDelta`);
+            //console.log(`[NETWORK] Storage listener fired for lastStateDelta`); //Debug
             if (delta) {
-                this.applyDeltaState(delta);
+                try {
+                    this.applyDeltaState(delta);
+                } catch (err) {
+                    console.error('[NETWORK] Error applying delta state:', err);
+                }
             }
         });
 
         // All clients listen for player inputs to validate their own input was received
-        NetworkManager.onStorageKey('inputs', (inputs: any) => {
+        NetworkManager.onStorageKey('inputs', () => {
             // Could use this for input validation/feedback, but not for game logic
             // Game logic comes from server deltas only
         });
@@ -440,230 +412,150 @@ export class GameScene extends Scene
             this.updateClient();
         }
     }
-    
-    //Soon to be depricated
+
+    //TODO - refactored: use updateHost/updateClient from MultiplayerUpdates.ts
     updateHost() {
-        // Host runs game simulation and broadcasts state
-        // Process local player input from ButtonMapper
-        if (this.buttonMapper && this.playerManager) {
-            const localPlayer = this.playerManager.getLocalPlayer();
-            if (localPlayer) {
-                const input = this.buttonMapper.getInput();
-                (localPlayer as PlayerController).processInput(input);
-                (localPlayer as PlayerController).storeInputForNetwork(input);
-            }
-        }
-
-        // Update all players
-        this.playerManager?.update();
-
-        // Update spawners (host-only logic)
-        this.updateSpawners();
-
-        // Broadcast state to server (which validates and broadcasts to all clients)
-        const now = Date.now();
-        if (now - this.lastStateSyncTime >= this.stateSyncRate) {
-            this.broadcastState();
-            this.lastStateSyncTime = now;
-        }
+        updateHost(this, this.playerManager, this.buttonMapper);
     }
 
     // Can probably be refactored
     updateClient() {
-        // Process local player input from ButtonMapper (client-side prediction)
-        if (this.buttonMapper && this.playerManager) {
-            const localPlayer = this.playerManager.getLocalPlayer();
-            if (localPlayer) {
-                const input = this.buttonMapper.getInput();
-                (localPlayer as PlayerController).processInput(input);
-                (localPlayer as PlayerController).storeInputForNetwork(input);
-            }
-        }
-
-        // Update all players (will be overridden by server deltas)
-        this.playerManager?.update();
-
-        // Send local input to server
-        const now = Date.now();
-        if (now - this.lastInputSendTime >= this.inputSendRate) {
-            this.sendInputToServer();
-            this.lastInputSendTime = now;
-        }
+        updateClient(this, this.playerManager, this.buttonMapper);
     }
 
-    //TODO - this is being refactored for deltas
-    broadcastState() {
-        if (!this.playerManager) return;
-
-        const allEnemies = this.enemyGroup.getChildren();
-        const allEnemyBullets = this.enemyBulletGroup.getChildren();
-        const allProjectiles = this.playerBulletGroup.getChildren();
-
-        // Limit enemies to 30 max (should be enough for multiplayer)
-        const enemies = allEnemies.length > 30 ? allEnemies.slice(0, 30) : allEnemies;
-
-        // Limit enemy bullets to 50 max (prevent packet overflow)
-        const enemyBullets = allEnemyBullets.length > 50 ? allEnemyBullets.slice(0, 50) : allEnemyBullets;
-
-        // Limit projectiles to 100 max (character-specific projectiles)
-        const projectiles = allProjectiles.length > 100 ? allProjectiles.slice(0, 100) : allProjectiles;
-
-        // Get destructible walls from synced walls map
-        const walls = Array.from(this.syncedWalls.values());
-
-        // Use delta serialization for bandwidth optimization
-        const delta = DeltaSerializer.serializeDelta({
-            tick: this.tick,
-            players: this.playerManager.collectPlayerStates().reduce((acc: any, p: any) => {
-                acc[p.id] = p;
-                return acc;
-            }, {}),
-            enemies: enemies.reduce((acc: any, e: any) => {
-                const enemyState = {
-                    id: (e as any).enemyId || `enemy_${e.x}_${e.y}`,
-                    x: Math.round(e.x),
-                    y: Math.round(e.y),
-                    health: (e as any).health || 1,
-                    enemyType: e.constructor.name,
-                    shipId: (e as any).shipId || 0,
-                    pathId: (e as any).pathIndex || 0,
-                    power: (e as any).power || 1
-                };
-                acc[enemyState.id] = enemyState;
-                return acc;
-            }, {}),
-            projectiles: projectiles.filter((p: any) => p.getNetworkState).map((p: any) => p) as any,
-            walls: walls as any,
-            score: this.score,
-            scrollMovement: this.scrollMovement,
-            spawnEnemyCounter: this.spawnEnemyCounter,
-            gameStarted: this.gameStarted
-        });
-
-        // Send delta to server (server validates tick and broadcasts to all clients)
-        // All clients send deltas, server is source of truth
-        NetworkManager.sendRequest('state', delta);
-    }
-
-    //Soon to be depricated by broadcast to server
-    sendInputToServer() {
-        if (!this.playerManager || !this.buttonMapper) return;
-
-        const localPlayer = this.playerManager.getLocalPlayer();
-        if (!localPlayer) return;
-
-        // Get abstract input from ButtonMapper
-        const abstractInput = this.buttonMapper.getInput();
-
-        // Convert to network InputState
-        const inputState = {
-            movementSpeed: (localPlayer as any).characterSpeed,
-            velocity: abstractInput.movement,
-            rotation: localPlayer.rotation,
-            aim: abstractInput.aim,  // Include aim position for firing bullets
-            ability1: abstractInput.ability1,
-            ability2: abstractInput.ability2
-        };
-
-        // Send input to host
-        NetworkManager.sendInput(inputState);
-    }
-    
     // Apply delta state updates from host
     applyDeltaState(delta: any) {
-        console.log(`[CLIENT] Received delta tick ${delta.tick}`);
+        //console.log(`[CLIENT] Received delta tick ${delta.tick}`); //Debug
         
-        // Detect missing packets (desync detection)
-        const tickDiff = delta.tick - this.lastReceivedTick;
-
-        if (tickDiff > 5 && this.lastReceivedTick > 0) {
-            // Missing more than 5 ticks = desync
-            console.warn(`⚠️ Desync detected: missing ${tickDiff} ticks`);
-            NetworkManager.sendRequest('snapshot');
-            return;
-        }
-
-        this.lastReceivedTick = delta.tick;
-
-        // Reconstruct full state from delta
-        const fullState = this.deltaDeserializer.applyDelta(delta);
-
-        // Apply player states
-        if (fullState.players) {
-            this.playerManager?.applyPlayerState(Object.values(fullState.players));
-        }
-
-        // Apply meta state
-        if (fullState.meta) {
-            if (fullState.meta.score !== undefined) {
-                this.score = fullState.meta.score;
-                this.scoreText.setText(`Score: ${this.score}`);
+        try {
+            if (!delta || typeof delta.tick !== 'number') {
+                console.error('[NETWORK] Invalid delta received:', delta);
+                return;
             }
-            if (fullState.meta.scrollMovement !== undefined) {
-                this.scrollMovement = fullState.meta.scrollMovement;
-            }
-            if (fullState.meta.spawnEnemyCounter !== undefined) {
-                this.spawnEnemyCounter = fullState.meta.spawnEnemyCounter;
-            }
-            if (fullState.meta.gameStarted !== undefined) {
-                this.gameStarted = fullState.meta.gameStarted;
-            }
-        }
 
-        // Sync enemies
-        if (fullState.enemies) {
-            this.syncEnemies(fullState.enemies);
-        }
+            // Detect missing packets (desync detection)
+            const tickDiff = delta.tick - this.lastReceivedTick;
 
-        // Sync projectiles
-        if (fullState.projectiles) {
-            this.syncProjectiles(fullState.projectiles);
-        }
+            if (tickDiff > 5 && this.lastReceivedTick > 0) {
+                // Missing more than 5 ticks = desync
+                console.warn(`⚠️ Desync detected: missing ${tickDiff} ticks`);
+                NetworkManager.sendRequest('snapshot');
+                return;
+            }
 
-        // Sync walls
-        if (fullState.walls) {
-            this.syncWalls(fullState.walls);
+            this.lastReceivedTick = delta.tick;
+
+            // Reconstruct full state from delta
+            const fullState = this.deltaDeserializer.applyDelta(delta);
+            
+            // Debug: Log player state structure once per 5 ticks
+            if (this.tick % 5 === 0 && Object.keys(fullState.players).length > 0) {
+                console.log('[DEBUG] Player state structure:', Object.entries(fullState.players).slice(0, 1).map(([id, state]) => ({ id, ...state })));
+            }
+
+            // Apply player states
+            if (fullState.players && Object.keys(fullState.players).length > 0) {
+                this.playerManager?.applyPlayerState(Object.values(fullState.players));
+            }
+            // Apply meta state
+            if (fullState.meta) {
+                try {
+                    if (fullState.meta.score !== undefined) {
+                        this.score = fullState.meta.score;
+                        this.scoreText.setText(`Score: ${this.score}`);
+                    }
+                    if (fullState.meta.scrollMovement !== undefined) {
+                        this.scrollMovement = fullState.meta.scrollMovement;
+                    }
+                    if (fullState.meta.spawnEnemyCounter !== undefined) {
+                        this.spawnEnemyCounter = fullState.meta.spawnEnemyCounter;
+                    }
+                    if (fullState.meta.gameStarted !== undefined) {
+                        this.gameStarted = fullState.meta.gameStarted;
+                    }
+                } catch (err) {
+                    console.error('[NETWORK] Error applying meta state:', err);
+                }
+            }
+
+            // Sync enemies
+            if (fullState.enemies) {
+                this.syncEnemies(fullState.enemies);
+            }
+
+            // Sync projectiles
+            if (fullState.projectiles) {
+                this.syncProjectiles(fullState.projectiles);
+            }
+
+            // Sync walls
+            if (fullState.walls) {
+                this.syncWalls(fullState.walls);
+            }
+        } catch (err) {
+            console.error('[NETWORK] Error in applyDeltaState:', err);
         }
     }
 
     // Helper method to sync enemies
     private syncEnemies(enemies: Record<string, any>) {
-        this.enemyIdCache.clear();
+        try {
+            this.enemyIdCache.clear();
 
-        Object.entries(enemies).forEach(([id, enemyState]) => {
-            if (enemyState === null) return; // Removed enemy
+            Object.entries(enemies).forEach(([id, enemyState]) => {
+                if (enemyState === null) return; // Removed enemy
 
-            this.enemyIdCache.add(id);
-
-            let enemy = this.syncedEnemies.get(id);
-
-            if (!enemy) {
-                // Create correct enemy type
-                if (enemyState.enemyType === 'EnemyLizardWizard') {
-                    const lizardEnemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
-                    (lizardEnemy as any).enemyId = id;
-                    // Cast to EnemyFlying for storage (type mismatch handled)
-                    this.syncedEnemies.set(id, lizardEnemy as any);
-                } else {
-                    enemy = new EnemyFlying(
-                        this,
-                        enemyState.shipId,
-                        0,
-                        0,
-                        enemyState.power
-                    );
-                    (enemy as any).enemyId = id;
-                    (enemy as any).pathIndex = 999; // Disable path following
-                    enemy.setPosition(enemyState.x, enemyState.y);
-                    this.enemyGroup.add(enemy);
-                    this.syncedEnemies.set(id, enemy);
+                if (!id || typeof id !== 'string') {
+                    console.warn('[NETWORK] Invalid enemy ID:', id);
+                    return;
                 }
-            } else {
-                // Update existing enemy
-                enemy.setPosition(enemyState.x, enemyState.y);
-                (enemy as any).health = enemyState.health;
-            }
-        });
+
+                this.enemyIdCache.add(id);
+
+                let enemy = this.syncedEnemies.get(id);
+
+                if (!enemy) {
+                    // Create correct enemy type
+                    try {
+                        if (enemyState.enemyType === 'EnemyLizardWizard') {
+                            const lizardEnemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
+                            (lizardEnemy as any).enemyId = id;
+                            // Cast to EnemyFlying for storage (type mismatch handled)
+                            this.syncedEnemies.set(id, lizardEnemy as any);
+                        } else {
+                            enemy = new EnemyFlying(
+                                this,
+                                enemyState.shipId,
+                                0,
+                                0,
+                                enemyState.power
+                            );
+                            (enemy as any).enemyId = id;
+                            (enemy as any).pathIndex = 999; // Disable path following
+                            enemy.setPosition(enemyState.x, enemyState.y);
+                            this.enemyGroup.add(enemy);
+                            this.syncedEnemies.set(id, enemy);
+                        }
+                    } catch (err) {
+                        console.error(`[NETWORK] Error creating enemy ${id}:`, err);
+                    }
+                } else {
+                    // Update existing enemy
+                    try {
+                        if (typeof enemyState.x === 'number' && typeof enemyState.y === 'number') {
+                            enemy.setPosition(enemyState.x, enemyState.y);
+                        }
+                        if (typeof enemyState.health === 'number') {
+                            (enemy as any).health = enemyState.health;
+                        }
+                    } catch (err) {
+                        console.error(`[NETWORK] Error updating enemy ${id}:`, err);
+                    }
+                }
+            });
+        } catch (err) {
+            console.error('[NETWORK] Error in syncEnemies:', err);
+        }
 
         // Remove enemies no longer in state
         this.syncedEnemies.forEach((enemy, id) => {
@@ -678,45 +570,71 @@ export class GameScene extends Scene
 
     // Helper method to sync projectiles
     private syncProjectiles(projectiles: Record<string, any>) {
-        const projectileIdCache = new Set<string>();
+        try {
+            const projectileIdCache = new Set<string>();
 
-        Object.entries(projectiles).forEach(([id, projState]) => {
-            if (projState === null) return; // Removed projectile
+            Object.entries(projectiles).forEach(([id, projState]) => {
+                if (projState === null) return; // Removed projectile
 
-            projectileIdCache.add(id);
-
-            const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === id);
-
-            if (!existing) {
-                const projectile = this.createProjectileFromState(projState);
-                if (projectile) {
-                    this.playerBulletGroup.add(projectile);
+                if (!id || typeof id !== 'string') {
+                    console.warn('[NETWORK] Invalid projectile ID:', id);
+                    return;
                 }
-            } else {
-                if ((existing as any).updateFromNetworkState) {
-                    (existing as any).updateFromNetworkState(projState);
-                }
-            }
-        });
 
-        // Remove projectiles no longer in state
-        this.playerBulletGroup.getChildren().forEach((projectile: any) => {
-            if (projectile.id && !projectileIdCache.has(projectile.id)) {
-                projectile.destroy();
-            }
-        });
+                projectileIdCache.add(id);
+
+                try {
+                    const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === id);
+
+                    if (!existing) {
+                        const projectile = this.createProjectileFromState(projState);
+                        if (projectile) {
+                            this.playerBulletGroup.add(projectile);
+                        }
+                    } else {
+                        if ((existing as any).updateFromNetworkState) {
+                            (existing as any).updateFromNetworkState(projState);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[NETWORK] Error syncing projectile ${id}:`, err);
+                }
+            });
+
+            // Remove projectiles no longer in state
+            this.playerBulletGroup.getChildren().forEach((projectile: any) => {
+                if (projectile.id && !projectileIdCache.has(projectile.id)) {
+                    projectile.destroy();
+                }
+            });
+        } catch (err) {
+            console.error('[NETWORK] Error in syncProjectiles:', err);
+        }
     }
 
     // Helper method to sync walls
     private syncWalls(walls: Record<string, any>) {
-        Object.entries(walls).forEach(([id, wallState]) => {
-            if (wallState === null) return; // Removed wall
+        try {
+            Object.entries(walls).forEach(([id, wallState]) => {
+                if (wallState === null) return; // Removed wall
 
-            const wall = this.syncedWalls.get(id);
-            if (wall) {
-                wall.updateFromNetworkState(wallState);
-            }
-        });
+                if (!id || typeof id !== 'string') {
+                    console.warn('[NETWORK] Invalid wall ID:', id);
+                    return;
+                }
+
+                try {
+                    const wall = this.syncedWalls.get(id);
+                    if (wall && wall.updateFromNetworkState) {
+                        wall.updateFromNetworkState(wallState);
+                    }
+                } catch (err) {
+                    console.error(`[NETWORK] Error syncing wall ${id}:`, err);
+                }
+            });
+        } catch (err) {
+            console.error('[NETWORK] Error in syncWalls:', err);
+        }
     }
 
     // Legacy method - kept for backwards compatibility
@@ -799,10 +717,13 @@ export class GameScene extends Scene
                     // Create correct enemy type based on network state
                     if (enemyState.enemyType === 'EnemyLizardWizard') {
                         // Create EnemyLizardWizard
-                        enemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
+                        const lizardWizard = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
 
                         // Set ID for tracking
-                        (enemy as any).enemyId = enemyState.id;
+                        (lizardWizard as any).enemyId = enemyState.id;
+
+                        // Cast to common type for storage
+                        enemy = lizardWizard as any as EnemyFlying;
                     } else {
                         // Create EnemyFlying (default/fallback)
                         enemy = new EnemyFlying(
@@ -825,7 +746,9 @@ export class GameScene extends Scene
                         this.enemyGroup.add(enemy);
                     }
 
-                    this.syncedEnemies.set(enemyState.id, enemy);
+                    if (enemy) {
+                        this.syncedEnemies.set(enemyState.id, enemy);
+                    }
                 } else {
                     // Update existing enemy position from host
                     enemy.setPosition(enemyState.x, enemyState.y);
@@ -1072,7 +995,8 @@ export class GameScene extends Scene
             let behavior: IBehavior | undefined;
 
             if (config.behaviorType) {
-                switch (config.behaviorType) {
+                const behaviorType = String(config.behaviorType);
+                switch (behaviorType) {
                     case 'Aggressive':
                         behavior = new AggressiveBehavior(config.behaviorOptions);
                         break;
@@ -1295,13 +1219,13 @@ export class GameScene extends Scene
         }
     }
 
-    hitEnemy(bullet: PlayerBullet, enemy: EnemyFlying) {
+    hitEnemy(bullet: any, enemy: EnemyFlying) {
         this.updateScore(10);
         bullet.remove();
         enemy.hit(bullet.getPower());
     }
 
-    hitWall(bullet: PlayerBullet, wall: Wall) {
+    hitWall(bullet: any, wall: Wall) {
         // Only damage destructible walls
         if (!wall.isIndestructible) {
             wall.hit(bullet.getPower());
@@ -1309,7 +1233,7 @@ export class GameScene extends Scene
         bullet.remove();
     }
 
-    destroyEnemyBullet(bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
+    destroyEnemyBullet(_bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
         this.removeEnemyBullet(enemyBullet);
     }
 

@@ -162,8 +162,7 @@ export class NetworkManager {
             seq
         };
 
-        //console.log(`[NetworkManager] sendInput: writing inputs.${this.localPlayerId} seq=${seq}, payload keys:`, Object.keys(payload)); //Debug
-        console.log(`[NetworkManager] sendInput: full payload:`, payload); //Debug
+        console.log(`[NetworkManager] sendInput: sending inputs.${this.localPlayerId} seq=${seq}, keys:`, Object.keys(payload));
         this.socket.updateStorage(`inputs.${this.localPlayerId}`, 'set', payload);
     }
 
@@ -183,12 +182,12 @@ export class NetworkManager {
             return;
         }
         
-        console.log(`[NetworkManager] Registering listener for storage key: ${key}`);
+        //console.log(`[NetworkManager] Registering listener for storage key: ${key}`); //Debug
         
         // Listen to all storage updates and call handler when the specific key changes
         this.socket.onEvent('storageUpdated', (storage: any) => {
             if (storage && storage[key] !== undefined) {
-                console.log(`[NetworkManager] Storage key "${key}" updated:`, storage[key]);
+                //console.log(`[NetworkManager] Storage key "${key}" updated:`, storage[key]); //Debug
                 handler(storage[key]);
             }
         });
@@ -277,7 +276,7 @@ export class NetworkManager {
     }
 
     sendRequest(requestName: string, data?: any) {
-        console.log(`[NetworkManager] Sending request: ${requestName}`, data ? `(data size: ${JSON.stringify(data).length} bytes)` : '');
+        //console.log(`[NetworkManager] Sending request: ${requestName}`, data ? `(data size: ${JSON.stringify(data).length} bytes)` : ''); //Debug
         this.socket?.sendRequest(requestName, data);
     }
 
