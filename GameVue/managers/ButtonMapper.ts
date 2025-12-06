@@ -29,6 +29,7 @@ export class ButtonMapper {
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
+        this.keys = {};  // Initialize as empty object to prevent undefined errors
         this.initializeDefaultMappings();
         this.detectControlScheme();
         this.setupKeyboard();
@@ -88,8 +89,14 @@ export class ButtonMapper {
                 });
             } else {
                 console.error('ButtonMapper: Keyboard initialization failed after max retries. Using empty input.');
+                this.keys = {};  // Ensure keys is initialized even on failure
             }
             return;
+        }
+
+        // Enable keyboard input (Phaser sometimes needs this explicitly)
+        if (this.scene.input.keyboard.preventDefault) {
+            this.scene.input.keyboard.preventDefault();
         }
 
         // Register each key individually (addKeys was causing all keys to share same object)
@@ -135,6 +142,11 @@ export class ButtonMapper {
     }
 
     getInput(): AbstractInputState {
+        // If keyboard isn't initialized yet, try to initialize it now
+        if (!this.keyboardInitialized && this.scene.input.keyboard) {
+            this.setupKeyboard();
+        }
+
         switch (this.currentScheme) {
             case ControlScheme.KEYBOARD_MOUSE:
                 return this.getKeyboardMouseInput();
@@ -150,10 +162,18 @@ export class ButtonMapper {
 
         // Read from mapped keys (with safety check)
         if (this.keys) {
-            if (this.keys.moveLeft?.isDown) movement.x -= 1;
-            if (this.keys.moveRight?.isDown) movement.x += 1;
-            if (this.keys.moveUp?.isDown) movement.y -= 1;
-            if (this.keys.moveDown?.isDown) movement.y += 1;
+            if (this.keys.moveLeft?.isDown) {
+                movement.x -= 1;
+            }
+            if (this.keys.moveRight?.isDown) {
+                movement.x += 1;
+            }
+            if (this.keys.moveUp?.isDown) {
+                movement.y -= 1;
+            }
+            if (this.keys.moveDown?.isDown) {
+                movement.y += 1;
+            }
         }
 
         movement.normalize();
@@ -229,5 +249,25 @@ export class ButtonMapper {
 
     getCurrentScheme(): ControlScheme {
         return this.currentScheme;
+    }
+
+    isKeyboardInitialized(): boolean {
+        return this.keyboardInitialized;
+    }
+
+    getDebugInfo(): any {
+        return {
+            scheme: this.currentScheme,
+            keyboardInitialized: this.keyboardInitialized,
+            keysRegistered: this.keys ? Object.keys(this.keys).length : 0,
+            keysState: this.keys ? {
+                moveLeft: this.keys.moveLeft?.isDown,
+                moveRight: this.keys.moveRight?.isDown,
+                moveUp: this.keys.moveUp?.isDown,
+                moveDown: this.keys.moveDown?.isDown,
+                ability1: this.keys.ability1?.isDown,
+                ability2: this.keys.ability2?.isDown
+            } : null
+        };
     }
 }
