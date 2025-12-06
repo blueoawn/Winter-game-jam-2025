@@ -33,7 +33,7 @@ export class BoomStick extends PlayerController {
 
         this.characterSpeed = 720;
         this.velocityMax = 420;
-        this.maxHealth = 2;
+        this.maxHealth = 20;
         this.health = this.maxHealth;
         this.ability1Rate = 80;
         this.ability2Rate = 90;

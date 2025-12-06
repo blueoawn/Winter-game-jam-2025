@@ -7,7 +7,7 @@ import TimerEvent = Phaser.Time.TimerEvent;
 export class BigSword extends PlayerController {
     // Ability 1 - Heavy Slash config
     slashDamage = 2;
-    slashWidth = 60;
+    slashWidth = 100;
     slashHeight = 15;
     slashOffset = 50;
     slashDuration = 250;
@@ -45,7 +45,7 @@ export class BigSword extends PlayerController {
 
         this.characterSpeed = 650;
         this.velocityMax = 380;
-        this.maxHealth = 5;
+        this.maxHealth = 25;
         this.health = this.maxHealth;
         this.ability1Rate = 40;
         this.ability2Rate = 180;

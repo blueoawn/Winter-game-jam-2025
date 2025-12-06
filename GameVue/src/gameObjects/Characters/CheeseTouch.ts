@@ -34,10 +34,10 @@ export class CheeseTouch extends PlayerController {
         // Balanced stats
         this.characterSpeed = 700;
         this.velocityMax = 400;
-        this.maxHealth = 10;
+        this.maxHealth = 15;
         this.health = this.maxHealth;
         this.ability1Rate = 5;    // Can use beam frequently
-        this.ability2Rate = 60;   // Heal every 1 second
+        this.ability2Rate = 60*2;   // Heal every 2 seconds
 
         // Enable skill bar for cheese meter
         this.skillBarEnabled = true;
@@ -89,6 +89,10 @@ export class CheeseTouch extends PlayerController {
 
         // Play cheese eating sound
         audioManager.playCheeseEat();
+
+        //stop the beam to start eating (make it more dangerous to heal)
+
+        this.stopBeam();
 
         // Consume cheese meter to heal
         const healAmount = Math.min(1, this.skillMeter / 50);  // Heal 1 HP per 50 cheese
@@ -171,7 +175,7 @@ export class CheeseTouch extends PlayerController {
 
     updateLockOnTarget(): void {
         // Find closest enemy within lockOnRadius of cursor
-        const enemies = this.gameScene.enemyGroup.getChildren();
+        const enemies = this.gameScene.enemyGroup.getChildren(); //TODO - Update to also lock on to damagable walls
         let closestEnemy: Phaser.Physics.Arcade.Sprite | null = null;
         let closestDist = this.lockOnRadius;
 
