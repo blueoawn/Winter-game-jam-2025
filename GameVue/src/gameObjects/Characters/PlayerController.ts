@@ -2,12 +2,13 @@ import ASSETS from '../../assets.js';
 import { GameScene } from "../../scenes/Game.ts";
 import { Depth } from '../../constants.ts';
 import type { InputState, PlayerState } from '../../../network/StateSerializer.ts';
+import { SyncableEntity, EntityState, EntityDelta } from '../../network/SyncableEntity';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
 
 //TODO add stuff for rollback/network sync
 
-export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
+export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite implements SyncableEntity{
     protected characterSpeed = 1000;
     protected velocityMax = 500;
     protected drag = 2000;
