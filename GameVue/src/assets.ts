@@ -1,5 +1,3 @@
-import { LizardWizard } from "./gameObjects/Characters/LizardWizard";
-
 export default {
     audio: {
         cheeseEat: {
@@ -20,6 +18,10 @@ export default {
         lizardWizard: {
             key: 'lizard-wizard',
             args: ['assets/Sprites/Wizard_Lizard_2.png']
+        },
+        lizardWizardBackground: {
+            key: 'lizard-wizard-bg',
+            args: ['assets/Backgrounds/lizardWizardBackground.png']
         }
     },
     spritesheet: {

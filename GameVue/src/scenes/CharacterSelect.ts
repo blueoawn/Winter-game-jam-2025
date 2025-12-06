@@ -481,13 +481,29 @@ export class CharacterSelectScene extends Scene {
         bg.setStrokeStyle(4, isLocked ? 0x333333 : 0x666666);
         container.add(bg);
 
-        // Character sprite - black silhouette for locked characters
-        const sprite = this.add.sprite(0, -100, ASSETS.spritesheet.ships.key, character.frame);
-        sprite.setScale(3.5);
-        if (isLocked) {
-            sprite.setTint(0x000000);
+        // Add decorative background image under the card contents if available
+        // Using the lizard-wizard background image as an example and repeating for all cards
+        if (this.textures.exists(ASSETS.image.lizardWizardBackground.key)) {
+            const cardBgImage = this.add.image(0, 0, ASSETS.image.lizardWizardBackground.key);
+            // Fit image to card size
+            cardBgImage.setCrop()
+            cardBgImage.setDisplaySize(cardWidth - 8, cardHeight - 8);
+            cardBgImage.setDepth(-1);
+            cardBgImage.setAlpha(0.6);
+            if (isLocked) {
+                cardBgImage.setTint(0x000000);
+            }
+            // Add behind the card rectangle so it shows under content but above scene background
+            container.addAt(cardBgImage, 1);
         }
-        container.add(sprite);
+
+        // Character sprite - black silhouette for locked characters
+        // const sprite = this.add.sprite(0, -100, ASSETS.spritesheet.ships.key, character.frame);
+        // sprite.setScale(3.5);
+        // if (isLocked) {
+        //     sprite.setTint(0x000000);
+        // }
+        // container.add(sprite);
 
         // Name - show "???" for locked characters
         const nameText = this.add.text(0, -10, isLocked ? '???' : character.name, {
