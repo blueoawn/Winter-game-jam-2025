@@ -23,13 +23,6 @@ interface CharacterSelection {
     timestamp: number;
 }
 
-// TODO There's several improvements to be made here, such as better UI/UX, gamepad support, etc.
-
-// The UI could display character stats as bars and abilities with icons
-
-// With 6 characters planned, the layout will need adjustment. I'm thinking a carousel would be nice with big cards showing details, but a grid could also work especially if we want to show all options at once.
-// Should some characters be locked initially and require unlocking?
-
 export class CharacterSelectScene extends Scene {
     private characters: CharacterData[] = [
         {
@@ -631,8 +624,6 @@ export class CharacterSelectScene extends Scene {
 
         return container;
     }
-
-    //TODO Make character cards selectable with gamepad
 
     private selectCharacter(characterId: string): void {
         // Safety check - don't allow selecting locked characters
