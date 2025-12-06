@@ -1,4 +1,4 @@
-import { PlayerController } from './PlayerController';
+import { PlayerController } from '../src/gameObjects/Characters/PlayerController.ts';
 import { LizardWizard } from '../src/gameObjects/Characters/LizardWizard';
 import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
 import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';

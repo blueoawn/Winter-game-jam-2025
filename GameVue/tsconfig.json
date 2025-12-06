@@ -26,6 +26,6 @@
   },
   "include": [
     "src",
-    "managers/PlayerController.ts"
+    "src/gameObjects/Characters/PlayerController.ts"
   ]
 }

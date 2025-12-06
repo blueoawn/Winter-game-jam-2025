@@ -1,9 +1,11 @@
-import ASSETS from '../src/assets.js';
-import { GameScene } from "../src/scenes/Game.ts";
-import { Depth } from '../src/constants.ts';
-import type { InputState, PlayerState } from '../network/StateSerializer.ts';
+import ASSETS from '../../assets.js';
+import { GameScene } from "../../scenes/Game.ts";
+import { Depth } from '../../constants.ts';
+import type { InputState, PlayerState } from '../../../network/StateSerializer.ts';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
+
+//TODO add stuff for rollback/network sync
 
 export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     protected characterSpeed = 1000;
@@ -21,6 +23,25 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
+
+    // Appearance can be a standalone texture/image or a frame from a spritesheet/atlas
+    appearance: { texture: string; frame?: string | number } | null = null;
+
+    /**
+     * Update the visual for this controller. Accepts either:
+     *  - a texture key for a single image or atlas, or
+     *  - a texture key + frame for a spritesheet/tile.
+     *
+     * This updates the underlying Arcade.Sprite texture/frame so the controller
+     * can use any registered Phaser texture.
+     */
+    setAppearance(texture: string, frame?: string | number): void {
+        this.appearance = { texture, frame };
+        this.setTexture(texture);
+        if (frame !== undefined && frame !== null) {
+            this.setFrame(frame as any);
+        }
+    }
     healthBarContainer: Container;
     skillBarContainer: Container | null = null;
     protected skillBarEnabled: boolean = false;  // Disabled by default
@@ -121,19 +142,6 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
             ability1: abstractInput.ability1,
             ability2: abstractInput.ability2
         };
-    }
-
-    // Legacy fire method - can remove this now
-    // Character-specific abilities are implemented via ability1() and ability2()
-    fire() {
-        if (this.fireCounter > 0) return;
-
-        this.fireCounter = this.fireRate;
-
-        this.gameScene.fireBullet(
-            {x: this.x, y: this.y},
-            {x: this.gameScene.input.mousePointer.x, y: this.gameScene.input.mousePointer.y}
-        );
     }
 
     hit(damage: number) {

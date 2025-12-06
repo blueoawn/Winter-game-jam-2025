@@ -1,12 +1,13 @@
 import { Scene } from 'phaser';
-import { PlayerController } from "../../managers/PlayerController.ts";
-import { EnemyController } from "../../managers/EnemyController.ts";
+import { PlayerController } from "../gameObjects/Characters/PlayerController.ts";
+import { EnemyController } from "../gameObjects/NPC/EnemyController.ts";
 import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
 import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
 import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
 import { BigSword } from "../gameObjects/Characters/BigSword.ts";
 import { BoomStick } from "../gameObjects/Characters/BoomStick.ts";
 import { ButtonMapper } from "../../managers/ButtonMapper.ts";
+import { Railgun } from '../gameObjects/Characters/Railgun.ts';
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
 import TilemapLayer = Phaser.Tilemaps.TilemapLayer;
@@ -19,7 +20,7 @@ import ASSETS from '../assets.ts';
 import EnemyBullet from "../gameObjects/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
-import EnemyFlying from "../gameObjects/EnemyFlying.ts";
+import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
 import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
@@ -244,6 +245,9 @@ export class GameScene extends Scene
             case CharacterNamesEnum.BoomStick:
                 this.player = new BoomStick(this, spawn.x, spawn.y);
                 break;
+            case CharacterNamesEnum.Railgun:
+                this.player = new Railgun(this,spawn.x,spawn.y);
+                break;
             case CharacterNamesEnum.LizardWizard:
             default:
                 this.player = new LizardWizard(this, spawn.x, spawn.y);
@@ -263,6 +267,8 @@ export class GameScene extends Scene
                 return CharacterNamesEnum.CheeseTouch;
             case CharacterIdsEnum.BoomStick:
                 return CharacterNamesEnum.BoomStick;
+            case CharacterIdsEnum.Railgun:
+                return CharacterNamesEnum.Railgun;
             case CharacterIdsEnum.LizardWizard:
             default:
                 return CharacterNamesEnum.LizardWizard;
@@ -307,7 +313,7 @@ export class GameScene extends Scene
         this.players.forEach((playerId, index) => {
             const isLocal = (playerId === localPlayerId);
             const characterType = Object.values(CharacterNamesEnum)[index];
-            this.playerManager!.createPlayer(playerId, isLocal, characterType, index);
+            this.playerManager!.createPlayer(playerId, isLocal, characterType);
         });
 
         // Set up network message handlers
@@ -380,7 +386,8 @@ export class GameScene extends Scene
             this.updateClient();
         }
     }
-
+    
+    //Soon to be depricated
     updateHost() {
         // Process local player input from ButtonMapper
         if (this.buttonMapper && this.playerManager) {
@@ -406,6 +413,7 @@ export class GameScene extends Scene
         }
     }
 
+    // Can probably be refactored
     updateClient() {
         // Process local player input from ButtonMapper (client-side prediction)
         if (this.buttonMapper && this.playerManager) {
@@ -428,10 +436,10 @@ export class GameScene extends Scene
         }
     }
 
+    //TODO - this is being refactored for deltas
     broadcastState() {
         if (!this.playerManager) return;
 
-        // Phase 3: Limit entity counts to prevent "Message too big" errors
         const allEnemies = this.enemyGroup.getChildren();
         const allEnemyBullets = this.enemyBulletGroup.getChildren();
 
@@ -458,6 +466,7 @@ export class GameScene extends Scene
         NetworkManager.updateGameState(state);
     }
 
+    //Soon to be depricated by broadcast to server
     sendInputToHost() {
         if (!this.playerManager || !this.buttonMapper) return;
 
@@ -498,7 +507,7 @@ export class GameScene extends Scene
             this.scoreText.setText(`Score: ${this.score}`);
         }
 
-        // Sync enemy bullets from host
+        // Sync enemy bullets from server
         if (state.enemyBullets && Array.isArray(state.enemyBullets)) {
             this.enemyBulletIdCache.clear();
 
@@ -547,7 +556,7 @@ export class GameScene extends Scene
             });
         }
 
-        // Sync enemies from host
+        // Sync enemies from Server
         if (state.enemies && Array.isArray(state.enemies)) {
             this.enemyIdCache.clear();
 
@@ -800,8 +809,9 @@ export class GameScene extends Scene
         console.log(`Initialized ${this.currentMap.walls.length} wall(s)`);
     }
 
+    // Probably still keep this for client prediction, but needs refactoring
     /**
-     * Update all active spawners (host-only)
+     * Update all active spawners 
      * Called every frame from updateHost()
      */
     updateSpawners(): void {
@@ -835,7 +845,6 @@ export class GameScene extends Scene
                 // randomly choose a tile id from this.tiles
                 // weightedPick favours items earlier in the array
                 const tileIndex = Phaser.Math.RND.weightedPick(this.tiles);
-
                 row.push(tileIndex);
             }
 
@@ -911,33 +920,6 @@ export class GameScene extends Scene
 
     removeEnemyBulletDestroyer(destroyer: Rectangle) {
         this.playerBulletGroup.remove(destroyer, true, true);
-    }
-
-    // add a group of flying enemies
-    // TODO FIX for Bluepawn: This function is currently broken in multiplayer mode, will be reworked significantly if not outright removed
-    addFlyingGroup() {
-        this.spawnEnemyCounter = Phaser.Math.RND.between(5, 8) * 60; // spawn next group after x seconds
-        const randomId = Phaser.Math.RND.between(0, 11); // id to choose image in tiles.png
-
-        // Reduce enemy count in multiplayer to avoid network/performance issues
-        const maxEnemies = this.networkEnabled ? 8 : 15;  // Limit to 8 in multiplayer, 15 in single player
-        const minEnemies = this.networkEnabled ? 3 : 5;   // Reduce minimum in multiplayer
-        const randomCount = Phaser.Math.RND.between(minEnemies, maxEnemies);
-
-        const randomInterval = Phaser.Math.RND.between(8, 12) * 100; // delay between spawning of each enemy
-        const randomPath = Phaser.Math.RND.between(0, 3); // choose a path, a group follows the same path
-        const randomPower = Phaser.Math.RND.between(1, 4); // strength of the enemy to determine damage to inflict and selecting bullet image
-        const randomSpeed = Phaser.Math.RND.realInRange(0.0001, 0.001); // increment of pathSpeed in enemy
-
-        this.timedEvent = this.time.addEvent(
-            {
-                delay: randomInterval,
-                callback: this.addEnemy,
-                args: [randomId, randomPath, randomSpeed, randomPower], // parameters passed to addEnemy()
-                callbackScope: this,
-                repeat: randomCount
-            }
-        );
     }
 
     addEnemy(shipId: number, pathId: number, speed: number, power: number) {

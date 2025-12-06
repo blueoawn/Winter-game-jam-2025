@@ -3,7 +3,8 @@ export enum CharacterNamesEnum {
     SwordAndBoard = 'SwordAndBoard',
     CheeseTouch = 'CheeseTouch',
     BigSword = 'BigSword',
-    BoomStick = 'BoomStick'
+    BoomStick = 'BoomStick',
+    Railgun = 'Railgun'
 }
 
 export enum CharacterIdsEnum {
@@ -11,6 +12,7 @@ export enum CharacterIdsEnum {
     SwordAndBoard = 'sword-and-board',
     CheeseTouch = 'cheese-touch',
     BigSword = 'big-sword',
-    BoomStick = 'boom-stick'
+    BoomStick = 'boom-stick',
+    Railgun = 'rail-gun'
 }
 

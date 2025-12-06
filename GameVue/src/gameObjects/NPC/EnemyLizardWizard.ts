@@ -1,4 +1,4 @@
-import { EnemyController } from '../../../managers/EnemyController';
+import { EnemyController } from './EnemyController';
 import { GameScene } from '../../scenes/Game';
 import { IBehavior } from '../../behaviorScripts/Behavior';
 import { AggressiveBehavior } from '../../behaviorScripts/Aggressive';
@@ -7,7 +7,7 @@ export default class EnemyLizardWizard extends EnemyController {
     private behavior: IBehavior;
 
     constructor(scene: GameScene, x: number, y: number, behavior?: IBehavior) {
-        const lizardWizardFrame = 0;  // Frame 0 is LizardWizard
+        const lizardWizardFrame = 12;  // Frame 0 is LizardWizard
         super(scene, x, y, lizardWizardFrame);
 
         // Set enemy type for network sync

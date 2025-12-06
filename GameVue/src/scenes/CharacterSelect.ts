@@ -96,6 +96,20 @@ export class CharacterSelectScene extends Scene {
             },
             ability1: 'Shotgun Blast (7 pellet spread)',
             ability2: 'Burst Dash (quick dodge)'
+        },
+        //why is this locked, I can't seem to figure it out lol
+        {
+            id: 'rail-gun',
+            name: 'Rail Gun',
+            frame: 5,
+            description: 'Stop and pop',
+            stats: {
+                speed: 'Medium',
+                health: 'Low',
+                fireRate: ''
+            },
+            ability1: 'Ninja stars',
+            ability2: 'Rail gun'
         }
     ];
 
@@ -128,7 +142,7 @@ export class CharacterSelectScene extends Scene {
         CharacterIdsEnum.SwordAndBoard,
         CharacterIdsEnum.BoomStick,
         CharacterIdsEnum.CheeseTouch,
-
+        CharacterIdsEnum.Railgun
     ];
 
     constructor() {
@@ -142,6 +156,18 @@ export class CharacterSelectScene extends Scene {
             if (stored) {
                 const parsed = JSON.parse(stored) as string[];
                 this.unlockedCharacters = new Set(parsed);
+                // Ensure any new default unlocks are present (migration)
+                let added = false;
+                (CharacterSelectScene.DEFAULT_UNLOCKED as string[]).forEach(def => {
+                    if (!this.unlockedCharacters.has(def)) {
+                        this.unlockedCharacters.add(def);
+                        added = true;
+                    }
+                });
+                if (added) {
+                    // Persist migration changes
+                    this.saveUnlockedCharacters();
+                }
             } else {
                 // First time - set defaults
                 this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
@@ -151,6 +177,7 @@ export class CharacterSelectScene extends Scene {
             console.warn('Failed to load unlocked characters from storage:', e);
             this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
         }
+        console.log('Unlocked characters:', Array.from(this.unlockedCharacters));
     }
 
     private saveUnlockedCharacters(): void {
