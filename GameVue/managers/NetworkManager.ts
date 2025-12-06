@@ -162,7 +162,6 @@ export class NetworkManager {
             seq
         };
 
-        console.log(`[NetworkManager] sendInput: sending inputs.${this.localPlayerId} seq=${seq}, keys:`, Object.keys(payload));
         this.socket.updateStorage(`inputs.${this.localPlayerId}`, 'set', payload);
     }
 
@@ -276,8 +275,12 @@ export class NetworkManager {
     }
 
     sendRequest(requestName: string, data?: any) {
-        //console.log(`[NetworkManager] Sending request: ${requestName}`, data ? `(data size: ${JSON.stringify(data).length} bytes)` : ''); //Debug
-        this.socket?.sendRequest(requestName, data);
+        if (!this.socket) {
+            console.error(`[NetworkManager] sendRequest: socket is null! Cannot send ${requestName}`);
+            return;
+        }
+        console.log(`[NetworkManager] Sending request: ${requestName}`);
+        this.socket.sendRequest(requestName, data);
     }
 
     destroy() {

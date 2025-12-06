@@ -60,16 +60,25 @@ server.onEvent('clientDisconnected', (clientId, roomId) => {
 });
 
 // Handle custom requests from clients (heartbeat, state, snapshot)
-server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
-    const meta = roomData.get(roomId);
-    if (!meta) return;
+// Note: PlaySocketJS uses 'name' not 'requestName' in the event payload
+server.onEvent('requestReceived', ({ clientId, roomId, name, data }) => {
+    // Debug: log all requests except heartbeat
+    if (name !== 'heartbeat') {
+        console.log(`📨 Request received: ${name} from ${clientId} in ${roomId}`);
+    }
 
-    if (requestName === 'heartbeat') {
+    const meta = roomData.get(roomId);
+    if (!meta) {
+        console.warn(`⚠️ No room metadata for ${roomId}`);
+        return;
+    }
+
+    if (name === 'heartbeat') {
         meta.heartbeats.set(clientId, now());
         return;
     }
 
-    if (requestName === 'state') {
+    if (name === 'state') {
         // Host or authoritative client may send a state delta; server will validate tick
         const delta = data;
         if (!delta || typeof delta.tick !== 'number') {
@@ -79,11 +88,10 @@ server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
 
         if (delta.tick > meta.lastTick) {
             meta.lastTick = delta.tick;
-            const storage = server.getRoomStorage(roomId);
-            if (storage) {
-                storage.lastStateDelta = delta;
-                console.log(`📡 Accepted state tick=${delta.tick} from ${clientId} in ${roomId}`);
-            }
+            // Use updateRoomStorage to properly broadcast to all clients
+            // This triggers the CRDT update and sends to all room participants
+            console.log(`📡 Broadcasting state tick=${delta.tick} to room ${roomId}`);
+            server.updateRoomStorage(roomId, 'lastStateDelta', 'set', delta);
         } else if (delta.tick === meta.lastTick) {
             // duplicate - ignore
         } else {
@@ -93,7 +101,7 @@ server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
         return;
     }
 
-    if (requestName === 'snapshot') {
+    if (name === 'snapshot') {
         console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
         // TODO: Implement snapshot response (e.g., send via request response or update storage)
         return;
@@ -108,11 +116,20 @@ server.onEvent('storageUpdateRequested', (params) => {
     const key = params?.update?.key;  // Key is nested in update object
     const operation = params?.update?.operation;  // Operation is also nested
     const storage = params?.storage;
-    
+
     // For value, we need to extract from the operation.data if it exists
+    // PlaySocketJS wraps values in { type: "set", value: actualPayload, updateValue: null }
     let value;
     if (operation && typeof operation === 'object' && 'data' in operation) {
-        value = operation.data;
+        const opData = operation.data;
+        // Unwrap the PlaySocketJS operation structure to get the actual payload
+        if (opData && opData.type === 'set' && opData.value !== undefined) {
+            value = opData.value;
+        } else if (opData && opData.type === 'update' && opData.updateValue !== undefined) {
+            value = opData.updateValue;
+        } else {
+            value = opData;
+        }
     }
 
     // Log problematic calls

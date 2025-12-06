@@ -13,7 +13,7 @@ import type { PlayerController } from '../src/gameObjects/Characters/PlayerContr
 
 /**
  * Host-side game loop update
- * Responsible for: local input processing, all player updates, spawner management, state broadcasting
+ * Responsible for: local input processing, remote input application, all player updates, spawner management, state broadcasting
  */
 export function updateHost(
     scene: GameScene,
@@ -30,6 +30,11 @@ export function updateHost(
         }
     }
 
+    // Apply remote player inputs from storage (host reads all player inputs)
+    if (playerManager) {
+        applyRemoteInputs(playerManager);
+    }
+
     // Update all players
     playerManager?.update();
 
@@ -41,6 +46,40 @@ export function updateHost(
     if (now - scene.lastStateSyncTime >= scene.stateSyncRate) {
         broadcastState(scene, playerManager);
         scene.lastStateSyncTime = now;
+    }
+}
+
+/**
+ * Apply remote player inputs from storage
+ * Host reads inputs.{playerId} from storage and applies them to remote player objects
+ */
+function applyRemoteInputs(playerManager: PlayerManager): void {
+    const storage = NetworkManager.getStorage();
+    if (!storage || !storage.inputs) return;
+
+    const localPlayerId = NetworkManager.getPlayerId();
+    const allPlayerIds = playerManager.getAllPlayerIds();
+
+    for (const playerId of allPlayerIds) {
+        // Skip local player (already processed via ButtonMapper)
+        if (playerId === localPlayerId) continue;
+
+        const inputData = storage.inputs[playerId];
+        if (!inputData) continue;
+
+        const player = playerManager.getPlayer(playerId);
+        if (!player) continue;
+
+        // Convert stored input to the format expected by processInput
+        const input = {
+            movement: inputData.velocity || { x: 0, y: 0 },
+            aim: inputData.aim || { x: 0, y: 0 },
+            ability1: inputData.ability1 || false,
+            ability2: inputData.ability2 || false
+        };
+
+        // Apply the input to the remote player
+        (player as PlayerController).processInput(input);
     }
 }
 
@@ -126,8 +165,8 @@ function broadcastState(scene: GameScene, playerManager: PlayerManager | null): 
         gameStarted: scene.gameStarted
     });
 
-    console.log('[MULTIPLAYER] Broadcasting state delta, tick:', delta.tick, 'players:', Object.keys(delta.players || {}).length);
     // Send delta to server (server validates tick and broadcasts to all clients)
+    console.log('[HOST] Broadcasting state, tick:', delta.tick, 'enemies:', Object.keys(delta.enemies || {}).length, 'players:', Object.keys(delta.players || {}).length);
     NetworkManager.sendRequest('state', delta);
 }
 
@@ -165,9 +204,5 @@ function sendInputToServer(
     };
 
     // Send input to server via storage update (path-based for sequence tracking)
-    console.log('[MULTIPLAYER] Sending input to server:', inputState);
     NetworkManager.sendInput(inputState);
-
-    // Debug: Log input send (uncomment for debugging)
-    // console.log('[MULTIPLAYER] Sent input to server:', inputState);
 }

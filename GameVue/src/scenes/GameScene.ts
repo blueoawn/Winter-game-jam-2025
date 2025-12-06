@@ -307,20 +307,20 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        //console.log('[NETWORK] Setting up network handlers'); //Debug
-        
-        // ALL clients listen for delta state updates from the server (server is source of truth)
-        NetworkManager.onStorageKey('lastStateDelta', (delta: any) => {
-            //console.log(`[NETWORK] Storage listener fired for lastStateDelta`); //Debug
-            if (delta) {
-                applyDeltaState(this, delta);
-            }
-        });
+        console.log('[NETWORK] Setting up network handlers, isHost:', this.isHost);
 
-        // All clients listen for player inputs to validate their own input was received
-        NetworkManager.onStorageKey('inputs', () => {
-            // Could use this for input validation/feedback, but not for game logic
-            // Game logic comes from server deltas only
+        // Listen for ALL storage updates to debug what's being received
+        NetworkManager.onStorageUpdate((storage: any) => {
+            // Log ALL storage updates to debug
+            const keys = storage ? Object.keys(storage) : [];
+            console.log('[NETWORK] Storage update received, keys:', keys);
+
+            if (storage?.lastStateDelta) {
+                console.log('[NETWORK] Found lastStateDelta, tick:', storage.lastStateDelta.tick);
+                if (!this.isHost) {
+                    applyDeltaState(this, storage.lastStateDelta);
+                }
+            }
         });
     }
 
@@ -374,6 +374,9 @@ export class GameScene extends Scene
         // Set up collisions based on game mode
         if (!this.networkEnabled && this.player) {
             CollisionManager.setupSinglePlayerCollisions(this);
+        } else if (this.networkEnabled && this.playerManager) {
+            // Set up multiplayer damage collisions (player bullets vs enemies, etc.)
+            CollisionManager.setupMultiplayerCollisions(this);
         }
 
         // Set up common collisions for both modes

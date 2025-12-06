@@ -20,30 +20,34 @@ import { NinjaStar } from '../src/gameObjects/Projectile/NinjaStar';
  */
 export function applyDeltaState(scene: GameScene, delta: any): void {
     try {
-        if (!delta || typeof delta.tick !== 'number') {
-            console.error('[NETWORK] Invalid delta received:', delta);
+        // Host should NOT apply delta state - they are the source of truth
+        if (scene.isHost) {
             return;
         }
 
-        // Detect missing packets (desync detection)
-        const tickDiff = delta.tick - scene.lastReceivedTick;
-
-        if (tickDiff > 5 && scene.lastReceivedTick > 0) {
-            // Missing more than 5 ticks = desync
-            console.warn(`⚠️ Desync detected: missing ${tickDiff} ticks`);
-            NetworkManager.sendRequest('snapshot');
+        if (!delta || typeof delta.tick !== 'number') {
+            console.error('[SYNC] Invalid delta received:', delta);
             return;
+        }
+
+        // Skip stale updates (we already have newer data)
+        if (delta.tick <= scene.lastReceivedTick) {
+            return;
+        }
+
+        // Detect large gaps (potential desync) - use larger threshold since ticks jump ~6 per update
+        const tickDiff = delta.tick - scene.lastReceivedTick;
+        if (tickDiff > 60 && scene.lastReceivedTick > 0) {
+            // Missing more than 60 ticks (~1 second) = potential desync, request snapshot
+            console.warn(`⚠️ Large tick gap: ${tickDiff} ticks (requesting snapshot)`);
+            NetworkManager.sendRequest('snapshot');
+            // Don't return - still apply the state we have
         }
 
         scene.lastReceivedTick = delta.tick;
 
         // Reconstruct full state from delta
         const fullState = scene.deltaDeserializer.applyDelta(delta);
-        
-        // Debug: Log player state structure once per 5 ticks
-        if (scene.tick % 5 === 0 && Object.keys(fullState.players).length > 0) {
-            console.log('[DEBUG] Player state structure:', Object.entries(fullState.players).slice(0, 1).map(([id, state]) => ({ id, ...state })));
-        }
 
         // Apply player states
         if (fullState.players && Object.keys(fullState.players).length > 0) {
@@ -56,7 +60,8 @@ export function applyDeltaState(scene: GameScene, delta: any): void {
         }
 
         // Sync entities
-        if (fullState.enemies) {
+        if (fullState.enemies && Object.keys(fullState.enemies).length > 0) {
+            console.log('[SYNC] Syncing', Object.keys(fullState.enemies).length, 'enemies');
             syncEnemies(scene, fullState.enemies);
         }
 

@@ -90,3 +90,66 @@ export function setupMultiplayerWallCollisions(scene: GameScene): void {
         scene.physics.add.collider(player, scene.wallGroup);
     });
 }
+
+/**
+ * Set up all damage collisions for multiplayer mode
+ * Must be called after players are created
+ */
+export function setupMultiplayerCollisions(scene: GameScene): void {
+    if (!scene.playerManager) {
+        console.warn('[COLLISION] Cannot setup multiplayer damage collisions - playerManager not found');
+        return;
+    }
+
+    const allPlayers = scene.playerManager.getAllPlayers();
+
+    // Player bullets damage enemies
+    scene.physics.add.overlap(
+        scene.playerBulletGroup,
+        scene.enemyGroup,
+        scene.hitEnemy as () => void,
+        undefined,
+        scene
+    );
+
+    // Player bullets can damage destructible walls
+    scene.physics.add.overlap(
+        scene.playerBulletGroup,
+        scene.wallGroup,
+        scene.hitWall as () => void,
+        undefined,
+        scene
+    );
+
+    // Enemy bullet destroyers (shields, barriers) destroy enemy bullets
+    scene.physics.add.overlap(
+        scene.enemyBulletDestroyersGroup,
+        scene.enemyBulletGroup,
+        scene.destroyEnemyBullet as () => void,
+        undefined,
+        scene
+    );
+
+    // Set up collisions for each player
+    allPlayers.forEach(player => {
+        // Enemy bullets damage players
+        scene.physics.add.overlap(
+            player,
+            scene.enemyBulletGroup,
+            scene.hitPlayer as () => void,
+            undefined,
+            scene
+        );
+
+        // Enemies damage players on contact
+        scene.physics.add.overlap(
+            player,
+            scene.enemyGroup,
+            scene.hitPlayer as () => void,
+            undefined,
+            scene
+        );
+    });
+
+    console.log(`[COLLISION] Multiplayer collisions set up for ${allPlayers.length} players`);
+}
