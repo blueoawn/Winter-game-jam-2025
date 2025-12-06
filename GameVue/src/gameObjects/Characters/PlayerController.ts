@@ -206,7 +206,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite {
 
     updateHealthBarPosition(): void {
         this.healthBarContainer.x = this.x;
-        this.healthBarContainer.y = this.y + this.height;
+        this.healthBarContainer.y = this.y + this.height * this.scaleY;
     }
 
     updateHealthBarValue(): void {
