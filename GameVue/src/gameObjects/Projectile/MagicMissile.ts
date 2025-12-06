@@ -2,18 +2,19 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { EntityState } from '../../../network/SyncableEntity';
+import Projectile from './Projectile';
 
 /**
  * MagicMissile - LizardWizard's primary projectile
  *
  * A purple glowing magic missile with particle trail effect
  */
-export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
+export class MagicMissile extends Projectile {
     private static nextId = 0;
 
     id: string;
     damage: number;
-    gameScene: GameScene;
     private createdTime: number;
     private maxLifetime: number = 3000; // 3 seconds
     private particleTrail: Phaser.GameObjects.Graphics | null = null;
@@ -31,18 +32,11 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
 
         this.id = `magic_missile_${Date.now()}_${MagicMissile.nextId++}`;
         this.damage = damage;
-        this.gameScene = scene;
         this.createdTime = Date.now();
 
-        // Add to scene
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
-
         // Configure sprite
-        this.setTint(0x9966ff); // Purple tint for magic
+        this.setTint(0x9966ff);
         this.setScale(0.8);
-        this.setDepth(Depth.BULLETS);
-
         // Calculate velocity
         const dx = targetX - x;
         const dy = targetY - y;
@@ -65,6 +59,10 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
     }
 
     private createParticleTrail(): void {
+        if (!this.gameScene) {
+            console.warn('MagicMissile: gameScene not initialized');
+            return;
+        }
         this.particleTrail = this.gameScene.add.graphics();
         this.particleTrail.setDepth(Depth.BULLETS - 1);
     }
@@ -130,5 +128,43 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite {
      */
     remove(): void {
         this.destroy();
+    }
+
+    /**
+     * Get network state for synchronization (SyncableEntity interface)
+     */
+    getNetworkState(): EntityState | null {
+        if (!this.active) return null;
+
+        return {
+            id: this.id,
+            type: 'MagicMissile',
+            x: Math.round(this.x),
+            y: Math.round(this.y),
+            velocityX: this.body ? Math.round(this.body.velocity.x) : 0,
+            velocityY: this.body ? Math.round(this.body.velocity.y) : 0,
+            rotation: this.rotation,
+            damage: this.damage
+        };
+    }
+
+    /**
+     * Update from network state (SyncableEntity interface)
+     */
+    updateFromNetworkState(state: EntityState): void {
+        this.setPosition(state.x, state.y);
+
+        if (state.velocityX !== undefined && state.velocityY !== undefined && this.body) {
+            this.body.velocity.x = state.velocityX;
+            this.body.velocity.y = state.velocityY;
+        }
+
+        if (state.rotation !== undefined) {
+            this.rotation = state.rotation;
+        }
+
+        if (state.damage !== undefined) {
+            this.damage = state.damage;
+        }
     }
 }

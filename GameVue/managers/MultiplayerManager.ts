@@ -117,12 +117,37 @@ export class PlayerManager {
 
     // Apply full player state from network (clients use this)
     applyPlayerState(playerStates: PlayerState[]): void {
-        playerStates.forEach(state => {
-            const player = this.players.get(state.id);
-            if (player && (player as any).applyState) {
-                (player as any).applyState(state);
+        try {
+            if (!Array.isArray(playerStates)) {
+                console.error('[MULTIPLAYER] applyPlayerState received non-array:', typeof playerStates);
+                return;
             }
-        });
+
+            playerStates.forEach(state => {
+                if (!state || !state.id) {
+                    console.warn('[MULTIPLAYER] Invalid player state (no id):', state);
+                    return;
+                }
+
+                const player = this.players.get(state.id);
+                if (!player) {
+                    console.warn('[MULTIPLAYER] Player not found:', state.id);
+                    return;
+                }
+
+                if ((player as any).applyState) {
+                    try {
+                        (player as any).applyState(state);
+                    } catch (err) {
+                        console.error(`[MULTIPLAYER] Error applying state to player ${state.id}:`, err);
+                    }
+                } else {
+                    console.warn(`[MULTIPLAYER] Player ${state.id} doesn't have applyState method`);
+                }
+            });
+        } catch (err) {
+            console.error('[MULTIPLAYER] Error in applyPlayerState:', err);
+        }
     }
 
     // Collect current state of all players for serialization

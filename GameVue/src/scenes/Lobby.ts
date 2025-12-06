@@ -1,4 +1,4 @@
-import NetworkManager from '../../network/NetworkManager';
+import NetworkManager from '../../managers/NetworkManager';
 import { LobbyUI } from '../ui/LobbyUI';
 
 interface LobbyInitData {
@@ -52,17 +52,18 @@ export class Lobby extends Phaser.Scene {
         // Initialize PlaySocket
         await NetworkManager.initialize();
 
-        // Setup storage update handler
-        this.setupStorageHandlers();
-
         if (this.mode === 'host') {
             this.ui!.changeMode('host');
+            // Setup storage handlers before hosting
+            this.setupStorageHandlers();
             await this.hostGame();
         } else if (this.mode === 'join') {
             this.ui!.changeMode('join');
             this.joinGame();
         }
     }
+
+    //TODO add field to enter player name after clicking host/join (backend can still use existing clientId system, but display names are nicer)
 
     async hostGame(): Promise<void> {
         this.isHost = true;
@@ -113,9 +114,12 @@ export class Lobby extends Phaser.Scene {
         try {
             await NetworkManager.joinGame(roomCode);
 
+            // Setup storage handlers AFTER joining the room
+            this.setupStorageHandlers();
+
             this.ui!.updateRoomCode(roomCode);
             this.ui!.changeMode('host');
-            this.ui!.updateStatus('Connected! Waiting for host to start game...', '#00ff00');
+            this.ui!.updateStatus('Connected! Waiting for host to initiate character select ', '#00ff00');
 
             // Get current players from storage
             const storage = NetworkManager.getStorage();
@@ -141,7 +145,7 @@ export class Lobby extends Phaser.Scene {
     setupStorageHandlers(): void {
         // Listen for storage updates
         NetworkManager.onStorageUpdate((storage: any) => {
-            console.log('Lobby storage updated:', storage);
+            console.log('Lobby storage updated:', storage, 'characterSelectionInProgress:', storage.characterSelectionInProgress);
 
             // Update player list
             if (storage.players) {
@@ -149,10 +153,10 @@ export class Lobby extends Phaser.Scene {
                 this.updatePlayerList();
             }
 
-            // Check if game is starting
-            if (storage.isGameStarted && storage.startGameData) {
-                console.log('Game starting!');
-                this.startGame(storage.startGameData);
+            // Check if character selection phase has started - trigger for ALL clients when flag is true
+            if (storage.characterSelectionInProgress === true) {
+                console.log('Character selection phase starting from storage update!');
+                this.startCharacterSelection(this.connectedPlayers);
             }
         });
     }
@@ -161,44 +165,39 @@ export class Lobby extends Phaser.Scene {
         this.ui!.updatePlayerList(this.connectedPlayers, this.isHost);
     }
 
-    onStartGame(): void {
+    onSelectCharacters(): void {
         if (!this.isHost) {
-            console.warn('Only host can start game');
+            console.warn('Only host can initiate character selection');
             return;
         }
 
         if (this.connectedPlayers.length < 1) {
-            this.ui!.showError('Need at least 1 player to start');
+            this.ui!.showError('Need at least 1 player to proceed');
             return;
         }
 
-        const startGameData = { players: this.connectedPlayers };
+        console.log('Host initiating character selection phase');
 
-        // Update storage to signal game start (will sync to all clients)
-        const storage = NetworkManager.getStorage();
-        if (storage) {
-            storage.isGameStarted = true;
-            storage.startGameData = startGameData;
-
-            // This will trigger storage update for all clients
-            const socket = (NetworkManager as any).socket;
-            if (socket) {
-                socket.updateStorage('isGameStarted', 'set', true);
-                socket.updateStorage('startGameData', 'set', startGameData);
-            }
+        // Update storage to signal character selection phase (will sync to all clients)
+        const socket = NetworkManager.getSocket();
+        if (socket) {
+            console.log('Writing characterSelectionInProgress=true to storage');
+            socket.updateStorage('characterSelectionInProgress', 'set', true);
+        } else {
+            console.error('Socket not available, cannot update storage');
         }
 
-        // Start game for host immediately
-        this.startGame(startGameData);
+        // Start character selection for host immediately
+        this.startCharacterSelection(this.connectedPlayers);
     }
 
-    startGame(data: StartGamePayload): void {
-        console.log('Starting game with players:', data.players);
+    startCharacterSelection(players: string[]): void {
+        console.log('Starting character selection with players:', players);
 
         const gameData: GameSceneData = {
             networkEnabled: true,
             isHost: this.isHost,
-            players: data.players || this.connectedPlayers
+            players: players
         };
 
         // Transition to Character Select scene
@@ -209,6 +208,11 @@ export class Lobby extends Phaser.Scene {
         // Clean up and return to Start scene
         NetworkManager.destroy();
         this.scene.start('Start');
+    }
+
+    // Alias for LobbyUI button handlers
+    selectCharacters(): void {
+        this.onSelectCharacters();
     }
 
     shutdown(): void {
