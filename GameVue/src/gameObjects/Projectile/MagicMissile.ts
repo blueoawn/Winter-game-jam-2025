@@ -2,19 +2,19 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
-import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
+import { EntityState } from '../../../network/SyncableEntity';
+import Projectile from './Projectile';
 
 /**
  * MagicMissile - LizardWizard's primary projectile
  *
  * A purple glowing magic missile with particle trail effect
  */
-export class MagicMissile extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
+export class MagicMissile extends Projectile {
     private static nextId = 0;
 
     id: string;
     damage: number;
-    gameScene: GameScene;
     private createdTime: number;
     private maxLifetime: number = 3000; // 3 seconds
     private particleTrail: Phaser.GameObjects.Graphics | null = null;
@@ -32,18 +32,11 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite implements Syncab
 
         this.id = `magic_missile_${Date.now()}_${MagicMissile.nextId++}`;
         this.damage = damage;
-        this.gameScene = scene;
         this.createdTime = Date.now();
 
-        // Add to scene
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
-
         // Configure sprite
-        this.setTint(0x9966ff); // Purple tint for magic
+        this.setTint(0x9966ff);
         this.setScale(0.8);
-        this.setDepth(Depth.BULLETS);
-
         // Calculate velocity
         const dx = targetX - x;
         const dy = targetY - y;
@@ -66,6 +59,10 @@ export class MagicMissile extends Phaser.Physics.Arcade.Sprite implements Syncab
     }
 
     private createParticleTrail(): void {
+        if (!this.gameScene) {
+            console.warn('MagicMissile: gameScene not initialized');
+            return;
+        }
         this.particleTrail = this.gameScene.add.graphics();
         this.particleTrail.setDepth(Depth.BULLETS - 1);
     }

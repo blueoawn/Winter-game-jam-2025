@@ -112,11 +112,11 @@ export class CharacterSelectScene extends Scene {
             ability2: 'Rail gun'
         }
     ];
-
     private selectedCharacterId: string | null = null;
     private networkEnabled: boolean = false;
     private isHost: boolean = false;
     private players: string[] = [];
+    private gameStarting: boolean = false;  // Guard against multiple game starts
     private characterSelections: Map<string, CharacterSelection> = new Map();
 
     private titleText!: Phaser.GameObjects.Text;
@@ -251,6 +251,15 @@ export class CharacterSelectScene extends Scene {
         // Setup network storage handlers if multiplayer
         if (this.networkEnabled) {
             this.setupStorageHandlers();
+
+            // Unregister storage listener when scene shuts down
+            this.events.on('shutdown', () => {
+                NetworkManager.offStorageUpdate();
+            });
+
+            this.events.on('sleep', () => {
+                NetworkManager.offStorageUpdate();
+            });
 
             // Initialize storage with character selections object if host
             if (this.isHost) {
@@ -710,7 +719,17 @@ export class CharacterSelectScene extends Scene {
     private onStartButtonClick(): void {
         // This is called when the button is clicked
         // Only host can manually start the game
-        if (!this.selectedCharacterId) return;
+        if (!this.selectedCharacterId) {
+            console.warn('Cannot start: No character selected');
+            return;
+        }
+
+        console.log('Start button clicked', {
+            isHost: this.isHost,
+            networkEnabled: this.networkEnabled,
+            playersCount: this.players.length,
+            selectedCharacterId: this.selectedCharacterId
+        });
 
         if (this.networkEnabled && this.players.length > 1) {
             if (!this.isHost) {
@@ -720,8 +739,19 @@ export class CharacterSelectScene extends Scene {
 
             // Check if all players have selected characters
             const allReady = this.checkAllPlayersReady();
+            console.log('All players ready check:', {
+                allReady,
+                players: this.players,
+                characterSelectionsCount: this.characterSelections.size,
+                readyPlayers: Array.from(this.characterSelections.keys()),
+                storageCharacterSelections: NetworkManager.getStorage()?.characterSelections
+            });
+            
             if (!allReady) {
-                console.log('Not all players are ready');
+                console.warn('Not all players are ready', {
+                    players: this.players,
+                    ready: Array.from(this.characterSelections.keys()),
+                });
                 return;
             }
 
@@ -729,26 +759,64 @@ export class CharacterSelectScene extends Scene {
             const storage = NetworkManager.getStorage();
             const socket = (NetworkManager as any).socket;
             if (socket && storage) {
+                console.log('Host triggering game start');
                 socket.updateStorage('gameStarting', 'set', true);
             }
         }
 
         // Start game immediately for host/single player
+        console.log('Starting game for', this.isHost ? 'host' : 'non-host');
         this.startGame();
     }
 
     private startGame(): void {
-        if (!this.selectedCharacterId) return;
+        // Guard: prevent starting game multiple times
+        if (this.gameStarting) {
+            console.log('Game already starting, ignoring duplicate call');
+            return;
+        }
+        if (!this.selectedCharacterId) {
+            console.log('No character selected, cannot start');
+            return;
+        }
+
+        this.gameStarting = true;
 
         console.log('Starting game with character:', this.selectedCharacterId);
 
-        // Transition to Game scene with character selection and network data
-        this.scene.start('GameScene', {
-            characterId: this.selectedCharacterId,
-            networkEnabled: this.networkEnabled,
-            isHost: this.isHost,
-            players: this.players
-        });
+        // Only host resets the gameStarting flag (to prevent race condition)
+        // Non-host clients will transition immediately when they see the flag
+        if (this.isHost) {
+            const socket = (NetworkManager as any).socket;
+            if (socket) {
+                // Small delay to ensure other clients receive the update
+                setTimeout(() => {
+                    socket.updateStorage('gameStarting', 'set', false);
+                }, 100);
+            }
+        }
+
+        try {
+            // Transition to Game scene with character selection and network data
+            console.log('Transitioning to GameScene with data:', {
+                characterId: this.selectedCharacterId,
+                networkEnabled: this.networkEnabled,
+                isHost: this.isHost,
+                players: this.players
+            });
+
+            this.scene.start('GameScene', {
+                characterId: this.selectedCharacterId,
+                networkEnabled: this.networkEnabled,
+                isHost: this.isHost,
+                players: this.players
+            });
+
+            console.log('Scene transition started');
+        } catch (error) {
+            console.error('Error transitioning to GameScene:', error);
+            this.gameStarting = false; // Reset flag on error
+        }
     }
 
     private setupStorageHandlers(): void {
@@ -774,7 +842,9 @@ export class CharacterSelectScene extends Scene {
     }
 
     private updatePlayerStatus(): void {
-        if (!this.playerStatusText || !this.networkEnabled) return;
+        // Guard: Check if scene is still active and UI elements exist
+        if (!this.scene.isActive() || !this.playerStatusText || !this.networkEnabled) return;
+        if (!this.startButton || !this.startButtonBg) return;
 
         const readyCount = this.characterSelections.size;
         const totalPlayers = this.players.length;
@@ -797,7 +867,6 @@ export class CharacterSelectScene extends Scene {
 
         this.playerStatusText.setText(statusText);
 
-        // Update start button state
         const allReady = this.checkAllPlayersReady();
         if (allReady && this.isHost) {
             this.startButtonBg.setFillStyle(0x00aa00);

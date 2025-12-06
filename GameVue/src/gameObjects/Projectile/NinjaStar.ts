@@ -2,19 +2,19 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
-import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
+import { EntityState } from '../../../network/SyncableEntity';
+import Projectile from './Projectile';
 
 /**
  * ninjastar - Right now this is used by Sword and Board, but I think it makes more sense as ability1 of the railgun character
  *
  * A silver/blue spinning blade projectile representing a sword slash attack
  */
-export class NinjaStar extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
+export class NinjaStar extends Projectile {
     private static nextId = 0;
 
     id: string;
     damage: number;
-    gameScene: GameScene;
     private createdTime: number;
     private maxLifetime: number = 800; // 0.8 seconds
     private spinSpeed: number = 0.3; // Rotation speed per frame
@@ -32,17 +32,11 @@ export class NinjaStar extends Phaser.Physics.Arcade.Sprite implements SyncableE
 
         this.id = `sword_slash_${Date.now()}_${NinjaStar.nextId++}`;
         this.damage = damage;
-        this.gameScene = scene;
         this.createdTime = Date.now();
 
-        // Add to scene
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
-
         // Configure sprite - silver/blue tint for blade
-        this.setTint(0xaaccff); // Light blue/silver
+        this.setTint(0xaaccff);
         this.setScale(0.9);
-        this.setDepth(Depth.BULLETS);
 
         // Calculate velocity
         const dx = targetX - x;

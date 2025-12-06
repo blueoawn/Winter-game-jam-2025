@@ -112,43 +112,48 @@ export class GameScene extends Scene
 
     create ()
     {
-        // Initialize audio manager
-        audioManager.init(this);
+        try {
+            // Initialize audio manager
+            audioManager.init(this);
 
-        this.initVariables();
-        this.initBackground();  // Add Summoners Rift map background
-        this.initGameUi();
-        this.initAnimations();
+            this.initVariables();
+            this.initBackground();  // Add Summoners Rift map background
+            this.initGameUi();
+            this.initAnimations();
 
-        // Initialize ButtonMapper for input
-        this.buttonMapper = new ButtonMapper(this);
+            // Initialize ButtonMapper for input
+            this.buttonMapper = new ButtonMapper(this);
 
-        // Set world bounds before creating players
-        this.initWorldBounds();
+            // Set world bounds before creating players
+            this.initWorldBounds();
 
-        if (this.networkEnabled) {
-            this.initMultiplayer();
-        } else {
-            this.initSinglePlayer();
+            if (this.networkEnabled) {
+                this.initMultiplayer();
+            } else {
+                this.initSinglePlayer();
+            }
+
+            this.initInput();
+            this.initPhysics();
+
+            // Set up multiplayer wall collisions after physics is initialized
+            if (this.networkEnabled) {
+                this.setupMultiplayerWallCollisions();
+            }
+
+            this.initSpawners();  // Initialize enemy spawners from map config
+            this.initWalls();     // Initialize walls from map config
+            // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
+
+            // Setup camera after players are created
+            this.initCamera();
+
+            // Auto-start for now
+            this.startGame();
+        } catch (error) {
+            console.error('Fatal error in Game.create():', error);
+            console.error('Stack:', (error as any).stack);
         }
-
-        this.initInput();
-        this.initPhysics();
-
-        // Set up multiplayer wall collisions after physics is initialized
-        if (this.networkEnabled) {
-            this.setupMultiplayerWallCollisions();
-        }
-
-        this.initSpawners();  // Initialize enemy spawners from map config
-        this.initWalls();     // Initialize walls from map config
-        // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
-
-        // Setup camera after players are created
-        this.initCamera();
-
-        // Auto-start for now
-        this.startGame();
     }
 
     update() {
@@ -316,10 +321,55 @@ export class GameScene extends Scene
 
         // Create all players with character assignments
         const localPlayerId = NetworkManager.getPlayerId();
-        this.players.forEach((playerId, index) => {
+        
+        if (!this.players || this.players.length === 0) {
+            console.error('Error: No players array provided for multiplayer game!', {
+                players: this.players,
+                localPlayerId: localPlayerId
+            });
+            // Fall back to at least creating local player
+            if (localPlayerId) {
+                const characterType = Object.values(CharacterNamesEnum)[0];
+                this.playerManager!.createPlayer(localPlayerId, true, characterType);
+            }
+            return;
+        }
+
+        // Get character selections from network storage
+        const storage = NetworkManager.getStorage();
+        const characterSelections = storage?.characterSelections || {};
+
+        this.players.forEach((playerId) => {
             const isLocal = (playerId === localPlayerId);
-            const characterType = Object.values(CharacterNamesEnum)[index];
-            this.playerManager!.createPlayer(playerId, isLocal, characterType);
+            
+            // Get the character ID for this player from storage
+            let characterType: CharacterNamesEnum | undefined;
+            const selection = characterSelections[playerId];
+            
+            if (selection && selection.characterId) {
+                // Map character ID to enum value
+                const charIdMap: {[key: string]: CharacterNamesEnum} = {
+                    'lizard-wizard': CharacterNamesEnum.LizardWizard,
+                    'sword-and-board': CharacterNamesEnum.SwordAndBoard,
+                    'cheese-touch': CharacterNamesEnum.CheeseTouch,
+                    'big-sword': CharacterNamesEnum.BigSword,
+                    'boom-stick': CharacterNamesEnum.BoomStick,
+                    'rail-gun': CharacterNamesEnum.Railgun,
+                };
+                characterType = charIdMap[selection.characterId];
+            }
+            
+            // Fall back to first character if not found
+            if (!characterType) {
+                characterType = Object.values(CharacterNamesEnum)[0];
+                console.warn(`Character selection not found for ${playerId}, using ${characterType}`);
+            }
+
+            try {
+                this.playerManager!.createPlayer(playerId, isLocal, characterType);
+            } catch (err) {
+                console.error(`Error creating player ${playerId}:`, err);
+            }
         });
 
         // Set up network message handlers
@@ -338,12 +388,8 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        // Clients receive delta updates via volatile channel
-        NetworkManager.onState((delta: any) => {
-            if (!this.isHost) {
-                this.applyDeltaState(delta);
-            }
-        });
+        // TODO: For volatile state updates, use storage-based sync or sendRequest()
+        // NetworkManager.onState() has been removed as 'state' is not a valid PlaySocket event
 
         // Host listens for player inputs via storage
         NetworkManager.onStorageKey('inputs', (inputs: any) => {
@@ -1177,7 +1223,11 @@ export class GameScene extends Scene
         if (this.gameStarted) return;
 
         this.gameStarted = true;
-        this.tutorialText.setVisible(false);
+        
+        // Safely hide tutorial text if it exists
+        if (this.tutorialText) {
+            this.tutorialText.setVisible(false);
+        }
 
         // Enemies will now spawn based off of data in the map. 
 

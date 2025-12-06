@@ -98,12 +98,9 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
         if (!this.isIndestructible && this.health > 0) {
             this.createHealthBar();
         }
-    private cloneState(state: EntityState): EntityState {
-        return { ...state };
-        this.handleDestruction();
 
-        // Initialize lastSyncedState for network sync (only for destructible walls)
-        this.lastSyncedState = this.getNetworkState() ? { ...(this.getNetworkState() as EntityState) } : null;
+        // Setup destruction handler for cleanup
+        this.handleDestruction();
     }
 
     /**
@@ -112,8 +109,7 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
     private cloneState(state: EntityState | null): EntityState | null {
         return state ? { ...state } : null;
     }
-
-        // lastSyncedState is always initialized; compare directly against it
+    // lastSyncedState is always initialized; compare directly against it
     public getDelta(): EntityDelta | null {
         if (this.isIndestructible) return null;
 
@@ -129,21 +125,12 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
         const delta: Partial<EntityState> & { id: string } = { id: current.id };
         let changed = false;
 
-        if (current.x !== this.lastSyncedState.x) {
-            delta.x = current.x;
-            changed = true;
-        }
-        if (current.y !== this.lastSyncedState.y) {
-            delta.y = current.y;
-            changed = true;
-        }
-        this.lastSyncedState = this.cloneState(current);
-            delta.health = current.health;
-            changed = true;
-        }
-        if (current.maxHealth !== this.lastSyncedState.maxHealth) {
-            delta.maxHealth = current.maxHealth;
-            changed = true;
+        const keysToCheck: (keyof EntityState)[] = ['x', 'y', 'health', 'maxHealth', 'netVersion', 'isDead'];
+        for (const key of keysToCheck) {
+            if ((current as any)[key] !== (this.lastSyncedState as any)[key]) {
+                (delta as any)[key] = (current as any)[key];
+                changed = true;
+            }
         }
 
         if (!changed) return null;

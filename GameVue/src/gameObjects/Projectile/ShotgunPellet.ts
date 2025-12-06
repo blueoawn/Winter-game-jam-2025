@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/Game';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
-import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
+import { EntityState } from '../../../network/SyncableEntity';
+import Projectile from './Projectile';
 
 /**
  * ShotgunPellet - BoomStick's shotgun projectile
@@ -10,7 +11,7 @@ import { SyncableEntity, EntityState } from '../../../network/SyncableEntity';
  * A fast-moving pellet with distance-based damage falloff
  * Visual: Orange/yellow tinted sprite representing shotgun scatter
  */
-export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
+export class ShotgunPellet extends Projectile {
     private static nextId = 0;
 
     id: string;
@@ -18,7 +19,6 @@ export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite implements Synca
     minDamageMultiplier: number;
     falloffStart: number;
     falloffEnd: number;
-    gameScene: GameScene;
 
     private startX: number;
     private startY: number;
@@ -45,22 +45,15 @@ export class ShotgunPellet extends Phaser.Physics.Arcade.Sprite implements Synca
         this.minDamageMultiplier = minDamageMultiplier;
         this.falloffStart = falloffStart;
         this.falloffEnd = falloffEnd;
-        this.gameScene = scene;
         this.createdTime = Date.now();
 
         // Track starting position for distance calculations
         this.startX = x;
         this.startY = y;
 
-        // Add to scene
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
-
         // Configure sprite - orange/yellow tint for shotgun blast
         this.setTint(0xffaa00);
-        this.setScale(0.6); // Smaller than magic missile
-        this.setDepth(Depth.BULLETS);
-
+        this.setScale(0.6);
         // Calculate velocity
         const dx = targetX - x;
         const dy = targetY - y;

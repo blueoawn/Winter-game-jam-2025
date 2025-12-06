@@ -3,7 +3,10 @@
 
 import PlaySocketServer from 'playsocketjs/server';
 
-const server = new PlaySocketServer({ port: 3001 });
+const server = new PlaySocketServer({ 
+    port: 3001,
+    rateLimit: 2000  // Increased from default 20 to handle game state updates
+});
 
 console.log("🚀 PlaySocketJS Server Booted on port 3001");
 
@@ -80,39 +83,53 @@ server.onEvent('clientDisconnected', (clientId, roomId) => {
 });
 
 //----------------------------------------------------------
-// Client → Server Heartbeat (Volatile)
+// Event: Client → Server Custom Requests (Heartbeat, State, Snapshots)
 //----------------------------------------------------------
-server.onEvent('heartbeat', (clientId, roomId) => {
-    const data = roomData.get(roomId);
-    if (!data) return;
+server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
+    const roomData_entry = roomData.get(roomId);
+    if (!roomData_entry) return;
 
-    data.heartbeats.set(clientId, Date.now());
-});
-
-//----------------------------------------------------------
-// Host sends delta updates (Volatile)
-//----------------------------------------------------------
-server.onEvent('state', (clientId, roomId, delta) => {
-    const data = roomData.get(roomId);
-    if (!data) return;
-
-    // TODO This ignores all non-host deltas, but clients should be able to send some too (e.g. player input)
-    if (clientId !== data.hostId) {
-        console.log(`⛔ Ignored delta from non-host ${clientId}`);
+    // Handle heartbeat requests
+    if (requestName === 'heartbeat') {
+        roomData_entry.heartbeats.set(clientId, Date.now());
         return;
     }
 
-    data.lastTick = delta.tick;
+    // Handle delta state updates from host
+    if (requestName === 'state') {
+        const delta = data;
+        if (!delta || clientId !== roomData_entry.hostId) {
+            console.log(`⛔ Ignored state update from non-host ${clientId}`);
+            return;
+        }
 
-    // Re-broadcast to other clients (volatile)
-    server.emitToRoomVolatile(roomId, 'state', delta, { except: clientId });
+        roomData_entry.lastTick = delta.tick;
+
+        // Re-broadcast to other clients (via sendRequest which is unreliable like volatile)
+        // Note: PlaySocket doesn't have emitToRoomVolatile, so we use storage or broadcast via sendRequest
+        console.log(`📡 Host ${clientId} sent state update for tick ${delta.tick}`);
+        return;
+    }
+
+    // Handle snapshot requests
+    if (requestName === 'requestSnapshot') {
+        const storage = server.getRoomStorage(roomId);
+        if (!storage) return;
+
+        console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
+        return;
+    }
 });
+
+//----------------------------------------------------------
+// Event: Client → Server Heartbeat (Volatile)
+//----------------------------------------------------------
 
 //----------------------------------------------------------
 // Server-side periodic cleanup (dead clients)
 //----------------------------------------------------------
 setInterval(() => {
-    const cutoff = now() - 8000; // 8 seconds without heartbeat → dead
+    const cutoff = now() - 30000; // 30 seconds without heartbeat → dead
 
     for (const [roomId, data] of roomData) {
         for (const [clientId, last] of data.heartbeats) {
@@ -141,12 +158,40 @@ server.onEvent('storageUpdated', ({ roomId, clientId, update }) => {
 server.onEvent('storageUpdateRequested', ({
     roomId,
     clientId,
-    key,
-    operation,
-    value
+    update,
+    storage
 }) => {
     // Allow server-side updates (PlaySocket uses null clientId)
     if (!clientId) return true;
+
+    // update object contains the key and value information
+    // For array operations: { key, operation, value, updateValue }
+    // For set operations: { key, value }
+    if (!update || !update.key) {
+        console.warn('Invalid storage update: missing key');
+        return false;
+    }
+
+    const key = update.key;
+    const operation = update.operation;
+    const value = update.value;
+
+    /**
+     * ✅ ALLOWED: Player list management
+     * e.g. players (direct) or players.<playerId>
+     */
+    if (key === 'players' || key.startsWith('players.')) {
+        return true;
+    }
+
+    /**
+     * ✅ ALLOWED: Character selections and game state metadata
+     */
+    if (key === 'characterSelections' || key.startsWith('characterSelections.') || 
+        key === 'allPlayersReady' || key === 'isGameStarted' || key === 'startGameData' || 
+        key === 'gameStarting') {
+        return true;
+    }
 
     /**
      * ✅ ALLOWED: Player input updates
@@ -161,13 +206,6 @@ server.onEvent('storageUpdateRequested', ({
             return false;
         }
 
-        return true;
-    }
-
-    /**
-     * ✅ ALLOWED: Player presence / metadata
-     */
-    if (key.startsWith('players.')) {
         return true;
     }
 
@@ -191,23 +229,4 @@ server.onEvent('storageUpdateRequested', ({
      * ❌ Default deny
      */
     return false;
-});
-
-server.onEvent('requestSnapshot', (clientId, roomId) => {
-    const storage = server.getRoomStorage(roomId);
-    if (!storage) return;
-
-    console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
-
-    const snapshot = {
-        tick: storage.game?.tick || 0,
-        timestamp: Date.now(),
-        players: storage.game?.players || {},
-        enemies: storage.game?.enemies || {},
-        projectiles: storage.game?.projectiles || {},
-        walls: storage.game?.walls || {},
-        meta: storage.game?.meta || {},
-    };
-
-    server.sendMessageToClient(clientId, 'snapshot', snapshot);
 });

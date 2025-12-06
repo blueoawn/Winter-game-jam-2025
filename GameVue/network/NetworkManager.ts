@@ -16,6 +16,7 @@ export class NetworkManager {
     private playerLeftHandler?: PlayerEventHandler;
 
     private connectedPlayers = new Set<string>();
+    private storage: any = null;
 
     private constructor() {}
 
@@ -43,28 +44,35 @@ export class NetworkManager {
     private registerCoreEvents() {
         if (!this.socket) return;
 
-        this.socket.onEvent('clientConnected', (id: string) => {
-            this.connectedPlayers.add(id);
-            this.playerJoinedHandler?.(id);
+        // Listen to client connected/disconnected events from PlaySocket
+        this.socket.onEvent('clientConnected', (clientId: string) => {
+            this.connectedPlayers.add(clientId);
+            this.playerJoinedHandler?.(clientId);
         });
 
-        this.socket.onEvent('clientDisconnected', (id: string) => {
-            this.connectedPlayers.delete(id);
-            this.playerLeftHandler?.(id);
+        this.socket.onEvent('clientDisconnected', (clientId: string) => {
+            this.connectedPlayers.delete(clientId);
+            this.playerLeftHandler?.(clientId);
         });
     }
 
     async hostGame(): Promise<string> {
         if (!this.socket) throw new Error('Network not initialized');
 
-        const roomCode = await this.socket.createRoom({
+        const initialStorage = {
             hostId: this.localPlayerId,
             players: [this.localPlayerId],
+            inputs: {},
+            isGameStarted: false,
+            startGameData: null,
             meta: { started: false }
-        });
+        };
+
+        const roomCode = await this.socket.createRoom(initialStorage);
 
         this.roomCode = roomCode;
         this.isHost = true;
+        this.storage = initialStorage;
         this.connectedPlayers.add(this.localPlayerId!);
 
         return roomCode;
@@ -77,10 +85,17 @@ export class NetworkManager {
         this.isHost = false;
         await this.socket.joinRoom(room);
 
-        this.socket.updateStorage(`players.${this.localPlayerId}`, 'set', {
-            id: this.localPlayerId,
-            joinedAt: Date.now()
-        });
+        // Get current room storage
+        this.storage = this.socket.getStorage;
+
+        // Add self to players list
+        if (Array.isArray(this.storage?.players)) {
+            if (!this.storage.players.includes(this.localPlayerId)) {
+                this.storage.players.push(this.localPlayerId);
+            }
+        }
+
+        this.socket.updateStorage(`players`, 'array-add-unique', this.localPlayerId);
     }
 
     //input update
@@ -96,18 +111,44 @@ export class NetworkManager {
     // Volatile state broadcasting (host)
     sendVolatileState(state: any) {
         if (!this.isHost || !this.socket) return;
-        this.socket.emitVolatile('state', state);
+        // PlaySocket doesn't support volatile/unreliable messages
+        // For frequent state updates, use storage or implement a custom protocol
+        // For now, this is a no-op
     }
 
-    // Subscribe to volatile state packets
-    onState(handler: (state: any) => void) {
-        if (!this.socket) return;
-        this.socket.onEvent('state', handler);
-    }
-
-    // Subscribe to specific storage keys (way faster than full storage listener)
+    // Subscribe to storage updates and filter by changes
     onStorageKey(key: string, handler: StorageKeyHandler) {
-        this.socket?.onStorageKey(key, handler);
+        if (!this.socket) return;
+        
+        // Listen to all storage updates and call handler when the specific key changes
+        this.socket.onEvent('storageUpdated', (storage: any) => {
+            if (storage && storage[key] !== undefined) {
+                handler(storage[key]);
+            }
+        });
+    }
+
+    // Listen for general storage updates
+    onStorageUpdate(handler: StorageUpdateHandler) {
+        this.storageUpdateHandler = handler;
+
+        // If we already have storage, invoke immediately
+        if (this.storage) {
+            handler(this.storage);
+        }
+
+        // Listen to storage updates from PlaySocket
+        if (this.socket) {
+            this.socket.onEvent('storageUpdated', (storage: any) => {
+                this.storage = storage;
+                this.storageUpdateHandler?.(storage);
+            });
+        }
+    }
+
+    // Stop listening to storage updates
+    offStorageUpdate() {
+        this.storageUpdateHandler = null;
     }
 
     onPlayerJoined(handler: PlayerEventHandler) {
@@ -116,6 +157,15 @@ export class NetworkManager {
 
     onPlayerLeft(handler: PlayerEventHandler) {
         this.playerLeftHandler = handler;
+    }
+
+    // Aliases for convenience
+    onPlayerJoin(handler: PlayerEventHandler) {
+        this.onPlayerJoined(handler);
+    }
+
+    onPlayerLeave(handler: PlayerEventHandler) {
+        this.onPlayerLeft(handler);
     }
 
     getPlayerId() {
@@ -132,6 +182,13 @@ export class NetworkManager {
 
     getIsHost() {
         return this.isHost;
+    }
+
+    getStorage() {
+        if (this.socket) {
+            return this.socket.getStorage;
+        }
+        return this.storage;
     }
 
     getStats() {
