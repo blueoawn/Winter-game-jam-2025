@@ -32,11 +32,18 @@ export default {
                 frameHeight: 64,
             }]
         },
-            tiles: {
+        tiles: {
             key: 'tiles',
             args: ['assets/tiles.png', {
                 frameWidth: 32,
                 frameHeight: 32
+            }]
+        },
+        slime: {
+            key: 'slime',
+            args: ['assets/Sprites/slime_F_Cleaned1Cropped.png', {
+                frameWidth: 574,
+                frameHeight: 588,
             }]
         },
     }

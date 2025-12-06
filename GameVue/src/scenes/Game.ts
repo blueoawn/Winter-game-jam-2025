@@ -36,6 +36,7 @@ import { AggressiveBehavior } from "../behaviorScripts/Aggressive.ts";
 import { IBehavior } from "../behaviorScripts/Behavior.ts";
 import { TerritorialBehavior } from "../behaviorScripts/Territorial.ts";
 import { PacifistBehavior } from "../behaviorScripts/Pacifist.ts";
+import EnemySlime from "../gameObjects/NPC/EnemySlime.ts";
 
 
 export class GameScene extends Scene
@@ -931,6 +932,11 @@ export class GameScene extends Scene
         this.enemyGroup.add(enemy);
     }
 
+    addSlimeEnemy(x: number, y: number) {
+        const enemy = new EnemySlime(this, x, y);
+        this.enemyGroup.add(enemy);
+        return enemy;
+    }
     addLizardWizardEnemy(x: number, y: number) {
         const enemy = new EnemyLizardWizard(this, x, y);
         this.enemyGroup.add(enemy);

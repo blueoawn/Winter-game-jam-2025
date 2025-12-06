@@ -106,7 +106,7 @@ export class Spawner {
         // Currently only supports EnemyLizardWizard
         // Future: Add enemy type registry to support multiple enemy types
         if (this.enemyType === 'EnemyLizardWizard') {
-            const enemy = this.scene.addLizardWizardEnemy(this.x, this.y);
+            const enemy = this.scene.addSlimeEnemy(this.x, this.y);
 
             // Apply custom behavior if provided
             if (this.behavior && enemy && enemy.setBehavior) {

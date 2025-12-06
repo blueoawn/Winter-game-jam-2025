@@ -81,7 +81,7 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite {
     updateHealthBarPosition(): void {
         if (!this.healthBarContainer) return;
         this.healthBarContainer.x = this.x;
-        this.healthBarContainer.y = this.y - this.height;
+        this.healthBarContainer.y = this.y - this.height * this.scaleY;
     }
 
     updateHealthBarValue(): void {
