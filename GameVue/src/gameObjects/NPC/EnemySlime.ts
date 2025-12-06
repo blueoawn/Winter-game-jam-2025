@@ -1,5 +1,5 @@
 import { EnemyController } from './EnemyController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene';
 import ASSETS from '../../assets';
 
 export default class EnemySlime extends EnemyController {

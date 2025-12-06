@@ -1,5 +1,5 @@
 import { EnemyController } from './EnemyController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene';
 import { IBehavior } from '../../behaviorScripts/Behavior';
 import { AggressiveBehavior } from '../../behaviorScripts/Aggressive';
 

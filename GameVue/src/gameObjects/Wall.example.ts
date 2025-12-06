@@ -7,7 +7,7 @@
  */
 
 import Wall from './Wall';
-import type { GameScene } from '../scenes/Game';
+import type { GameScene } from '../scenes/GameScene';
 import ASSETS from '../assets';
 
 /**

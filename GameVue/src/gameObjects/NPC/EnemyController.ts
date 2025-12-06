@@ -1,5 +1,5 @@
 import ASSETS from '../../assets.js';
-import type { GameScene } from '../../scenes/Game.ts';
+import type { GameScene } from '../../scenes/GameScene.ts';
 import { Depth } from '../../constants.ts';
 import Container = Phaser.GameObjects.Container;
 import { SyncableEntity } from '../../../network/SyncableEntity.ts';

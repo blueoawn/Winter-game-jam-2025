@@ -1,5 +1,5 @@
 import { PlayerController } from './PlayerController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import Graphics = Phaser.GameObjects.Graphics;

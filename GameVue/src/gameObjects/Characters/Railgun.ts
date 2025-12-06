@@ -1,5 +1,5 @@
 import { PlayerController } from './PlayerController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import { Audio } from '../../../constants/Audio'; // Assuming Audio constants exist
 import { NinjaStar } from '../Projectile/NinjaStar';

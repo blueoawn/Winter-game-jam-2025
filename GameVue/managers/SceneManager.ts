@@ -1,6 +1,6 @@
 //TODO - refactor SceneManager to use a registry pattern for scene creation and transitioning
 
-import type { GameScene } from '../src/scenes/Game';
+import type { GameScene } from '../src/scenes/GameScene';
 
 /**
  * SceneManager

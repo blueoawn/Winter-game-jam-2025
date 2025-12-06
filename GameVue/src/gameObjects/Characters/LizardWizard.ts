@@ -1,5 +1,5 @@
 import { PlayerController } from './PlayerController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene.ts';
 import { MagicMissile } from '../Projectile/MagicMissile';
 import ASSETS from "../../assets.ts";
 

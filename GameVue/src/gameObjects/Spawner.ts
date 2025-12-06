@@ -1,4 +1,4 @@
-import { GameScene } from '../scenes/Game';
+import { GameScene } from '../scenes/GameScene';
 import { IBehavior } from '../behaviorScripts/Behavior';
 /**
  * Spawner - Host-authoritative enemy spawner with tick-based timing

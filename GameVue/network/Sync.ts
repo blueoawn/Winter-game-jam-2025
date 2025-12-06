@@ -5,7 +5,7 @@
  * Separates sync logic from main game scene
  */
 
-import type { GameScene } from '../src/scenes/Game';
+import type { GameScene } from '../src/scenes/GameScene';
 import NetworkManager from '../managers/NetworkManager';
 import EnemyBullet from '../src/gameObjects/Projectile/EnemyBullet';
 import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';

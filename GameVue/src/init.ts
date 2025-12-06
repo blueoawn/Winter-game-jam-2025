@@ -120,10 +120,7 @@ export function initAnimations(scene: Scene): void {
         if (!scene.anims.exists(key)) {
             scene.anims.create({
                 key,
-                frames: scene.anims.generateFrameNumbers(config.spritesheet, {
-                    start: config.frameStart,
-                    end: config.frameEnd
-                }),
+                frames: scene.anims.generateFrameNumbers(config.texture, config.config),
                 frameRate: config.frameRate,
                 repeat: config.repeat
             });

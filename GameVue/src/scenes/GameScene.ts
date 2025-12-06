@@ -1,13 +1,7 @@
 import { Scene } from 'phaser';
 import { PlayerController } from "../gameObjects/Characters/PlayerController.ts";
 import { EnemyController } from "../gameObjects/NPC/EnemyController.ts";
-import { LizardWizard } from "../gameObjects/Characters/LizardWizard.ts";
-import { SwordAndBoard } from "../gameObjects/Characters/SwordAndBoard.ts";
-import { CheeseTouch } from "../gameObjects/Characters/CheeseTouch.ts";
-import { BigSword } from "../gameObjects/Characters/BigSword.ts";
-import { BoomStick } from "../gameObjects/Characters/BoomStick.ts";
 import { ButtonMapper } from "../../managers/ButtonMapper.ts";
-import { Railgun } from '../gameObjects/Characters/Railgun.ts';
 import Tilemap = Phaser.Tilemaps.Tilemap;
 import Sprite = Phaser.GameObjects.Sprite;
 import TilemapLayer = Phaser.Tilemaps.TilemapLayer;
@@ -23,16 +17,16 @@ import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../managers/NetworkManager.ts';
-import { DeltaDeserializer } from '../../network/DeltaDeserializer';
-import { updateHost, updateClient } from '../../network/MultiplayerUpdates';
-import { applyDeltaState } from '../../network/Sync';
+import { DeltaDeserializer } from '../../network/DeltaDeserializer.ts';
+import { updateHost, updateClient } from '../../network/MultiplayerUpdates.ts';
+import { applyDeltaState } from '../../network/Sync.ts';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { SceneManager } from '../../managers/SceneManager.ts';
 import * as LevelManager from '../../managers/LevelManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
-import { MapData } from '../maps/SummonerRift';
-import { getDefaultMap, getMapById } from '../maps/MapRegistry';
-import { audioManager } from '../../managers/AudioManager';
+import { MapData } from '../maps/SummonerRift.ts';
+import { getDefaultMap, getMapById } from '../maps/MapRegistry.ts';
+import { audioManager } from '../../managers/AudioManager.ts';
 import { CharacterIdsEnum, CharacterNamesEnum } from "../gameObjects/Characters/CharactersEnum.ts";
 import {
     initVariables,
@@ -41,9 +35,10 @@ import {
     initCamera,
     initGameUi,
     initAnimations,
-    initInput,
-    initPhysics
-} from '../init';
+    initInput
+} from '../init.ts';
+import { getCharacterType, createCharacter, CHARACTER_ID_MAP } from '../utils/CharacterFactory.ts';
+import * as CollisionManager from '../../managers/CollisionManager.ts';
 
 
 export class GameScene extends Scene
@@ -168,7 +163,6 @@ export class GameScene extends Scene
             }
 
             initInput(this);
-            initPhysics(this);
 
             // Create all game object groups BEFORE using them in Level Manager
             this.enemyGroup = this.add.group();
@@ -176,6 +170,9 @@ export class GameScene extends Scene
             this.playerBulletGroup = this.add.group();
             this.enemyBulletDestroyersGroup = this.add.group();
             this.wallGroup = this.add.group();
+
+            // Set up physics collisions after groups are created
+            this.initPhysics();
 
             // Set up multiplayer wall collisions after physics is initialized
             if (this.networkEnabled) {
@@ -211,52 +208,15 @@ export class GameScene extends Scene
     initSinglePlayer() {
         // Create single player with selected character
         const characterId = (this as any).selectedCharacterId || 'lizard-wizard';
-        const characterType = this.getCharacterType(characterId);
+        const characterType = getCharacterType(characterId);
 
         // Use default spawn point from current map
         const spawn = this.currentMap.spawnPoints.default;
 
-        switch (characterType) {
-            case CharacterNamesEnum.BigSword:
-                this.player = new BigSword(this, spawn.x, spawn.y);
-                break;
-            case CharacterNamesEnum.SwordAndBoard:
-                this.player = new SwordAndBoard(this, spawn.x, spawn.y);
-                break;
-            case CharacterNamesEnum.CheeseTouch:
-                this.player = new CheeseTouch(this, spawn.x, spawn.y);
-                break;
-            case CharacterNamesEnum.BoomStick:
-                this.player = new BoomStick(this, spawn.x, spawn.y);
-                break;
-            case CharacterNamesEnum.Railgun:
-                this.player = new Railgun(this,spawn.x,spawn.y);
-                break;
-            case CharacterNamesEnum.LizardWizard:
-            default:
-                this.player = new LizardWizard(this, spawn.x, spawn.y);
-        }
-
+        // Create character using factory
+        this.player = createCharacter(this, characterType, spawn.x, spawn.y);
         (this.player as any).isLocal = true;
         this.playerManager = null;
-    }
-
-    getCharacterType(characterId: string): CharacterNamesEnum {
-        switch (characterId) {
-            case CharacterIdsEnum.BigSword:
-                return CharacterNamesEnum.BigSword;
-            case CharacterIdsEnum.SwordAndBoard:
-                return CharacterNamesEnum.SwordAndBoard;
-            case CharacterIdsEnum.CheeseTouch:
-                return CharacterNamesEnum.CheeseTouch;
-            case CharacterIdsEnum.BoomStick:
-                return CharacterNamesEnum.BoomStick;
-            case CharacterIdsEnum.Railgun:
-                return CharacterNamesEnum.Railgun;
-            case CharacterIdsEnum.LizardWizard:
-            default:
-                return CharacterNamesEnum.LizardWizard;
-        }
     }
 
     /**
@@ -320,16 +280,7 @@ export class GameScene extends Scene
             const selection = characterSelections[playerId];
             
             if (selection && selection.characterId) {
-                // Map character ID to enum value
-                const charIdMap: {[key: string]: CharacterNamesEnum} = {
-                    'lizard-wizard': CharacterNamesEnum.LizardWizard,
-                    'sword-and-board': CharacterNamesEnum.SwordAndBoard,
-                    'cheese-touch': CharacterNamesEnum.CheeseTouch,
-                    'big-sword': CharacterNamesEnum.BigSword,
-                    'boom-stick': CharacterNamesEnum.BoomStick,
-                    'rail-gun': CharacterNamesEnum.Railgun,
-                };
-                characterType = charIdMap[selection.characterId];
+                characterType = CHARACTER_ID_MAP[selection.characterId];
             }
             
             // Fall back to first character if not found
@@ -352,12 +303,7 @@ export class GameScene extends Scene
     }
 
     setupMultiplayerWallCollisions() {
-        if (!this.playerManager) return;
-
-        // Add wall collision for each multiplayer player
-        this.playerManager.getAllPlayers().forEach(player => {
-            this.physics.add.collider(player, this.wallGroup);
-        });
+        CollisionManager.setupMultiplayerWallCollisions(this);
     }
 
     setupNetworkHandlers() {
@@ -422,109 +368,16 @@ export class GameScene extends Scene
 
 
 
-    initGameUi() {
-        // Create tutorial text
-        this.tutorialText = this.add.text(this.centreX, this.centreY, 'Tap to shoot!', {
-            fontFamily: 'Arial Black', fontSize: 42, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        })
-            .setOrigin(0.5)
-            .setDepth(100)
-            .setScrollFactor(0);  // Fix to camera viewport
-
-        // Create score text
-        this.scoreText = this.add.text(20, 20, 'Score: 0', {
-            fontFamily: 'Arial Black', fontSize: 28, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-        })
-            .setDepth(100)
-            .setScrollFactor(0);  // Fix to camera viewport
-
-        // Create game over text
-        this.gameOverText = this.add.text(this.scale.width * 0.5, this.scale.height * 0.5, 'Game Over', {
-            fontFamily: 'Arial Black', fontSize: 64, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        })
-            .setOrigin(0.5)
-            .setDepth(100)
-            .setVisible(false)
-            .setScrollFactor(0);  // Fix to camera viewport
-    }
-
-    initAnimations() {
-        // Only create animation if it doesn't already exist (prevents error on scene restart)
-        if (!this.anims.exists(ANIMATION.explosion.key)) {
-            this.anims.create({
-                key: ANIMATION.explosion.key,
-                frames: this.anims.generateFrameNumbers(ANIMATION.explosion.texture, ANIMATION.explosion.config),
-                frameRate: ANIMATION.explosion.frameRate,
-                repeat: ANIMATION.explosion.repeat
-            });
-        }
-    }
+    // Note: initGameUi and initAnimations are handled by init.ts functions
 
     initPhysics() {
-        // Groups are now created earlier in create() before LevelManager functions use them
-        
-        // Only set up collisions for single player mode
+        // Set up collisions based on game mode
         if (!this.networkEnabled && this.player) {
-            // This overlap should come before checking if the bullet hit the player
-            this.physics.add.overlap(
-                this.enemyBulletDestroyersGroup,
-                this.enemyBulletGroup,
-                this.destroyEnemyBullet as () => void,
-                undefined,
-                this
-            );
-            this.physics.add.overlap(
-                this.playerBulletGroup,
-                this.enemyGroup,
-                this.hitEnemy as () => void,
-                undefined,
-                this
-            );
-            this.physics.add.overlap(
-                this.player,
-                this.enemyBulletGroup,
-                this.hitPlayer as () => void,
-                undefined,
-                this
-            );
-            this.physics.add.overlap(
-                this.player,
-                this.enemyGroup,
-                this.hitPlayer as () => void,
-                undefined,
-                this
-            );
-
-        }
-        // TODO: Set up collisions for multiplayer mode with all players
-
-        // Wall collisions (applies to both single and multiplayer)
-        // Players collide with walls (solid collision)
-        if (this.player) {
-            this.physics.add.collider(this.player, this.wallGroup);
+            CollisionManager.setupSinglePlayerCollisions(this);
         }
 
-        // Enemies collide with walls (solid collision)
-        this.physics.add.collider(this.enemyGroup, this.wallGroup);
-
-        // Player bullets can damage destructible walls
-        this.physics.add.overlap(
-            this.playerBulletGroup,
-            this.wallGroup,
-            this.hitWall as () => void,
-            undefined,
-            this
-        );
-
-        // Enemy bullets collide with walls (both types blocked)
-        this.physics.add.collider(this.enemyBulletGroup, this.wallGroup, (bullet: any) => {
-            this.removeEnemyBullet(bullet);
-        });
+        // Set up common collisions for both modes
+        CollisionManager.setupCommonCollisions(this);
     }
 
     /**
@@ -552,75 +405,9 @@ export class GameScene extends Scene
         LevelManager.updateSpawners(this);
     }
 
-    // initPlayer() removed - now using initSinglePlayer() and initMultiplayer() with character classes
-
-    initInput() {
-        this.cursors = this.input.keyboard?.createCursorKeys();
-
-        // check for spacebar press only once
-        this.cursors?.space.once('down', () => {
-            this.startGame();
-        });
-    }
-
-    // create tile map data
-    initMap() {
-        const mapData = [];
-        for (let y = 0; y < this.mapHeight; y++) {
-            const row = [];
-
-            for (let x = 0; x < this.mapWidth; x++) {
-                // randomly choose a tile id from this.tiles
-                // weightedPick favours items earlier in the array
-                const tileIndex = Phaser.Math.RND.weightedPick(this.tiles);
-                row.push(tileIndex);
-            }
-
-            mapData.push(row);
-        }
-
-        this.map = this.make.tilemap({ data: mapData, tileWidth: this.tileSize, tileHeight: this.tileSize });
-        const tileset = this.map.addTilesetImage(ASSETS.spritesheet.tiles.key);
-        if (tileset) {
-            this.groundLayer = this.map.createLayer(0, tileset, 0, this.mapTop);
-        }
-    }
-
-    // scroll the tile map
-    updateMap() {
-        this.scrollMovement += this.scrollSpeed;
-
-        if (this.scrollMovement >= this.tileSize) {
-            //  Create new row on top
-            let tile;
-            let prev;
-
-            // loop through map from bottom to top row
-            for (let y = this.mapHeight - 2; y > 0; y--) {
-                // loop through map from left to right column
-                for (let x = 0; x < this.mapWidth; x++) {
-                    tile = this.map.getTileAt(x, y - 1);
-                    prev = this.map.getTileAt(x, y);
-
-                    if (prev && tile) {
-                        prev.index = tile.index;
-                    }
-
-                    if (y === 1 && tile) { // if top row
-                        // randomly choose a tile id from this.tiles
-                        // weightedPick favours items earlier in the array
-                        tile.index = Phaser.Math.RND.weightedPick(this.tiles);
-                    }
-                }
-            }
-
-            this.scrollMovement -= this.tileSize; // reset to 0
-        }
-
-        if (this.groundLayer) {
-            this.groundLayer.y = this.mapTop + this.scrollMovement; // move one tile up
-        }
-    }
+    // Note: initInput is handled by init.ts
+    // Note: Old tilemap scrolling system (initMap/updateMap) has been removed
+    // Maps are now static and loaded from MapRegistry
 
     startGame() {
         // Delegate to SceneManager for consistent game lifecycle management

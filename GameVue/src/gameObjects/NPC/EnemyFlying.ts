@@ -1,7 +1,7 @@
 //TODO Bluepawn is reworking this into something better
 
 import { EnemyController } from './EnemyController';
-import { GameScene } from '../../scenes/Game';
+import { GameScene } from '../../scenes/GameScene';
 import Vector2 = Phaser.Math.Vector2;
 import Spline = Phaser.Curves.Spline;
 

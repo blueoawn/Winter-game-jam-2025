@@ -6,7 +6,7 @@ import { Boot } from "./scenes/Boot.ts";
 import { Preloader } from "./scenes/Preloader.ts";
 import { GameOver } from "./scenes/GameOver.ts";
 import { Start } from "./scenes/Start.ts";
-import { GameScene } from "./scenes/Game.ts";
+import { GameScene } from "./scenes/GameScene.ts";
 import { Lobby } from "./scenes/Lobby.ts";
 import { CharacterSelectScene } from "./scenes/CharacterSelect.ts";
 import { onMounted } from "vue";

@@ -4,7 +4,7 @@
  * Separates game object lifecycle from scene management
  */
 
-import type { GameScene } from '../src/scenes/Game';
+import type { GameScene } from '../src/scenes/GameScene.ts';
 import EnemyBullet from '../src/gameObjects/Projectile/EnemyBullet';
 import Explosion from '../src/gameObjects/Explosion';
 import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';

@@ -6,7 +6,7 @@
 
 import NetworkManager from '../managers/NetworkManager';
 import { DeltaSerializer } from './StateSerializer';
-import type { GameScene } from '../src/scenes/Game';
+import type { GameScene } from '../src/scenes/GameScene';
 import type { PlayerManager } from '../managers/MultiplayerManager';
 import type { ButtonMapper } from '../managers/ButtonMapper';
 import type { PlayerController } from '../src/gameObjects/Characters/PlayerController';

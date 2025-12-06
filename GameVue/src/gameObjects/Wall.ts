@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { GameScene } from '../scenes/Game';
+import type { GameScene } from '../scenes/GameScene';
 import { Depth } from '../constants';
 import { SyncableEntity, EntityState, EntityDelta } from '../../network/SyncableEntity';
 

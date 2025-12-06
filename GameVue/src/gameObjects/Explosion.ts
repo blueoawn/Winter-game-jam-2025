@@ -1,6 +1,6 @@
 import ASSETS from '../assets.js';
 import ANIMATION from '../animation.ts';
-import { GameScene } from "../scenes/Game.ts";
+import { GameScene } from "../scenes/GameScene.ts";
 
 export default class Explosion extends Phaser.GameObjects.Sprite {
 
