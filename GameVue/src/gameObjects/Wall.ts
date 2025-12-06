@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { GameScene } from '../scenes/Game';
 import { Depth } from '../constants';
-import { SyncableEntity, EntityState } from '../../network/SyncableEntity';
+import { SyncableEntity, EntityState, EntityDelta } from '../../network/SyncableEntity';
 
 /**
  * Wall - Static obstacle entity with optional destructibility
@@ -17,8 +17,8 @@ import { SyncableEntity, EntityState } from '../../network/SyncableEntity';
 export default class Wall extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
     private static nextId = 0;
 
-    id: string;  // Implements SyncableEntity.id
-    wallId: string;  // Alias for id (backwards compatibility)
+    id: string; // Implements SyncableEntity.id
+    wallId: string; // Alias for id (backwards compatibility)
     wallType: string = 'Wall';
     gameScene: GameScene;
 
@@ -27,6 +27,10 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
     isIndestructible: boolean;
 
     private healthBarContainer: Phaser.GameObjects.Container | null = null;
+
+    // Sync-related
+    protected lastSyncedState: EntityState | null = null;
+    public view: any = null;
 
     /**
      * Creates a new Wall instance
@@ -72,16 +76,172 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
         this.body!.setSize(this.width, this.height);
         this.setImmovable(true);
 
-        // Set rendering depth
-        this.setDepth(Depth.TILES);
+        // Initialize lastSyncedState for network sync (only for destructible walls)
+        const initialNetState = this.getNetworkState();
+        if (initialNetState) {
+            this.lastSyncedState = this.cloneState(initialNetState);
+        } else {
+            // Provide a safe default state when there's no network state (indestructible walls)
+            this.lastSyncedState = {
+                id: this.id || '',
+                type: this.wallType,
+                x: Math.round(this.x),
+                y: Math.round(this.y),
+                health: this.health,
+                maxHealth: this.maxHealth,
+                netVersion: 0,
+                isDead: false
+            };
+        }
 
         // Create health bar for destructible walls only
         if (!this.isIndestructible && this.health > 0) {
             this.createHealthBar();
         }
-
-        // Handle cleanup when wall is destroyed
+    private cloneState(state: EntityState): EntityState {
+        return { ...state };
         this.handleDestruction();
+
+        // Initialize lastSyncedState for network sync (only for destructible walls)
+        this.lastSyncedState = this.getNetworkState() ? { ...(this.getNetworkState() as EntityState) } : null;
+    }
+
+    /**
+     * Utility: clone an EntityState (or return null)
+     */
+    private cloneState(state: EntityState | null): EntityState | null {
+        return state ? { ...state } : null;
+    }
+
+        // lastSyncedState is always initialized; compare directly against it
+    public getDelta(): EntityDelta | null {
+        if (this.isIndestructible) return null;
+
+        const current = this.getNetworkState();
+        if (!current) return null;
+
+        // If we have never synced, send full state
+        if (!this.lastSyncedState) {
+            this.lastSyncedState = this.cloneState(current);
+            return { ...current } as EntityDelta;
+        }
+
+        const delta: Partial<EntityState> & { id: string } = { id: current.id };
+        let changed = false;
+
+        if (current.x !== this.lastSyncedState.x) {
+            delta.x = current.x;
+            changed = true;
+        }
+        if (current.y !== this.lastSyncedState.y) {
+            delta.y = current.y;
+            changed = true;
+        }
+        this.lastSyncedState = this.cloneState(current);
+            delta.health = current.health;
+            changed = true;
+        }
+        if (current.maxHealth !== this.lastSyncedState.maxHealth) {
+            delta.maxHealth = current.maxHealth;
+            changed = true;
+        }
+
+        if (!changed) return null;
+
+        // Update lastSyncedState to current full state
+        this.lastSyncedState = this.cloneState(current);
+        return delta as EntityDelta;
+    }
+
+    /**
+     * Apply a delta from the network to this local instance.
+     */
+    public applyDelta(delta: EntityDelta): void {
+        if (this.isIndestructible) return;
+        if (!delta || (delta as any).id && (delta as any).id !== this.id) {
+            // If the delta is for another entity, ignore it.
+            if ((delta as any).id && (delta as any).id !== this.id) return;
+        }
+
+        // Apply fields present in delta
+        const postNetState = this.getNetworkState();
+        if (postNetState) {
+            this.lastSyncedState = this.cloneState(postNetState);
+        } else {
+            this.lastSyncedState = {
+                id: this.id || '',
+                type: this.wallType,
+                x: Math.round(this.x),
+                y: Math.round(this.y),
+                health: this.health,
+                maxHealth: this.maxHealth,
+                netVersion: 0,
+                isDead: false
+            };
+        }
+        if ((delta as any).y !== undefined) this.y = (delta as any).y;
+        if ((delta as any).health !== undefined) this.health = (delta as any).health;
+        if ((delta as any).maxHealth !== undefined) this.maxHealth = (delta as any).maxHealth;
+
+        // Update visuals
+        this.updateHealthBarValue();
+        if (this.health <= 0) {
+            this.die();
+        }
+
+        // Refresh lastSyncedState to reflect applied state
+        this.lastSyncedState = this.getNetworkState() ? { ...(this.getNetworkState() as EntityState) } : null;
+    }
+
+    /**
+     * Reconcile authoritative server state: overwrite local state with server-provided state.
+     */
+    public reconcile(serverState: EntityState): void {
+        if (this.isIndestructible) return;
+
+        if (serverState.x !== undefined) this.x = serverState.x;
+        if (serverState.y !== undefined) this.y = serverState.y;
+        if (serverState.health !== undefined) this.health = serverState.health;
+        if (serverState.maxHealth !== undefined) this.maxHealth = serverState.maxHealth;
+
+        this.updateHealthBarValue();
+        if (this.health <= 0) {
+            this.die();
+        }
+
+        this.lastSyncedState = this.cloneState(serverState);
+    }
+
+    /**
+     * Create a client-side view representation for this entity.
+     * For this class we typically use the sprite itself as the view, but this method
+     * allows a distinct view to be created if needed by the networking system.
+     */
+    public createView(scene: any): void {
+        // By default use the sprite itself as the view
+        this.view = this;
+
+        // Ensure health bar exists for view if applicable
+        if (!this.healthBarContainer && !this.isIndestructible && this.health > 0) {
+            this.createHealthBar();
+        }
+    }
+
+    /**
+     * Sync visual representation from current authoritative fields.
+     */
+    public syncView(): void {
+        if (!this.view) return;
+
+        // Ensure sprite is positioned at authoritative coordinates
+        this.setPosition(this.x, this.y);
+
+        // Move health bar container if present
+        if (this.healthBarContainer) {
+            const offsetY = this.displayHeight / 2 + 10;
+            this.healthBarContainer.setPosition(this.x, this.y - offsetY);
+            this.updateHealthBarValue();
+        }
     }
 
     /**
@@ -126,7 +286,9 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
     private updateHealthBarValue(): void {
         if (!this.healthBarContainer || this.isIndestructible) return;
 
-        const remainingHealthRatio = Math.max(0, this.health) / this.maxHealth;
+        // Avoid division by zero
+        const max = this.maxHealth > 0 ? this.maxHealth : 1;
+        const remainingHealthRatio = Math.max(0, this.health) / max;
         const fullHealthWidth = (this.healthBarContainer.list[0] as Phaser.GameObjects.Rectangle).width;
         const remainingHealthWidth = fullHealthWidth * remainingHealthRatio;
 
@@ -189,13 +351,15 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
         }
 
         return {
-            id: this.id,
-            type: this.wallType,
-            x: Math.round(this.x),
-            y: Math.round(this.y),
-            health: this.health,
-            maxHealth: this.maxHealth
-        };
+    id: this.id,
+    type: this.wallType,
+    x: Math.round(this.x),
+    y: Math.round(this.y),
+    health: this.health,
+    maxHealth: this.maxHealth,
+    netVersion: 0,
+    isDead: false
+};
     }
 
     /**
@@ -223,5 +387,8 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
                 this.die();
             }
         }
+
+        // Keep lastSyncedState in sync with authoritative update
+        this.lastSyncedState = this.cloneState(state);
     }
 }

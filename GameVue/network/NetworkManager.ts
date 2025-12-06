@@ -1,6 +1,7 @@
 import PlaySocket from 'playsocketjs';
 
 type StorageKeyHandler = (value: any) => void;
+type StorageUpdateHandler = (storage: any) => void; //keeping this to keep track of players in lobby until I figure out a better way to do this
 type PlayerEventHandler = (playerId: string) => void;
 export class NetworkManager {
     private static instance: NetworkManager;
@@ -8,6 +9,7 @@ export class NetworkManager {
     private socket: PlaySocket | null = null;
     private localPlayerId: string | null = null;
     private roomCode: string | null = null;
+    private storageUpdateHandler: StorageUpdateHandler | null = null; //update when player joins or leaves the lobby via disconnect
     private isHost = false;
 
     private playerJoinedHandler?: PlayerEventHandler;
