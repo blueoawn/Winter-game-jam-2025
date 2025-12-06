@@ -474,20 +474,29 @@ export class CharacterSelectScene extends Scene {
         bg.setStrokeStyle(4, isLocked ? 0x333333 : 0x666666);
         container.add(bg);
 
-        // Add decorative background image under the card contents if available
+        // Add decorative background image above character name if available
         // Using the lizard-wizard background image as an example and repeating for all cards
-        if (this.textures.exists(ASSETS.image.lizardWizardBackground.key)) {
-            const cardBgImage = this.add.image(0, 0, ASSETS.image.lizardWizardBackground.key);
-            // Fit image to card size
-            cardBgImage.setCrop()
-            cardBgImage.setDisplaySize(cardWidth - 8, cardHeight - 8);
-            cardBgImage.setDepth(-1);
-            cardBgImage.setAlpha(0.6);
+        if (this.textures.exists(ASSETS.image.lizardWizardBackgroundSmall.key)) {
+            const cardBgImage = this.add.image(0, -120, ASSETS.image.lizardWizardBackgroundSmall.key);
+
+            // Calculate scale to fit within 200x150 while maintaining aspect ratio
+            const maxWidth = 200;
+            const maxHeight = 150;
+            const texture = this.textures.get(ASSETS.image.lizardWizardBackgroundSmall.key);
+            const textureWidth = texture.source[0].width;
+            const textureHeight = texture.source[0].height;
+
+            const scaleX = maxWidth / textureWidth;
+            const scaleY = maxHeight / textureHeight;
+            const fitScale = Math.min(scaleX, scaleY);
+
+            cardBgImage.setScale(fitScale);
+            cardBgImage.setDepth(1);
+            cardBgImage.setAlpha(1);
             if (isLocked) {
                 cardBgImage.setTint(0x000000);
             }
-            // Add behind the card rectangle so it shows under content but above scene background
-            container.addAt(cardBgImage, 1);
+            container.add(cardBgImage);
         }
 
         // Character sprite - black silhouette for locked characters

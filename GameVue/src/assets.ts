@@ -19,9 +19,9 @@ export default {
             key: 'lizard-wizard',
             args: ['assets/Sprites/Wizard_Lizard_2.png']
         },
-        lizardWizardBackground: {
+        lizardWizardBackgroundSmall: {
             key: 'lizard-wizard-bg',
-            args: ['assets/Backgrounds/lizardWizardBackground.png']
+            args: ['assets/Backgrounds/lizardWizardBackgroundSmall.png']
         }
     },
     spritesheet: {
