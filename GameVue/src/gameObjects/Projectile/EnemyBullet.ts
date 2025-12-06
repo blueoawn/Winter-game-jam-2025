@@ -1,7 +1,8 @@
-import ASSETS from '../assets.js';
-import { GameScene } from "../scenes/Game.ts";
+import { SyncableEntity } from '../../../network/SyncableEntity.ts';
+import ASSETS from '../../assets.js';
+import { GameScene } from "../../scenes/Game.ts";
 
-export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite {
+export default class EnemyBullet extends Phaser.Physics.Arcade.Sprite implements SyncableEntity {
     id: string;  // Unique ID for network syncing
     power = 1;
     moveVelocity = 200;

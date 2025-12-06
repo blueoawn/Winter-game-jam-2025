@@ -17,26 +17,33 @@ import CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys;
 
 import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
-import EnemyBullet from "../gameObjects/EnemyBullet.ts";
+import EnemyBullet from "../gameObjects/Projectile/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
-import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
-import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
-import NetworkManager from '../../network/NetworkManager';
-import { StateSerializer } from '../../network/StateSerializer';
+import NetworkManager from '../../managers/NetworkManager.ts';
+import { DeltaDeserializer } from '../../network/DeltaDeserializer';
+import { updateHost, updateClient } from '../../network/MultiplayerUpdates';
+import { applyDeltaState } from '../../network/Sync';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
+import { SceneManager } from '../../managers/SceneManager.ts';
+import * as LevelManager from '../../managers/LevelManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
 import { audioManager } from '../../managers/AudioManager';
 import { CharacterIdsEnum, CharacterNamesEnum } from "../gameObjects/Characters/CharactersEnum.ts";
-import { AggressiveBehavior } from "../behaviorScripts/Aggressive.ts";
-import { IBehavior } from "../behaviorScripts/Behavior.ts";
-import { TerritorialBehavior } from "../behaviorScripts/Territorial.ts";
-import { PacifistBehavior } from "../behaviorScripts/Pacifist.ts";
-import EnemySlime from "../gameObjects/NPC/EnemySlime.ts";
+import {
+    initVariables,
+    initBackground,
+    initWorldBounds,
+    initCamera,
+    initGameUi,
+    initAnimations,
+    initInput,
+    initPhysics
+} from '../init';
 
 
 export class GameScene extends Scene
@@ -86,6 +93,8 @@ export class GameScene extends Scene
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     currentMap: MapData;  // Current active map data
     spawners: Spawner[] = [];  // Enemy spawners for current map
+    deltaDeserializer: DeltaDeserializer = new DeltaDeserializer();  // Delta reconstruction
+    lastReceivedTick: number = 0;  // Track last received tick for desync detection
 
     constructor ()
     {
@@ -111,43 +120,81 @@ export class GameScene extends Scene
 
     create ()
     {
-        // Initialize audio manager
-        audioManager.init(this);
+        try {
+            // Initialize audio manager
+            audioManager.init(this);
 
-        this.initVariables();
-        this.initBackground();  // Add Summoners Rift map background
-        this.initGameUi();
-        this.initAnimations();
+            // Load current map (default to Summoners Rift)
+            this.currentMap = getDefaultMap();
 
-        // Initialize ButtonMapper for input
-        this.buttonMapper = new ButtonMapper(this);
+            // Initialize variables using extracted init function
+            const vars = initVariables(this, this.currentMap);
+            this.score = vars.score;
+            this.centreX = vars.centreX;
+            this.centreY = vars.centreY;
+            this.tileSize = vars.tileSize;
+            this.mapOffset = vars.mapOffset;
+            this.mapTop = vars.mapTop;
+            this.mapHeight = vars.mapHeight;
+            this.mapWidth = vars.mapWidth;
+            this.spawnEnemyCounter = vars.spawnEnemyCounter;
+            this.stateSyncRate = vars.stateSyncRate;
+            this.inputSendRate = vars.inputSendRate;
+            this.tick = vars.tick;
+            this.lastStateSyncTime = 0;
+            this.lastInputSendTime = 0;
+            this.tiles = [50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 36, 48, 60, 72, 84];
 
-        // Set world bounds before creating players
-        this.initWorldBounds();
+            // Initialize scene UI
+            initBackground(this, this.currentMap);
+            const ui = initGameUi(this);
+            this.tutorialText = ui.tutorialText;
+            this.scoreText = ui.scoreText;
+            this.gameOverText = ui.gameOverText;
 
-        if (this.networkEnabled) {
-            this.initMultiplayer();
-        } else {
-            this.initSinglePlayer();
+            initAnimations(this);
+
+            // Initialize ButtonMapper for input
+            this.buttonMapper = new ButtonMapper(this);
+
+            // Set world bounds before creating players
+            initWorldBounds(this, this.currentMap);
+
+            // Create player(s) based on game mode
+            if (this.networkEnabled) {
+                this.initMultiplayer();
+            } else {
+                this.initSinglePlayer();
+            }
+
+            initInput(this);
+            initPhysics(this);
+
+            // Create all game object groups BEFORE using them in Level Manager
+            this.enemyGroup = this.add.group();
+            this.enemyBulletGroup = this.add.group();
+            this.playerBulletGroup = this.add.group();
+            this.enemyBulletDestroyersGroup = this.add.group();
+            this.wallGroup = this.add.group();
+
+            // Set up multiplayer wall collisions after physics is initialized
+            if (this.networkEnabled) {
+                this.setupMultiplayerWallCollisions();
+            }
+
+            this.initSpawners();  // Initialize enemy spawners from map config
+            this.initWalls();     // Initialize walls from map config
+
+            // Setup camera after players are created
+            const playerToFollow = this.networkEnabled ? this.playerManager?.getLocalPlayer() : this.player;
+            initCamera(this, this.currentMap, playerToFollow || undefined);
+
+            // Auto-start for now
+            this.startGame();
+        } catch (error) {
+            console.error('Fatal error in Game.create():', error);
+            console.error('Stack:', (error as any).stack);
         }
-
-        this.initInput();
-        this.initPhysics();
-
-        // Set up multiplayer wall collisions after physics is initialized
-        if (this.networkEnabled) {
-            this.setupMultiplayerWallCollisions();
-        }
-
-        this.initSpawners();  // Initialize enemy spawners from map config
-        this.initWalls();     // Initialize walls from map config
-        // this.initMap();  // DEPRECATED: Tilemap system replaced by image-based background
-
-        // Setup camera after players are created
-        this.initCamera();
-
-        // Auto-start for now
-        this.startGame();
     }
 
     update() {
@@ -159,74 +206,6 @@ export class GameScene extends Scene
             this.updateSinglePlayer();
         }
 
-    }
-
-    initVariables() {
-        // Load current map (default to Summoners Rift)
-        this.currentMap = getDefaultMap();
-
-        this.score = 0;
-        this.centreX = this.scale.width * 0.5;
-        this.centreY = this.scale.height * 0.5;
-
-        // list of tile ids in tiles.png
-        // items nearer to the beginning of the array have a higher chance of being randomly chosen when using weighted()
-        this.tiles = [50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 50, 50, 50, 50, 50, 50, 50, 50, 50, 110, 110, 110, 110, 110, 36, 48, 60, 72, 84];
-        this.tileSize = 32; // width and height of a tile in pixels
-
-        this.mapOffset = 10; // offset (in tiles) to move the map above the top of the screen
-        this.mapTop = -this.mapOffset * this.tileSize; // offset (in pixels) to move the map above the top of the screen
-        this.mapHeight = Math.ceil(this.scale.height / this.tileSize) + this.mapOffset + 1; // height of the tile map (in tiles)
-        this.mapWidth = Math.ceil(this.scale.width / this.tileSize); // width of the tile map (in tiles)
-        //this.scrollSpeed = 1; // background scrolling speed (in pixels) DISABLED FOR NOW
-        // this.scrollMovement = 0; // current scroll amount DISABLED FOR NOW
-        this.spawnEnemyCounter = 0; // timer before spawning next group of enemies
-
-        // Network variables
-        this.stateSyncRate = 1000 / 15;  // 15 times per second
-        this.lastStateSyncTime = 0;
-        this.inputSendRate = 1000 / 30;  // 30 times per second (optimized from 60)
-        this.lastInputSendTime = 0;
-        this.tick = 0;
-    }
-
-    initBackground() {
-        // Add background image centered in world
-        this.add.image(
-            this.currentMap.width / 2,
-            this.currentMap.height / 2,
-            this.currentMap.assetKey
-        )
-            .setOrigin(0.5, 0.5)
-            .setDepth(0);  // Behind all game objects
-    }
-
-    initWorldBounds() {
-        // Set physics world bounds to map size
-        this.physics.world.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
-    }
-
-    initCamera() {
-        const camera = this.cameras.main;
-
-        // Set camera bounds to prevent showing black areas
-        camera.setBounds(0, 0, this.currentMap.width, this.currentMap.height);
-
-        // Determine which player to follow
-        let playerToFollow = null;
-
-        if (this.networkEnabled && this.playerManager) {
-            // Multiplayer: Follow local player
-            playerToFollow = this.playerManager.getLocalPlayer();
-        } else if (this.player) {
-            // Single player: Follow the player
-            playerToFollow = this.player;
-        }
-
-        // Start following with smooth camera
-        if (playerToFollow) {
-            camera.startFollow(playerToFollow, true, 0.1, 0.1);
-        }
     }
 
     initSinglePlayer() {
@@ -314,11 +293,56 @@ export class GameScene extends Scene
         this.playerManager = new PlayerManager(this);
 
         // Create all players with character assignments
-        const localPlayerId = NetworkManager.getStats().playerId;
-        this.players.forEach((playerId, index) => {
+        const localPlayerId = NetworkManager.getPlayerId();
+        
+        if (!this.players || this.players.length === 0) {
+            console.error('Error: No players array provided for multiplayer game!', {
+                players: this.players,
+                localPlayerId: localPlayerId
+            });
+            // Fall back to at least creating local player
+            if (localPlayerId) {
+                const characterType = Object.values(CharacterNamesEnum)[0];
+                this.playerManager!.createPlayer(localPlayerId, true, characterType);
+            }
+            return;
+        }
+
+        // Get character selections from network storage
+        const storage = NetworkManager.getStorage();
+        const characterSelections = storage?.characterSelections || {};
+
+        this.players.forEach((playerId) => {
             const isLocal = (playerId === localPlayerId);
-            const characterType = Object.values(CharacterNamesEnum)[index];
-            this.playerManager!.createPlayer(playerId, isLocal, characterType);
+            
+            // Get the character ID for this player from storage
+            let characterType: CharacterNamesEnum | undefined;
+            const selection = characterSelections[playerId];
+            
+            if (selection && selection.characterId) {
+                // Map character ID to enum value
+                const charIdMap: {[key: string]: CharacterNamesEnum} = {
+                    'lizard-wizard': CharacterNamesEnum.LizardWizard,
+                    'sword-and-board': CharacterNamesEnum.SwordAndBoard,
+                    'cheese-touch': CharacterNamesEnum.CheeseTouch,
+                    'big-sword': CharacterNamesEnum.BigSword,
+                    'boom-stick': CharacterNamesEnum.BoomStick,
+                    'rail-gun': CharacterNamesEnum.Railgun,
+                };
+                characterType = charIdMap[selection.characterId];
+            }
+            
+            // Fall back to first character if not found
+            if (!characterType) {
+                characterType = Object.values(CharacterNamesEnum)[0];
+                console.warn(`Character selection not found for ${playerId}, using ${characterType}`);
+            }
+
+            try {
+                this.playerManager!.createPlayer(playerId, isLocal, characterType);
+            } catch (err) {
+                console.error(`Error creating player ${playerId}:`, err);
+            }
         });
 
         // Set up network message handlers
@@ -337,26 +361,20 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        // Listen for storage updates (both host and clients)
-        NetworkManager.onStorageUpdate((storage: any) => {
-            if (this.isHost) {
-                // Host reads player inputs from storage
-                if (storage.playerInputs) {
-                    Object.entries(storage.playerInputs).forEach(([playerId, inputData]: [string, any]) => {
-                        // Skip own input (already processed locally)
-                        const localPlayerId = NetworkManager.getPlayerId();
-                        if (playerId !== localPlayerId) {
-                            // inputData has inputState properties spread at top level with timestamp
-                            this.playerManager?.applyInput(playerId, inputData);
-                        }
-                    });
-                }
-            } else {
-                // Clients receive game state from host via storage
-                if (storage.gameState) {
-                    this.applyNetworkState(storage.gameState);
-                }
+        //console.log('[NETWORK] Setting up network handlers'); //Debug
+        
+        // ALL clients listen for delta state updates from the server (server is source of truth)
+        NetworkManager.onStorageKey('lastStateDelta', (delta: any) => {
+            //console.log(`[NETWORK] Storage listener fired for lastStateDelta`); //Debug
+            if (delta) {
+                applyDeltaState(this, delta);
             }
+        });
+
+        // All clients listen for player inputs to validate their own input was received
+        NetworkManager.onStorageKey('inputs', () => {
+            // Could use this for input validation/feedback, but not for game logic
+            // Game logic comes from server deltas only
         });
     }
 
@@ -391,233 +409,18 @@ export class GameScene extends Scene
             this.updateClient();
         }
     }
-    
-    //Soon to be depricated
+
+    //TODO - refactored: use updateHost/updateClient from MultiplayerUpdates.ts
     updateHost() {
-        // Process local player input from ButtonMapper
-        if (this.buttonMapper && this.playerManager) {
-            const localPlayer = this.playerManager.getLocalPlayer();
-            if (localPlayer) {
-                const input = this.buttonMapper.getInput();
-                (localPlayer as PlayerController).processInput(input);
-                (localPlayer as PlayerController).storeInputForNetwork(input);
-            }
-        }
-
-        // Update all players
-        this.playerManager?.update();
-
-        // Update spawners (host-only)
-        this.updateSpawners();
-
-        // Broadcast state to clients
-        const now = Date.now();
-        if (now - this.lastStateSyncTime >= this.stateSyncRate) {
-            this.broadcastState();
-            this.lastStateSyncTime = now;
-        }
+        updateHost(this, this.playerManager, this.buttonMapper);
     }
 
     // Can probably be refactored
     updateClient() {
-        // Process local player input from ButtonMapper (client-side prediction)
-        if (this.buttonMapper && this.playerManager) {
-            const localPlayer = this.playerManager.getLocalPlayer();
-            if (localPlayer) {
-                const input = this.buttonMapper.getInput();
-                (localPlayer as PlayerController).processInput(input);
-                (localPlayer as PlayerController).storeInputForNetwork(input);
-            }
-        }
-
-        // Update all players (interpolation happens in player update)
-        this.playerManager?.update();
-
-        // Send local input to host
-        const now = Date.now();
-        if (now - this.lastInputSendTime >= this.inputSendRate) {
-            this.sendInputToHost();
-            this.lastInputSendTime = now;
-        }
+        updateClient(this, this.playerManager, this.buttonMapper);
     }
 
-    //TODO - this is being refactored for deltas
-    broadcastState() {
-        if (!this.playerManager) return;
 
-        const allEnemies = this.enemyGroup.getChildren();
-        const allEnemyBullets = this.enemyBulletGroup.getChildren();
-
-        // Limit enemies to 30 max (should be enough for multiplayer)
-        const enemies = allEnemies.length > 30 ? allEnemies.slice(0, 30) : allEnemies;
-
-        // Limit enemy bullets to 50 max (prevent packet overflow)
-        const enemyBullets = allEnemyBullets.length > 50 ? allEnemyBullets.slice(0, 50) : allEnemyBullets;
-
-        // Reuse timestamp from rate limiting check to avoid redundant Date.now() calls
-        const state = StateSerializer.serialize({
-            tick: this.tick,
-            players: this.playerManager.getAllPlayers() as any,
-            enemies: enemies as any,
-            bullets: this.playerBulletGroup.getChildren() as any,
-            enemyBullets: enemyBullets as any,  // Limited enemy bullets
-            score: this.score,
-            scrollMovement: this.scrollMovement,
-            spawnEnemyCounter: this.spawnEnemyCounter,
-            gameStarted: this.gameStarted
-        }, this.lastStateSyncTime);  // Pass timestamp to avoid redundant Date.now()
-
-        // Update game state in storage (will sync to all clients)
-        NetworkManager.updateGameState(state);
-    }
-
-    //Soon to be depricated by broadcast to server
-    sendInputToHost() {
-        if (!this.playerManager || !this.buttonMapper) return;
-
-        const localPlayer = this.playerManager.getLocalPlayer();
-        if (!localPlayer) return;
-
-        // Get abstract input from ButtonMapper
-        const abstractInput = this.buttonMapper.getInput();
-
-        // Convert to network InputState
-        const inputState = {
-            movementSpeed: (localPlayer as any).characterSpeed,
-            velocity: abstractInput.movement,
-            rotation: localPlayer.rotation,
-            aim: abstractInput.aim,  // Include aim position for firing bullets
-            ability1: abstractInput.ability1,
-            ability2: abstractInput.ability2
-        };
-
-        // Update player input in storage (will sync to host)
-        NetworkManager.updatePlayerInput(inputState);
-    }
-    
-    // This function is Work in progress
-    applyNetworkState(state: any) {
-        // Apply player states
-        if (state.players && this.playerManager) {
-            this.playerManager.applyPlayerState(state.players);
-        }
-
-        // Apply game state
-        if (state.gameState) {
-            this.score = state.gameState.score;
-            this.scrollMovement = state.gameState.scrollMovement;
-            this.spawnEnemyCounter = state.gameState.spawnEnemyCounter;
-            this.gameStarted = state.gameState.gameStarted;
-
-            this.scoreText.setText(`Score: ${this.score}`);
-        }
-
-        // Sync enemy bullets from server
-        if (state.enemyBullets && Array.isArray(state.enemyBullets)) {
-            this.enemyBulletIdCache.clear();
-
-            state.enemyBullets.forEach((bulletState: any) => {
-                this.enemyBulletIdCache.add(bulletState.id);
-
-                // Check if enemy bullet already exists
-                let bullet = this.syncedEnemyBullets.get(bulletState.id);
-
-                if (!bullet) {
-                    // Create new enemy bullet
-                    bullet = new EnemyBullet(
-                        this,
-                        bulletState.x,
-                        bulletState.y,
-                        bulletState.power
-                    );
-
-                    // Override generated ID with network state ID for sync
-                    bullet.id = bulletState.id;
-
-                    // Set velocity from network state
-                    if (bullet.body) {
-                        bullet.body.velocity.x = bulletState.velocityX;
-                        bullet.body.velocity.y = bulletState.velocityY;
-                    }
-
-                    this.enemyBulletGroup.add(bullet);
-                    this.syncedEnemyBullets.set(bulletState.id, bullet);
-                } else {
-                    // Update existing enemy bullet position and velocity
-                    bullet.setPosition(bulletState.x, bulletState.y);
-                    if (bullet.body) {
-                        bullet.body.velocity.x = bulletState.velocityX;
-                        bullet.body.velocity.y = bulletState.velocityY;
-                    }
-                }
-            });
-
-            // Remove enemy bullets that are no longer in the state
-            this.syncedEnemyBullets.forEach((bullet, id) => {
-                if (!this.enemyBulletIdCache.has(id)) {
-                    this.enemyBulletGroup.remove(bullet, true, true);
-                    this.syncedEnemyBullets.delete(id);
-                }
-            });
-        }
-
-        // Sync enemies from Server
-        if (state.enemies && Array.isArray(state.enemies)) {
-            this.enemyIdCache.clear();
-
-            state.enemies.forEach((enemyState: any) => {
-                this.enemyIdCache.add(enemyState.id);
-
-                // Check if enemy already exists
-                let enemy = this.syncedEnemies.get(enemyState.id);
-
-                if (!enemy) {
-                    // Create correct enemy type based on network state
-                    if (enemyState.enemyType === 'EnemyLizardWizard') {
-                        // Create EnemyLizardWizard
-                        enemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
-
-                        // Set ID for tracking
-                        (enemy as any).enemyId = enemyState.id;
-                    } else {
-                        // Create EnemyFlying (default/fallback)
-                        enemy = new EnemyFlying(
-                            this,
-                            enemyState.shipId,
-                            0,  // pathId 0 (will be overridden by network position)
-                            0,  // speed 0 (not following path, position synced from host)
-                            enemyState.power
-                        );
-
-                        // Set ID for tracking
-                        (enemy as any).enemyId = enemyState.id;
-
-                        // Disable path following for network-synced enemies
-                        (enemy as any).pathIndex = 999;  // Set > 1 to stop path updates (see preUpdate line 44)
-
-                        // Set initial position from network state
-                        enemy.setPosition(enemyState.x, enemyState.y);
-
-                        this.enemyGroup.add(enemy);
-                    }
-
-                    this.syncedEnemies.set(enemyState.id, enemy);
-                } else {
-                    // Update existing enemy position from host
-                    enemy.setPosition(enemyState.x, enemyState.y);
-                    (enemy as any).health = enemyState.health;
-                }
-            });
-
-            // Remove enemies that are no longer in the state
-            this.syncedEnemies.forEach((enemy, id) => {
-                if (!this.enemyIdCache.has(id)) {
-                    enemy.destroy();
-                    this.syncedEnemies.delete(id);
-                }
-            });
-        }
-    }
 
     initGameUi() {
         // Create tutorial text
@@ -663,12 +466,8 @@ export class GameScene extends Scene
     }
 
     initPhysics() {
-        this.enemyGroup = this.add.group();
-        this.enemyBulletGroup = this.add.group();
-        this.playerBulletGroup = this.add.group();
-        this.enemyBulletDestroyersGroup = this.add.group();
-        this.wallGroup = this.add.group();
-
+        // Groups are now created earlier in create() before LevelManager functions use them
+        
         // Only set up collisions for single player mode
         if (!this.networkEnabled && this.player) {
             // This overlap should come before checking if the bullet hit the player
@@ -730,103 +529,27 @@ export class GameScene extends Scene
 
     /**
      * Initialize spawners from current map configuration
-     * Creates Spawner instances based on map's spawners array
+     * Delegates to LevelManager
      */
     initSpawners(): void {
-        if (!this.currentMap.spawners) {
-            console.log('No spawners defined for current map');
-            return;
-        }
-
-        // Create spawner instances from map config
-        this.currentMap.spawners.forEach(config => {
-            // Create behavior if specified
-            let behavior: IBehavior | undefined;
-
-            if (config.behaviorType) {
-                switch (config.behaviorType) {
-                    case 'Aggressive':
-                        behavior = new AggressiveBehavior(config.behaviorOptions);
-                        break;
-                    case 'Territorial':
-                        behavior = new TerritorialBehavior(
-                            config.x,
-                            config.y,
-                            config.behaviorOptions
-                        );
-                        break;
-                    case 'Pacifist':
-                        behavior = new PacifistBehavior(
-                            config.x,
-                            config.y,
-                            config.behaviorOptions
-                        );
-                        break;
-                }
-            }
-
-            const spawner = new Spawner(
-                this,
-                config.x,
-                config.y,
-                config.totalEnemies,
-                config.spawnRate,
-                config.timeOffset,
-                config.enemyType,
-                behavior
-            );
-
-            this.spawners.push(spawner);
-        });
-
-        console.log(`Initialized ${this.spawners.length} spawner(s)`);
+        LevelManager.initSpawners(this);
     }
 
     /**
      * Initialize walls from current map configuration
-     * Creates Wall instances based on map's walls array
+     * Delegates to LevelManager
      */
     initWalls(): void {
-        if (!this.currentMap.walls) {
-            console.log('No walls defined for current map');
-            return;
-        }
-
-        // Create wall instances from map config
-        this.currentMap.walls.forEach(wallData => {
-            const wall = new Wall(
-                this,
-                wallData.x,
-                wallData.y,
-                wallData.spriteKey,
-                wallData.frame || 0,
-                wallData.health
-            );
-
-            this.addWall(wall);
-
-            // Track destructible walls for network sync
-            if (!wall.isIndestructible) {
-                this.syncedWalls.set(wall.wallId, wall);
-            }
-        });
-
-        console.log(`Initialized ${this.currentMap.walls.length} wall(s)`);
+        LevelManager.initWalls(this);
     }
 
-    // Probably still keep this for client prediction, but needs refactoring
     /**
      * Update all active spawners 
      * Called every frame from updateHost()
+     * Delegates to LevelManager
      */
     updateSpawners(): void {
-        // Only host updates spawners (clients receive enemies via network sync)
-        if (!this.isHost && this.networkEnabled) return;
-
-        // Update all active spawners
-        for (let i = 0; i < this.spawners.length; i++) {
-            this.spawners[i].update();
-        }
+        LevelManager.updateSpawners(this);
     }
 
     // initPlayer() removed - now using initSinglePlayer() and initMultiplayer() with character classes
@@ -900,90 +623,67 @@ export class GameScene extends Scene
     }
 
     startGame() {
-        // Prevent double-spawning if startGame is called multiple times
-        if (this.gameStarted) return;
-
-        this.gameStarted = true;
-        this.tutorialText.setVisible(false);
-
-        // Enemies will now spawn based off of data in the map. 
-
+        // Delegate to SceneManager for consistent game lifecycle management
+        SceneManager.startGameSession(this);
     }
 
     fireEnemyBullet(x: number, y: number, power: number, targetX?: number, targetY?: number) {
-        const bullet = new EnemyBullet(this, x, y, power, targetX, targetY);
-        this.enemyBulletGroup.add(bullet);
+        LevelManager.fireEnemyBullet(this, x, y, power, targetX, targetY);
     }
 
     removeEnemyBullet(bullet: EnemyBullet) {
-        this.enemyBulletGroup.remove(bullet, true, true);
+        LevelManager.removeEnemyBullet(this, bullet);
     }
 
     addEnemyBulletDestroyer(destroyer: Rectangle) {
-        this.enemyBulletDestroyersGroup.add(destroyer);
+        LevelManager.addEnemyBulletDestroyer(this, destroyer);
     }
 
     removeEnemyBulletDestroyer(destroyer: Rectangle) {
-        this.playerBulletGroup.remove(destroyer, true, true);
+        LevelManager.removeEnemyBulletDestroyer(this, destroyer);
     }
 
     addEnemy(shipId: number, pathId: number, speed: number, power: number) {
-        const enemy = new EnemyFlying(this, shipId, pathId, speed, power);
-        this.enemyGroup.add(enemy);
+        return LevelManager.addEnemy(this, shipId, pathId, speed, power);
     }
 
-    addSlimeEnemy(x: number, y: number) {
-        const enemy = new EnemySlime(this, x, y);
-        this.enemyGroup.add(enemy);
-        return enemy;
-    }
     addLizardWizardEnemy(x: number, y: number) {
-        const enemy = new EnemyLizardWizard(this, x, y);
-        this.enemyGroup.add(enemy);
-        return enemy;
+        return LevelManager.addLizardWizardEnemy(this, x, y);
+    }
+    addSlimeEnemy(x: number, y: number) {
+        return LevelManager.addSlimeEnemy(this, x, y);
     }
 
     removeEnemy(enemy: EnemyController) {
-        this.enemyGroup.remove(enemy, true, true);
+        LevelManager.removeEnemy(this, enemy);
     }
 
     addWall(wall: Wall) {
-        this.wallGroup.add(wall);
+        LevelManager.addWall(this, wall);
     }
 
     removeWall(wall: Wall) {
-        this.wallGroup.remove(wall, true, true);
+        LevelManager.removeWall(this, wall);
     }
 
     addExplosion(x: number, y: number) {
-        new Explosion(this, x, y);
+        LevelManager.addExplosion(this, x, y);
     }
 
     hitPlayer(player: PlayerController, obstacle: EnemyBullet) {
-        this.addExplosion(player.x, player.y);
-        player.hit(obstacle.getPower());
-        obstacle.die();
-        if (player.health <= 0) {
-            this.GameOver();
-        }
+        LevelManager.hitPlayer(this, player, obstacle);
     }
 
-    hitEnemy(bullet: PlayerBullet, enemy: EnemyFlying) {
-        this.updateScore(10);
-        bullet.remove();
-        enemy.hit(bullet.getPower());
+    hitEnemy(bullet: any, enemy: EnemyFlying) {
+        LevelManager.hitEnemy(this, bullet, enemy);
     }
 
-    hitWall(bullet: PlayerBullet, wall: Wall) {
-        // Only damage destructible walls
-        if (!wall.isIndestructible) {
-            wall.hit(bullet.getPower());
-        }
-        bullet.remove();
+    hitWall(bullet: any, wall: Wall) {
+        LevelManager.hitWall(this, bullet, wall);
     }
 
-    destroyEnemyBullet(bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
-        this.removeEnemyBullet(enemyBullet);
+    destroyEnemyBullet(_bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
+        LevelManager.destroyEnemyBullet(this, _bulletDestroyer, enemyBullet);
     }
 
     updateScore(points: number) {
@@ -992,11 +692,7 @@ export class GameScene extends Scene
     }
 
     GameOver() {
-        this.gameStarted = false;
-        this.cameras.main.fade(1000, 0, 0, 0, false, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-            if (progress === 1) {
-                this.scene.start('GameOver');
-            }
-        });
+        // Delegate to SceneManager for consistent scene transitions
+        SceneManager.endGameSession(this);
     }
 }

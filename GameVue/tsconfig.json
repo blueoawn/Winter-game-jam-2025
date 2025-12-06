@@ -26,6 +26,8 @@
   },
   "include": [
     "src",
-    "src/gameObjects/Characters/PlayerController.ts"
+    "src/gameObjects/Characters/PlayerController.ts",
+    "network",
+    "managers"
   ]
 }
