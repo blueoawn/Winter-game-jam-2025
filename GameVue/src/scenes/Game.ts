@@ -36,6 +36,10 @@ import { MapData } from '../maps/SummonerRift';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry';
 import { audioManager } from '../../managers/AudioManager';
 import { CharacterIdsEnum, CharacterNamesEnum } from "../gameObjects/Characters/CharactersEnum.ts";
+import { AggressiveBehavior } from "../behaviorScripts/Aggressive.ts";
+import { IBehavior } from "../behaviorScripts/Behavior.ts";
+import { TerritorialBehavior } from "../behaviorScripts/Territorial.ts";
+import { PacifistBehavior } from "../behaviorScripts/Pacifist.ts";
 
 
 export class GameScene extends Scene

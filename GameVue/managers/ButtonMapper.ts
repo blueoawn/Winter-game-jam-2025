@@ -34,6 +34,9 @@ export class ButtonMapper {
         this.setupKeyboard();
         this.setupGamepad();
         this.setupFocusListener();
+
+        // Prevent the browser context menu from appearing on right-click so the game can use the right mouse button
+        this.scene.input.mouse?.disableContextMenu();
     }
 
     private initializeDefaultMappings(): void {
@@ -158,11 +161,29 @@ export class ButtonMapper {
         const worldPoints = this.scene.cameras.main.getWorldPoint(this.scene.input.mousePointer.x, this.scene.input.mousePointer.y);
         const aim = new Phaser.Math.Vector2(worldPoints);
 
+        // Read mouse buttons: left click => ability1, right click => ability2
+        const pointer = this.scene.input.activePointer;
+        let leftMouseDown = false;
+        let rightMouseDown = false;
+        if (pointer) {
+            // Use pointer helper methods if available (Phaser Pointer API)
+            try {
+                leftMouseDown = !!(pointer.leftButtonDown && pointer.leftButtonDown());
+            } catch (e) {
+                leftMouseDown = pointer.isDown && pointer.button === 0;
+            }
+            try {
+                rightMouseDown = !!(pointer.rightButtonDown && pointer.rightButtonDown());
+            } catch (e) {
+                rightMouseDown = pointer.isDown && pointer.button === 2;
+            }
+        }
+
         return {
             movement,
             aim,
-            ability1: this.keys?.ability1?.isDown || false,
-            ability2: this.keys?.ability2?.isDown || false
+            ability1: (this.keys?.ability1?.isDown || false) || leftMouseDown,
+            ability2: (this.keys?.ability2?.isDown || false) || rightMouseDown
         };
     }
 

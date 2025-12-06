@@ -1,6 +1,7 @@
 import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/Game';
 import { MagicMissile } from '../Projectile/MagicMissile';
+import ASSETS from "../../assets.ts";
 
 export class LizardWizard extends PlayerController {
     private missiles: Set<MagicMissile> = new Set();
@@ -13,8 +14,12 @@ export class LizardWizard extends PlayerController {
         this.velocityMax = 450;
         this.maxHealth = 20;
         this.health = this.maxHealth;
-        this.ability1Rate = 10;   // Fast fire rate
+        this.ability1Rate = 30;   // Fast fire rate
         this.ability2Rate = 60*2;  // Special ability every 2 seconds
+
+        this.setAppearance(ASSETS.image.lizardWizard.key, 0);
+        this.setScale(0.5, 0.5)
+        this.setBodySize(this.width, this.height);
 
         // Cleanup missiles on destroy
         this.on('destroy', () => {
