@@ -27,7 +27,8 @@ import EnemyLizardWizard from "../gameObjects/NPC/EnemyLizardWizard.ts";
 import Explosion from "../gameObjects/Explosion.ts";
 import { Spawner } from "../gameObjects/Spawner.ts";
 import NetworkManager from '../../network/NetworkManager';
-import { StateSerializer } from '../../network/StateSerializer';
+import { DeltaSerializer } from '../../network/StateSerializer';
+import { DeltaDeserializer } from '../../network/DeltaDeserializer';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift';
@@ -83,6 +84,8 @@ export class GameScene extends Scene
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     currentMap: MapData;  // Current active map data
     spawners: Spawner[] = [];  // Enemy spawners for current map
+    deltaDeserializer: DeltaDeserializer = new DeltaDeserializer();  // Delta reconstruction
+    lastReceivedTick: number = 0;  // Track last received tick for desync detection
 
     constructor ()
     {
@@ -306,7 +309,7 @@ export class GameScene extends Scene
         this.playerManager = new PlayerManager(this);
 
         // Create all players with character assignments
-        const localPlayerId = NetworkManager.getStats().playerId;
+        const localPlayerId = NetworkManager.getPlayerId();
         this.players.forEach((playerId, index) => {
             const isLocal = (playerId === localPlayerId);
             const characterType = Object.values(CharacterNamesEnum)[index];
@@ -329,25 +332,22 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        // Listen for storage updates (both host and clients)
-        NetworkManager.onStorageUpdate((storage: any) => {
+        // Clients receive delta updates via volatile channel
+        NetworkManager.onState((delta: any) => {
+            if (!this.isHost) {
+                this.applyDeltaState(delta);
+            }
+        });
+
+        // Host listens for player inputs via storage
+        NetworkManager.onStorageKey('inputs', (inputs: any) => {
             if (this.isHost) {
-                // Host reads player inputs from storage
-                if (storage.playerInputs) {
-                    Object.entries(storage.playerInputs).forEach(([playerId, inputData]: [string, any]) => {
-                        // Skip own input (already processed locally)
-                        const localPlayerId = NetworkManager.getPlayerId();
-                        if (playerId !== localPlayerId) {
-                            // inputData has inputState properties spread at top level with timestamp
-                            this.playerManager?.applyInput(playerId, inputData);
-                        }
-                    });
-                }
-            } else {
-                // Clients receive game state from host via storage
-                if (storage.gameState) {
-                    this.applyNetworkState(storage.gameState);
-                }
+                // Host processes remote player inputs
+                Object.entries(inputs || {}).forEach(([playerId, inputData]: [string, any]) => {
+                    if (playerId !== NetworkManager.getPlayerId()) {
+                        this.playerManager?.applyInput(playerId, inputData);
+                    }
+                });
             }
         });
     }
@@ -451,22 +451,37 @@ export class GameScene extends Scene
         // Get destructible walls from synced walls map
         const walls = Array.from(this.syncedWalls.values());
 
-        // Reuse timestamp from rate limiting check to avoid redundant Date.now() calls
-        const state = StateSerializer.serialize({
+        // Use delta serialization for bandwidth optimization
+        const delta = DeltaSerializer.serializeDelta({
             tick: this.tick,
-            players: this.playerManager.getAllPlayers() as any,
-            enemies: enemies as any,
-            projectiles: projectiles as any,  // Character-specific projectiles
-            enemyBullets: enemyBullets as any,  // Limited enemy bullets
-            walls: walls as any,  // Destructible walls
+            players: this.playerManager.collectPlayerStates().reduce((acc: any, p: any) => {
+                acc[p.id] = p;
+                return acc;
+            }, {}),
+            enemies: enemies.reduce((acc: any, e: any) => {
+                const enemyState = {
+                    id: (e as any).enemyId || `enemy_${e.x}_${e.y}`,
+                    x: Math.round(e.x),
+                    y: Math.round(e.y),
+                    health: (e as any).health || 1,
+                    enemyType: e.constructor.name,
+                    shipId: (e as any).shipId || 0,
+                    pathId: (e as any).pathIndex || 0,
+                    power: (e as any).power || 1
+                };
+                acc[enemyState.id] = enemyState;
+                return acc;
+            }, {}),
+            projectiles: projectiles.filter((p: any) => p.getNetworkState).map((p: any) => p) as any,
+            walls: walls as any,
             score: this.score,
             scrollMovement: this.scrollMovement,
             spawnEnemyCounter: this.spawnEnemyCounter,
             gameStarted: this.gameStarted
-        }, this.lastStateSyncTime);  // Pass timestamp to avoid redundant Date.now()
+        });
 
-        // Update game state in storage (will sync to all clients)
-        NetworkManager.updateGameState(state);
+        // Send delta via volatile channel (not storage - much faster)
+        NetworkManager.sendVolatileState(delta);
     }
 
     sendInputToHost() {
@@ -488,11 +503,159 @@ export class GameScene extends Scene
             ability2: abstractInput.ability2
         };
 
-        // Update player input in storage (will sync to host)
-        NetworkManager.updatePlayerInput(inputState);
+        // Send input to host
+        NetworkManager.sendInput(inputState);
     }
     
-    // This function is Work in progress
+    // Apply delta state updates from host
+    applyDeltaState(delta: any) {
+        // Detect missing packets (desync detection)
+        const tickDiff = delta.tick - this.lastReceivedTick;
+
+        if (tickDiff > 5 && this.lastReceivedTick > 0) {
+            // Missing more than 5 ticks = desync
+            console.warn(`⚠️ Desync detected: missing ${tickDiff} ticks`);
+            NetworkManager.sendRequest('snapshot');
+            return;
+        }
+
+        this.lastReceivedTick = delta.tick;
+
+        // Reconstruct full state from delta
+        const fullState = this.deltaDeserializer.applyDelta(delta);
+
+        // Apply player states
+        if (fullState.players) {
+            this.playerManager?.applyPlayerState(Object.values(fullState.players));
+        }
+
+        // Apply meta state
+        if (fullState.meta) {
+            if (fullState.meta.score !== undefined) {
+                this.score = fullState.meta.score;
+                this.scoreText.setText(`Score: ${this.score}`);
+            }
+            if (fullState.meta.scrollMovement !== undefined) {
+                this.scrollMovement = fullState.meta.scrollMovement;
+            }
+            if (fullState.meta.spawnEnemyCounter !== undefined) {
+                this.spawnEnemyCounter = fullState.meta.spawnEnemyCounter;
+            }
+            if (fullState.meta.gameStarted !== undefined) {
+                this.gameStarted = fullState.meta.gameStarted;
+            }
+        }
+
+        // Sync enemies
+        if (fullState.enemies) {
+            this.syncEnemies(fullState.enemies);
+        }
+
+        // Sync projectiles
+        if (fullState.projectiles) {
+            this.syncProjectiles(fullState.projectiles);
+        }
+
+        // Sync walls
+        if (fullState.walls) {
+            this.syncWalls(fullState.walls);
+        }
+    }
+
+    // Helper method to sync enemies
+    private syncEnemies(enemies: Record<string, any>) {
+        this.enemyIdCache.clear();
+
+        Object.entries(enemies).forEach(([id, enemyState]) => {
+            if (enemyState === null) return; // Removed enemy
+
+            this.enemyIdCache.add(id);
+
+            let enemy = this.syncedEnemies.get(id);
+
+            if (!enemy) {
+                // Create correct enemy type
+                if (enemyState.enemyType === 'EnemyLizardWizard') {
+                    const lizardEnemy = this.addLizardWizardEnemy(enemyState.x, enemyState.y);
+                    (lizardEnemy as any).enemyId = id;
+                    // Cast to EnemyFlying for storage (type mismatch handled)
+                    this.syncedEnemies.set(id, lizardEnemy as any);
+                } else {
+                    enemy = new EnemyFlying(
+                        this,
+                        enemyState.shipId,
+                        0,
+                        0,
+                        enemyState.power
+                    );
+                    (enemy as any).enemyId = id;
+                    (enemy as any).pathIndex = 999; // Disable path following
+                    enemy.setPosition(enemyState.x, enemyState.y);
+                    this.enemyGroup.add(enemy);
+                    this.syncedEnemies.set(id, enemy);
+                }
+            } else {
+                // Update existing enemy
+                enemy.setPosition(enemyState.x, enemyState.y);
+                (enemy as any).health = enemyState.health;
+            }
+        });
+
+        // Remove enemies no longer in state
+        this.syncedEnemies.forEach((enemy, id) => {
+            if (!this.enemyIdCache.has(id)) {
+                if (enemy) {
+                    enemy.destroy();
+                }
+                this.syncedEnemies.delete(id);
+            }
+        });
+    }
+
+    // Helper method to sync projectiles
+    private syncProjectiles(projectiles: Record<string, any>) {
+        const projectileIdCache = new Set<string>();
+
+        Object.entries(projectiles).forEach(([id, projState]) => {
+            if (projState === null) return; // Removed projectile
+
+            projectileIdCache.add(id);
+
+            const existing = this.playerBulletGroup.getChildren().find((p: any) => p.id === id);
+
+            if (!existing) {
+                const projectile = this.createProjectileFromState(projState);
+                if (projectile) {
+                    this.playerBulletGroup.add(projectile);
+                }
+            } else {
+                if ((existing as any).updateFromNetworkState) {
+                    (existing as any).updateFromNetworkState(projState);
+                }
+            }
+        });
+
+        // Remove projectiles no longer in state
+        this.playerBulletGroup.getChildren().forEach((projectile: any) => {
+            if (projectile.id && !projectileIdCache.has(projectile.id)) {
+                projectile.destroy();
+            }
+        });
+    }
+
+    // Helper method to sync walls
+    private syncWalls(walls: Record<string, any>) {
+        Object.entries(walls).forEach(([id, wallState]) => {
+            if (wallState === null) return; // Removed wall
+
+            const wall = this.syncedWalls.get(id);
+            if (wall) {
+                wall.updateFromNetworkState(wallState);
+            }
+        });
+    }
+
+    // Legacy method - kept for backwards compatibility
     applyNetworkState(state: any) {
         // Apply player states
         if (state.players && this.playerManager) {

@@ -92,7 +92,7 @@ server.onEvent('heartbeat', (clientId, roomId) => {
 //----------------------------------------------------------
 // Host sends delta updates (Volatile)
 //----------------------------------------------------------
-server.onEvent('stateDelta', (clientId, roomId, delta) => {
+server.onEvent('state', (clientId, roomId, delta) => {
     const data = roomData.get(roomId);
     if (!data) return;
 
@@ -105,7 +105,7 @@ server.onEvent('stateDelta', (clientId, roomId, delta) => {
     data.lastTick = delta.tick;
 
     // Re-broadcast to other clients (volatile)
-    server.emitToRoomVolatile(roomId, 'stateDelta', delta, { except: clientId });
+    server.emitToRoomVolatile(roomId, 'state', delta, { except: clientId });
 });
 
 //----------------------------------------------------------
@@ -138,4 +138,76 @@ server.onEvent('storageUpdated', ({ roomId, clientId, update }) => {
     // console.log(` Storage updated in ${roomId} by ${clientId}:`, update);
 });
 
-console.log("✅ Advanced server logic initialized! Ready for gameplay.");
+server.onEvent('storageUpdateRequested', ({
+    roomId,
+    clientId,
+    key,
+    operation,
+    value
+}) => {
+    // Allow server-side updates (PlaySocket uses null clientId)
+    if (!clientId) return true;
+
+    /**
+     * ✅ ALLOWED: Player input updates
+     * e.g. inputs.<playerId>
+     */
+    if (key.startsWith('inputs.')) {
+        const inputOwner = key.split('.')[1];
+
+        // Clients may ONLY write their own input
+        if (inputOwner !== clientId) {
+            console.warn(`❌ ${clientId} tried to write input for ${inputOwner}`);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * ✅ ALLOWED: Player presence / metadata
+     */
+    if (key.startsWith('players.')) {
+        return true;
+    }
+
+    /**
+     * ❌ DISALLOWED: Any authoritative game state
+     */
+    if (
+        key.startsWith('game') ||
+        key.startsWith('entities') ||
+        key.startsWith('enemies') ||
+        key.startsWith('projectiles') ||
+        key.startsWith('walls')
+    ) {
+        console.warn(
+            `⛔ Blocked unauthorized storage write by ${clientId} to ${key}`
+        );
+        return false;
+    }
+
+    /**
+     * ❌ Default deny
+     */
+    return false;
+});
+
+server.onEvent('requestSnapshot', (clientId, roomId) => {
+    const storage = server.getRoomStorage(roomId);
+    if (!storage) return;
+
+    console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
+
+    const snapshot = {
+        tick: storage.game?.tick || 0,
+        timestamp: Date.now(),
+        players: storage.game?.players || {},
+        enemies: storage.game?.enemies || {},
+        projectiles: storage.game?.projectiles || {},
+        walls: storage.game?.walls || {},
+        meta: storage.game?.meta || {},
+    };
+
+    server.sendMessageToClient(clientId, 'snapshot', snapshot);
+});

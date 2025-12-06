@@ -35,7 +35,7 @@ export class NetworkManager {
 
         this.registerCoreEvents();
 
-        return this.localPlayerId;
+        return this.localPlayerId!; // Non-null assertion since init() always returns a string
     }
 
     private registerCoreEvents() {
@@ -130,6 +130,24 @@ export class NetworkManager {
 
     getIsHost() {
         return this.isHost;
+    }
+
+    getStats() {
+        return {
+            isHost: this.isHost,
+            playerId: this.localPlayerId,
+            roomCode: this.roomCode,
+            connectedPlayers: this.connectedPlayers.size,
+            isConnected: this.socket !== null
+        };
+    }
+
+    getSocket() {
+        return this.socket;
+    }
+
+    sendRequest(requestName: string, data?: any) {
+        this.socket?.sendRequest(requestName, data);
     }
 
     destroy() {
