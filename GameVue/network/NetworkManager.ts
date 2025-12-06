@@ -111,18 +111,24 @@ export class NetworkManager {
     // Volatile state broadcasting (host)
     sendVolatileState(state: any) {
         if (!this.isHost || !this.socket) return;
-        // PlaySocket doesn't support volatile/unreliable messages
-        // For frequent state updates, use storage or implement a custom protocol
-        // For now, this is a no-op
+        // Use sendRequest to transmit delta state to server
+        // Server will re-broadcast to other clients via storage or other mechanism
+        this.sendRequest('state', state);
     }
 
     // Subscribe to storage updates and filter by changes
     onStorageKey(key: string, handler: StorageKeyHandler) {
-        if (!this.socket) return;
+        if (!this.socket) {
+            console.warn(`[NetworkManager] onStorageKey called but socket not ready for key: ${key}`);
+            return;
+        }
+        
+        console.log(`[NetworkManager] Registering listener for storage key: ${key}`);
         
         // Listen to all storage updates and call handler when the specific key changes
         this.socket.onEvent('storageUpdated', (storage: any) => {
             if (storage && storage[key] !== undefined) {
+                console.log(`[NetworkManager] Storage key "${key}" updated:`, storage[key]);
                 handler(storage[key]);
             }
         });
@@ -206,6 +212,7 @@ export class NetworkManager {
     }
 
     sendRequest(requestName: string, data?: any) {
+        console.log(`[NetworkManager] Sending request: ${requestName}`, data ? `(data size: ${JSON.stringify(data).length} bytes)` : '');
         this.socket?.sendRequest(requestName, data);
     }
 

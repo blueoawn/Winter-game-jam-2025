@@ -17,7 +17,7 @@ import CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys;
 
 import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
-import EnemyBullet from "../gameObjects/EnemyBullet.ts";
+import EnemyBullet from "../gameObjects/Projectile/EnemyBullet.ts";
 import Wall from "../gameObjects/Wall.ts";
 import { MagicMissile } from "../gameObjects/Projectile/MagicMissile.ts";
 import { ShotgunPellet } from "../gameObjects/Projectile/ShotgunPellet.ts";
@@ -392,19 +392,20 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        // TODO: For volatile state updates, use storage-based sync or sendRequest()
-        // NetworkManager.onState() has been removed as 'state' is not a valid PlaySocket event
-
-        // Host listens for player inputs via storage
-        NetworkManager.onStorageKey('inputs', (inputs: any) => {
-            if (this.isHost) {
-                // Host processes remote player inputs
-                Object.entries(inputs || {}).forEach(([playerId, inputData]: [string, any]) => {
-                    if (playerId !== NetworkManager.getPlayerId()) {
-                        this.playerManager?.applyInput(playerId, inputData);
-                    }
-                });
+        console.log('[NETWORK] Setting up network handlers');
+        
+        // ALL clients listen for delta state updates from the server (server is source of truth)
+        NetworkManager.onStorageKey('lastStateDelta', (delta: any) => {
+            console.log(`[NETWORK] Storage listener fired for lastStateDelta`);
+            if (delta) {
+                this.applyDeltaState(delta);
             }
+        });
+
+        // All clients listen for player inputs to validate their own input was received
+        NetworkManager.onStorageKey('inputs', (inputs: any) => {
+            // Could use this for input validation/feedback, but not for game logic
+            // Game logic comes from server deltas only
         });
     }
 
@@ -442,6 +443,7 @@ export class GameScene extends Scene
     
     //Soon to be depricated
     updateHost() {
+        // Host runs game simulation and broadcasts state
         // Process local player input from ButtonMapper
         if (this.buttonMapper && this.playerManager) {
             const localPlayer = this.playerManager.getLocalPlayer();
@@ -455,10 +457,10 @@ export class GameScene extends Scene
         // Update all players
         this.playerManager?.update();
 
-        // Update spawners (host-only)
+        // Update spawners (host-only logic)
         this.updateSpawners();
 
-        // Broadcast state to clients
+        // Broadcast state to server (which validates and broadcasts to all clients)
         const now = Date.now();
         if (now - this.lastStateSyncTime >= this.stateSyncRate) {
             this.broadcastState();
@@ -478,13 +480,13 @@ export class GameScene extends Scene
             }
         }
 
-        // Update all players (interpolation happens in player update)
+        // Update all players (will be overridden by server deltas)
         this.playerManager?.update();
 
-        // Send local input to host
+        // Send local input to server
         const now = Date.now();
         if (now - this.lastInputSendTime >= this.inputSendRate) {
-            this.sendInputToHost();
+            this.sendInputToServer();
             this.lastInputSendTime = now;
         }
     }
@@ -538,12 +540,13 @@ export class GameScene extends Scene
             gameStarted: this.gameStarted
         });
 
-        // Send delta via volatile channel (not storage - much faster)
-        NetworkManager.sendVolatileState(delta);
+        // Send delta to server (server validates tick and broadcasts to all clients)
+        // All clients send deltas, server is source of truth
+        NetworkManager.sendRequest('state', delta);
     }
 
     //Soon to be depricated by broadcast to server
-    sendInputToHost() {
+    sendInputToServer() {
         if (!this.playerManager || !this.buttonMapper) return;
 
         const localPlayer = this.playerManager.getLocalPlayer();
@@ -568,6 +571,8 @@ export class GameScene extends Scene
     
     // Apply delta state updates from host
     applyDeltaState(delta: any) {
+        console.log(`[CLIENT] Received delta tick ${delta.tick}`);
+        
         // Detect missing packets (desync detection)
         const tickDiff = delta.tick - this.lastReceivedTick;
 

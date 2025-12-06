@@ -95,19 +95,31 @@ server.onEvent('requestReceived', ({ clientId, roomId, requestName, data }) => {
         return;
     }
 
-    // Handle delta state updates from host
+    // Handle delta state updates from ANY client (server validates sequence)
     if (requestName === 'state') {
         const delta = data;
-        if (!delta || clientId !== roomData_entry.hostId) {
-            console.log(`⛔ Ignored state update from non-host ${clientId}`);
+        if (!delta || delta.tick === undefined) {
+            console.log(`⛔ Invalid state update from ${clientId}: missing tick`);
             return;
         }
 
-        roomData_entry.lastTick = delta.tick;
-
-        // Re-broadcast to other clients (via sendRequest which is unreliable like volatile)
-        // Note: PlaySocket doesn't have emitToRoomVolatile, so we use storage or broadcast via sendRequest
-        console.log(`📡 Host ${clientId} sent state update for tick ${delta.tick}`);
+        // Server validates tick sequence
+        if (delta.tick > roomData_entry.lastTick) {
+            // Valid tick - advance server state and broadcast to all clients
+            roomData_entry.lastTick = delta.tick;
+            const storage = server.getRoomStorage(roomId);
+            if (storage) {
+                storage.lastStateDelta = delta;
+                console.log(`📡 Client ${clientId} sent state update for tick ${delta.tick} (accepted - broadcast to all)`);
+            }
+        } else if (delta.tick === roomData_entry.lastTick) {
+            // Duplicate tick - ignore
+            console.log(`↩️  Client ${clientId} sent duplicate tick ${delta.tick} (ignored)`);
+        } else {
+            // Old tick - client needs to resync
+            console.log(`⚠️  Client ${clientId} sent old tick ${delta.tick} (server at ${roomData_entry.lastTick}) - requesting snapshot`);
+            // Client should request snapshot to resync
+        }
         return;
     }
 
@@ -189,7 +201,7 @@ server.onEvent('storageUpdateRequested', ({
      */
     if (key === 'characterSelections' || key.startsWith('characterSelections.') || 
         key === 'allPlayersReady' || key === 'isGameStarted' || key === 'startGameData' || 
-        key === 'gameStarting') {
+        key === 'gameStarting' || key === 'lastStateDelta') {
         return true;
     }
 

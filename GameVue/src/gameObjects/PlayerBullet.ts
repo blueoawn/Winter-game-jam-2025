@@ -1,3 +1,5 @@
+/* Deprecated from when we were using pool instead of entity deltas
+
 import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
 import Vector2 = Phaser.Math.Vector2;
@@ -110,3 +112,4 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         this.gameScene.removeBullet(this);
     }
 }
+*/
