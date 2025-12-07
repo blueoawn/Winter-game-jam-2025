@@ -12,19 +12,19 @@ export class Railgun extends PlayerController {
     
     // Beam Stats
     private readonly maxBeamRange = 600;
-    private readonly maxBeamWidth = 40;
-    private readonly minBeamWidth = 5;
-    private readonly maxBeamDamage = 10;
+    private readonly maxBeamWidth = 50;
+    private readonly minBeamWidth = 3;
+    private readonly maxBeamDamage = 8;
     
     // Recharge Stats
-    private readonly baseRechargeRate = 10; // Per second
-    private readonly staticRechargeMultiplier = 4; // 4x speed when standing still
+    private readonly baseRechargeRate = 3; // Per second
+    private readonly staticRechargeMultiplier = 10; // 10x speed when standing still
 
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 3); // Frame 3 for Railgun (Assumed)
 
         // Stats: Slower movement, heavy hitter
-        this.characterSpeed = 600;
+        this.characterSpeed = 400;
         this.velocityMax = 350;
         this.maxHealth = 25;
         this.health = this.maxHealth;
@@ -33,7 +33,7 @@ export class Railgun extends PlayerController {
         this.ability1Rate = 120; 
         
         // Ability 2: Railgun (Cooldown handles the 'refire' delay, but damage depends on meter)
-        this.ability2Rate = 60; 
+        this.ability2Rate = 120; 
 
         // Enable skill bar for Railgun Charge
         this.skillBarEnabled = true;
@@ -62,7 +62,6 @@ export class Railgun extends PlayerController {
 
         let rechargeAmount = (this.baseRechargeRate * delta) / 1000;
 
-        // Mechanics: "Lock movement to restore charge" interpreted as 
         // "Standing still restores charge significantly faster"
         if (this.body.velocity.length() < 10) {
             rechargeAmount *= this.staticRechargeMultiplier;
@@ -177,10 +176,7 @@ export class Railgun extends PlayerController {
         // Check all enemies to see if they are touching the beam line
         const enemies = this.gameScene.enemyGroup.getChildren();
         const walls = this.gameScene.wallGroup.getChildren();
-
-        // We check walls first to see if beam should stop? 
-        // Prompt says "Pierces", usually implies piercing enemies, but maybe not walls.
-        // For this implementation, we will assume it pierces EVERYTHING (like a true Railgun).
+        // For this implementation, it pierces EVERYTHING (like a true Railgun).
 
         for (const enemy of enemies) {
             const e = enemy as Phaser.Physics.Arcade.Sprite;

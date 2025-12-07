@@ -174,11 +174,12 @@ export class CheeseTouch extends PlayerController {
     }
 
     updateLockOnTarget(): void {
-        // Find closest enemy within lockOnRadius of cursor
-        const enemies = this.gameScene.enemyGroup.getChildren(); //TODO - Update to also lock on to damagable walls
-        let closestEnemy: Phaser.Physics.Arcade.Sprite | null = null;
+        // Find closest target (enemy or destructible wall) within lockOnRadius of cursor
+        let closestTarget: Phaser.Physics.Arcade.Sprite | null = null;
         let closestDist = this.lockOnRadius;
 
+        // Check enemies
+        const enemies = this.gameScene.enemyGroup.getChildren();
         for (const enemy of enemies) {
             const e = enemy as Phaser.Physics.Arcade.Sprite;
             if (!e.active) continue;
@@ -193,11 +194,31 @@ export class CheeseTouch extends PlayerController {
 
             if (dist < closestDist && playerDist <= this.beamRange) {
                 closestDist = dist;
-                closestEnemy = e;
+                closestTarget = e;
             }
         }
 
-        this.lockedTarget = closestEnemy;
+        // Check destructible walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || w.isIndestructible) continue;
+
+            // Distance from cursor to wall
+            const dx = w.x - this.currentAim.x;
+            const dy = w.y - this.currentAim.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Also check if wall is within beam range from player
+            const playerDist = Math.sqrt((w.x - this.x) ** 2 + (w.y - this.y) ** 2);
+
+            if (dist < closestDist && playerDist <= this.beamRange) {
+                closestDist = dist;
+                closestTarget = w;
+            }
+        }
+
+        this.lockedTarget = closestTarget;
     }
 
     drawLockOnIndicator(): void {

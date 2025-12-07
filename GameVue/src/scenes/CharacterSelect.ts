@@ -90,7 +90,6 @@ export class CharacterSelectScene extends Scene {
             ability1: 'Shotgun Blast (7 pellet spread)',
             ability2: 'Burst Dash (quick dodge)'
         },
-        //why is this locked, I can't seem to figure it out lol
         {
             id: 'rail-gun',
             name: 'Rail Gun',
