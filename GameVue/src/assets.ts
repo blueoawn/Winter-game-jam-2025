@@ -5,6 +5,11 @@ export default {
             // Not sure if it's legal to use roblox sound effects, but it's funny
             args: ['assets/SoundEffects/roblox-eating-sound-effect-nom-nom-nom.mp3']
         },
+        // Placeholder railgun fire sound. Add `assets/SoundEffects/railgun-fire.mp3` to the assets folder.
+        railgunFire: {
+            key: 'railgun-fire',
+            args: ['assets/SoundEffects/railgun-fire.mp3']
+        },
     },
     tilemapTiledJSON: {
         dungeonCrawl: {
