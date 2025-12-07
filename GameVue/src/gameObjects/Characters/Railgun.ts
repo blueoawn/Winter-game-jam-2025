@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { audioManager } from '../../../managers/AudioManager';
 import { NinjaStar } from '../Projectile/NinjaStar';
 
 export class Railgun extends PlayerController {
@@ -124,8 +125,12 @@ export class Railgun extends PlayerController {
             this.gameScene.playerBulletGroup.add(star);
         }
 
-        // Optional: Play Sound
-        // audioManager.playSound('throw');
+        // Play firing sound (if asset present)
+        try {
+            audioManager.play(ASSETS.audio.railgunFire.key);
+        } catch (e) {
+            // Fail silently if audio asset isn't available yet
+        }
 
         this.startAbility1Cooldown();
     }
