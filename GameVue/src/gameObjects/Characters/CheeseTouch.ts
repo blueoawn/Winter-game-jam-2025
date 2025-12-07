@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import { audioManager } from '../../../managers/AudioManager';
+import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 
@@ -16,6 +17,10 @@ import TimerEvent = Phaser.Time.TimerEvent;
 // Description: Consumes the secondary meter to heal self, restoring a portion of health based on the amount of meter consumed
 
 export class CheeseTouch extends PlayerController {
+    // Animation keys
+    static readonly ANIM_IDLE = 'cheese_idle';
+    static readonly ANIM_BEAM = 'cheese_beam';
+
     // Beam properties
     beamGraphics: Graphics | null = null;
     isBeaming = false;
@@ -24,26 +29,45 @@ export class CheeseTouch extends PlayerController {
     beamDamage = 1;
 
     // Lock-on properties
-    lockOnRadius = 100;  // Configurable radius around cursor to find targets
+    lockOnRadius = 100;
     lockedTarget: Phaser.Physics.Arcade.Sprite | null = null;
     lockOnIndicator: Graphics | null = null;
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 2);  // Frame 2 for CheeseTouc
+        super(scene, x, y, 2);
 
-        // Balanced stats
         this.characterSpeed = 700;
         this.velocityMax = 400;
         this.maxHealth = 15;
         this.health = this.maxHealth;
-        this.ability1Rate = 5;    // Can use beam frequently
-        this.ability2Rate = 60*2;   // Heal every 2 seconds
+        this.ability1Rate = 5;
+        this.ability2Rate = 60*2;
+
+        // Use sprite sheet
+        this.setAppearance(ASSETS.spritesheet.cheeseTouchAttack.key, 0);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 49;
+        const frameHeight = 44;
+
+        const bodyWidth = frameWidth * 0.6;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
+
+        // Create animations
+        this.createAnimations();
 
         // Enable skill bar for cheese meter
         this.skillBarEnabled = true;
         this.maxSkillMeter = 100;
         this.skillMeter = 0;
-        this.createSkillBar();  // Create it now that it's enabled
+        this.createSkillBar();
 
         this.ability1Rate = 60;
         this.ability1Cooldown = 0;
@@ -56,6 +80,33 @@ export class CheeseTouch extends PlayerController {
                 this.lockOnIndicator = null;
             }
         });
+    }
+
+    private createAnimations(): void {
+        const anims = this.scene.anims;
+
+        // Idle animation: just frame 0
+        if (!anims.exists(CheeseTouch.ANIM_IDLE)) {
+            anims.create({
+                key: CheeseTouch.ANIM_IDLE,
+                frames: [{ key: ASSETS.spritesheet.cheeseTouchAttack.key, frame: 0 }],
+                frameRate: 1,
+                repeat: -1
+            });
+        }
+
+        // Beam animation: frame 1 (hands up) held continuously
+        if (!anims.exists(CheeseTouch.ANIM_BEAM)) {
+            anims.create({
+                key: CheeseTouch.ANIM_BEAM,
+                frames: [{ key: ASSETS.spritesheet.cheeseTouchAttack.key, frame: 1 }],
+                frameRate: 1,
+                repeat: -1
+            });
+        }
+
+        // Start with idle animation
+        this.play(CheeseTouch.ANIM_IDLE);
     }
 
     public preUpdate(time: number, delta: number) {
@@ -109,6 +160,9 @@ export class CheeseTouch extends PlayerController {
     startBeam(): void {
         this.isBeaming = true;
 
+        // Play beam animation (hands up)
+        this.play(CheeseTouch.ANIM_BEAM);
+
         // Create beam graphics
         this.beamGraphics = this.gameScene.add.graphics();
         this.beamGraphics.setDepth(Depth.ABILITIES);
@@ -129,6 +183,9 @@ export class CheeseTouch extends PlayerController {
     stopBeam(): void {
         this.isBeaming = false;
         this.lockedTarget = null;
+
+        // Return to idle animation
+        this.play(CheeseTouch.ANIM_IDLE);
 
         if (this.beamGraphics) {
             this.beamGraphics.destroy();

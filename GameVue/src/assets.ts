@@ -63,5 +63,12 @@ export default {
                 frameHeight: 53
             }]
         },
+        cheeseTouchAttack: {
+            key: 'cheese-touch-attack',
+            args: ['assets/Sprites/cheeseTouchAttackSpriteSheetCropped.png', {
+                frameWidth: 49,
+                frameHeight: 44
+            }]
+        },
     }
 };
