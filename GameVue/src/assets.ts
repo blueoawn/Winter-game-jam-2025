@@ -56,5 +56,12 @@ export default {
                 frameHeight: 588,
             }]
         },
+        lizardWizardAttack: {
+            key: 'lizard-wizard-attack',
+            args: ['assets/Sprites/lizardWizardAttackSpriteSheetCropped.png', {
+                frameWidth: 54,
+                frameHeight: 53
+            }]
+        },
     }
 };
