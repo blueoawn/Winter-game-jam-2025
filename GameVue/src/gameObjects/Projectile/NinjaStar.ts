@@ -27,22 +27,20 @@ export class NinjaStar extends Projectile {
         targetY: number,
         damage: number = 2
     ) {
-        // Use a metallic-looking frame from tiles spritesheet
-        super(scene, x, y, ASSETS.spritesheet.tiles.key, 1); // Frame 1 for blade
+        super(scene, x, y, ASSETS.image.shuriken.key);
 
         this.id = `sword_slash_${Date.now()}_${NinjaStar.nextId++}`;
         this.damage = damage;
         this.createdTime = Date.now();
 
-        // Configure sprite - silver/blue tint for blade
-        this.setTint(0xaaccff);
-        this.setScale(0.9);
+        this.setScale(0.5);
+        this.setOrigin(0.5, 0.5);
 
         // Calculate velocity
         const dx = targetX - x;
         const dy = targetY - y;
         const angle = Math.atan2(dy, dx);
-        const speed = 600; // Slower than shotgun pellet, but steady
+        const speed = 600;
 
         this.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
         this.rotation = angle;

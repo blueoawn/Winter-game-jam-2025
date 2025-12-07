@@ -1,49 +1,64 @@
 import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
-// Audio handled by AudioManager
+import ASSETS from '../../assets';
 import { NinjaStar } from '../Projectile/NinjaStar';
-import Graphics = Phaser.GameObjects.Graphics;
 
 export class Railgun extends PlayerController {
     // Railgun specific properties
-    private beamGraphics: Graphics | null = null;
-    // private beamFadeTimer: Phaser.Time.TimerEvent | null = null; // TODO: Implement fade effect if needed
-    
+    private beamSprite: Phaser.GameObjects.Image | null = null;
+
     // Beam Stats
     private readonly maxBeamRange = 600;
     private readonly maxBeamWidth = 50;
     private readonly minBeamWidth = 3;
     private readonly maxBeamDamage = 8;
-    
+
+    // Barrel offset config (adjust these to position the beam origin)
+    barrelOffsetForward = 40;  // Distance in front of character
+    barrelOffsetRight = 10;      // Offset to the right (negative = left)
+    barrelOffsetUp = -10;       // Vertical offset (negative = down)
+
     // Recharge Stats
     private readonly baseRechargeRate = 3; // Per second
     private readonly staticRechargeMultiplier = 10; // 10x speed when standing still
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 3); // Frame 3 for Railgun (Assumed)
+        super(scene, x, y, 0);
 
-        // Stats: Slower movement, heavy hitter
         this.characterSpeed = 400;
         this.velocityMax = 350;
         this.maxHealth = 25;
         this.health = this.maxHealth;
-        
-        // Ability 1: Ninja Stars (Medium cooldown, moderate damage)
-        this.ability1Rate = 120; 
-        
-        // Ability 2: Railgun (Cooldown handles the 'refire' delay, but damage depends on meter)
-        this.ability2Rate = 120; 
+        this.ability1Rate = 120;
+        this.ability2Rate = 120;
+
+        // Use playable characters sprite sheet - frame 0 is Railgun
+        this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 0);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 60;
+        const frameHeight = 77;
+
+        const bodyWidth = frameWidth * 0.5;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
 
         // Enable skill bar for Railgun Charge
         this.skillBarEnabled = true;
         this.maxSkillMeter = 100;
-        this.skillMeter = 0; // Starts empty or full? Let's start empty to encourage charging
+        this.skillMeter = 0;
         this.createSkillBar();
 
         this.on('destroy', () => {
-           if (this.beamGraphics) {
-               this.beamGraphics.destroy();
+           if (this.beamSprite) {
+               this.beamSprite.destroy();
            }
         });
     }
@@ -142,74 +157,104 @@ export class Railgun extends PlayerController {
     private fireBeam(damage: number, width: number): void {
         // 1. Calculate Beam Geometry
         const angle = Phaser.Math.Angle.Between(this.x, this.y, this.currentAim.x, this.currentAim.y);
-        const endX = this.x + Math.cos(angle) * this.maxBeamRange;
-        const endY = this.y + Math.sin(angle) * this.maxBeamRange;
 
-        // 2. Visuals
-        if (!this.beamGraphics) {
-            this.beamGraphics = this.gameScene.add.graphics();
-            this.beamGraphics.setDepth(Depth.ABILITIES);
+        // Calculate barrel position with configurable offsets
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        // Forward offset (in the direction of aim)
+        const forwardX = cos * this.barrelOffsetForward;
+        const forwardY = sin * this.barrelOffsetForward;
+
+        // Right offset (perpendicular to aim direction)
+        const rightX = -sin * this.barrelOffsetRight;
+        const rightY = cos * this.barrelOffsetRight;
+
+        // Combine all offsets to get barrel position
+        const barrelX = this.x + forwardX + rightX;
+        const barrelY = this.y + forwardY + rightY + this.barrelOffsetUp;
+
+        const endX = barrelX + Math.cos(angle) * this.maxBeamRange;
+        const endY = barrelY + Math.sin(angle) * this.maxBeamRange;
+
+        // 2. Create Beam Sprite
+        if (this.beamSprite) {
+            this.beamSprite.destroy();
         }
-        
-        this.beamGraphics.clear();
-        this.beamGraphics.lineStyle(width, 0x00FFFF, 1); // Cyan beam
-        this.beamGraphics.lineBetween(this.x, this.y, endX, endY);
-        
-        // Add a core to the beam for visual pop
-        this.beamGraphics.lineStyle(width / 3, 0xFFFFFF, 1);
-        this.beamGraphics.lineBetween(this.x, this.y, endX, endY);
 
-        // Fade out effect
+        this.beamSprite = this.gameScene.add.image(barrelX, barrelY, ASSETS.image.railgunBeam.key);
+        this.beamSprite.setOrigin(0.5, 0);
+        this.beamSprite.setRotation(angle - Math.PI / 2);
+        this.beamSprite.setDepth(Depth.ABILITIES);
+
+        // Scale the beam
+        const beamWidthScale = width / this.beamSprite.width;
+        const targetLengthScale = this.maxBeamRange / this.beamSprite.height;
+
+        // Start with minimal length (just the arrow tip visible)
+        this.beamSprite.setScale(beamWidthScale, 0.05);
+
+        // Animate beam expanding from barrel to full length
+        const expandDuration = 150;
         this.gameScene.tweens.add({
-            targets: this.beamGraphics,
-            alpha: 0,
-            duration: 300,
+            targets: this.beamSprite,
+            scaleY: targetLengthScale,
+            duration: expandDuration,
+            ease: 'Cubic.easeOut',
             onComplete: () => {
-                if (this.beamGraphics) {
-                    this.beamGraphics.clear();
-                    this.beamGraphics.alpha = 1;
-                }
+                // After expanding, fade out the beam
+                this.gameScene.tweens.add({
+                    targets: this.beamSprite,
+                    alpha: 0,
+                    duration: 200,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        if (this.beamSprite) {
+                            this.beamSprite.destroy();
+                            this.beamSprite = null;
+                        }
+                    }
+                });
             }
         });
 
-        // 3. Collision Logic (Piercing)
-        // Check all enemies to see if they are touching the beam line
-        const enemies = this.gameScene.enemyGroup.getChildren();
-        // const walls = this.gameScene.wallGroup.getChildren(); // TODO: Add wall collision if needed
-        // For this implementation, it pierces EVERYTHING (like a true Railgun).
+        // 3. Collision Logic (Piercing) - apply damage when beam reaches full extension
+        this.gameScene.time.delayedCall(expandDuration, () => {
+            const enemies = this.gameScene.enemyGroup.getChildren();
 
-        for (const enemy of enemies) {
-            const e = enemy as Phaser.Physics.Arcade.Sprite;
-            if (!e.active) continue;
+            for (const enemy of enemies) {
+                const e = enemy as Phaser.Physics.Arcade.Sprite;
+                if (!e.active) continue;
 
-            if (this.isInBeamPath(e.x, e.y, width, endX, endY)) {
-                if ((e as any).hit) {
-                    (e as any).hit(damage);
+                if (this.isInBeamPath(e.x, e.y, width, endX, endY, barrelX, barrelY)) {
+                    if ((e as any).hit) {
+                        (e as any).hit(damage);
+                    }
                 }
             }
-        }
+        });
     }
 
     // Helper to check collision with beam line
-    private isInBeamPath(targetX: number, targetY: number, beamWidth: number, endX: number, endY: number): boolean {
+    private isInBeamPath(targetX: number, targetY: number, beamWidth: number, endX: number, endY: number, startX: number, startY: number): boolean {
         // Vector from start to end
-        const dx = endX - this.x;
-        const dy = endY - this.y;
+        const dx = endX - startX;
+        const dy = endY - startY;
         const beamLenSq = dx * dx + dy * dy;
 
         if (beamLenSq === 0) return false;
 
         // Vector from start to target
-        const tx = targetX - this.x;
-        const ty = targetY - this.y;
+        const tx = targetX - startX;
+        const ty = targetY - startY;
 
         // Project target vector onto beam vector (dot product)
         // t is the normalized distance along the line (0 to 1)
         const t = Math.max(0, Math.min(1, (tx * dx + ty * dy) / beamLenSq));
 
         // Closest point on line to target
-        const closestX = this.x + t * dx;
-        const closestY = this.y + t * dy;
+        const closestX = startX + t * dx;
+        const closestY = startY + t * dy;
 
         // Distance from closest point to target center
         const distSq = (targetX - closestX) ** 2 + (targetY - closestY) ** 2;

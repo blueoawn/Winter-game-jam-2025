@@ -360,7 +360,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
 
     updateHealthBarPosition(): void {
         this.healthBarContainer.x = this.x;
-        this.healthBarContainer.y = this.y + this.height * this.scaleY;
+        this.healthBarContainer.y = this.y + this.displayHeight / 2 + 5;
     }
 
     updateHealthBarValue(): void {
@@ -392,7 +392,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     updateSkillBarPosition(): void {
         if (!this.skillBarContainer) return;
         this.skillBarContainer.x = this.x;
-        this.skillBarContainer.y = this.y + this.height + 12;
+        this.skillBarContainer.y = this.y + this.displayHeight / 2 + 17;
     }
 
     updateSkillBarValue(): void {

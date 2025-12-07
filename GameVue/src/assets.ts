@@ -36,6 +36,14 @@ export default {
         shield: {
             key: 'shield',
             args: ['assets/Sprites/shieldSpriteCropped.png']
+        },
+        railgunBeam: {
+            key: 'railgun-beam',
+            args: ['assets/Sprites/railgunBeamCropped.png']
+        },
+        shuriken: {
+            key: 'shuriken',
+            args: ['assets/Sprites/shurikenCropped.png']
         }
     },
     spritesheet: {
