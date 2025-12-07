@@ -18,6 +18,8 @@ import { PacifistBehavior } from '../src/behaviorScripts/Pacifist';
 import type { IBehavior } from '../src/behaviorScripts/Behavior';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
+import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
+import { Consumable } from '../src/gameObjects/Consumable/Consumable';
 
 /**
  * Initialize spawners from map data
@@ -111,6 +113,44 @@ export function initWalls(scene: GameScene): void {
         console.log(`[LEVEL] Initialized ${scene.currentMap.walls.length} wall(s)`);
     } catch (err) {
         console.error('[LEVEL] Error initializing walls:', err);
+    }
+}
+
+/**
+ * Initialize consumables from map data
+ * Creates consumable items that can be picked up by players
+ */
+export function initConsumables(scene: GameScene): void {
+    try {
+        if (!scene.currentMap?.consumables) {
+            console.log('[LEVEL] No consumables defined for current map');
+            return;
+        }
+
+        // Create consumable instances from map config
+        scene.currentMap.consumables.forEach((consumableData: any) => {
+            let consumable: Consumable;
+
+            switch (consumableData.type) {
+                case 'HealthPack':
+                    consumable = new HealthPack(
+                        consumableData.x,
+                        consumableData.y,
+                        consumableData.value || 1,
+                        consumableData.lifetime
+                    );
+                    break;
+                default:
+                    console.warn(`[LEVEL] Unknown consumable type: ${consumableData.type}`);
+                    return;
+            }
+
+            addConsumable(scene, consumable);
+        });
+
+        console.log(`[LEVEL] Initialized ${scene.currentMap.consumables.length} consumable(s)`);
+    } catch (err) {
+        console.error('[LEVEL] Error initializing consumables:', err);
     }
 }
 
@@ -253,6 +293,36 @@ export function removeWall(scene: GameScene, wall: Wall): void {
 }
 
 /**
+ * Add consumable to scene
+ */
+export function addConsumable(scene: GameScene, consumable: Consumable): void {
+    try {
+        consumable.createView(scene);
+        if (!scene.consumableGroup) {
+            scene.consumableGroup = scene.physics.add.group();
+        }
+        scene.consumableGroup.add(consumable.view);
+        scene.syncedConsumables.set(consumable.id, consumable);
+    } catch (err) {
+        console.error('[LEVEL] Error adding consumable:', err);
+    }
+}
+
+/**
+ * Remove consumable from scene
+ */
+export function removeConsumable(scene: GameScene, consumable: Consumable): void {
+    try {
+        if (consumable.view) {
+            scene.consumableGroup.remove(consumable.view, true, true);
+        }
+        scene.syncedConsumables.delete(consumable.id);
+    } catch (err) {
+        console.error('[LEVEL] Error removing consumable:', err);
+    }
+}
+
+/**
  * Create explosion effect
  */
 export function addExplosion(scene: GameScene, x: number, y: number): void {
@@ -306,6 +376,27 @@ export function hitWall(_scene: GameScene, bullet: any, wall: Wall): void {
         bullet.remove();
     } catch (err) {
         console.error('[LEVEL] Error handling wall hit:', err);
+    }
+}
+
+/**
+ * Handle player picking up consumable
+ */
+export function pickupConsumable(scene: GameScene, player: any, consumableView: any): void {
+    try {
+        // Find the consumable instance from the view
+        for (const [id, consumable] of scene.syncedConsumables.entries()) {
+            if (consumable.view === consumableView) {
+                // Apply effect to player
+                consumable.applyEffect(player);
+                
+                // Remove consumable
+                removeConsumable(scene, consumable);
+                break;
+            }
+        }
+    } catch (err) {
+        console.error('[LEVEL] Error handling consumable pickup:', err);
     }
 }
 

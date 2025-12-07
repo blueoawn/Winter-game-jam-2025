@@ -95,9 +95,8 @@ export class ButtonMapper {
         }
 
         // Enable keyboard input (Phaser sometimes needs this explicitly)
-        if (this.scene.input.keyboard.preventDefault) {
-            this.scene.input.keyboard.preventDefault();
-        }
+        // Note: Phaser 3 doesn't have a global preventDefault method
+        // Individual keys should have their events prevented if needed
 
         // Register each key individually (addKeys was causing all keys to share same object)
         this.keys = {

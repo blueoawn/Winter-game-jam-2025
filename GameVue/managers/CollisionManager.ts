@@ -61,6 +61,15 @@ export function setupSinglePlayerCollisions(scene: GameScene): void {
         undefined,
         scene
     );
+
+    // Player picks up consumables
+    scene.physics.add.overlap(
+        scene.player,
+        scene.consumableGroup,
+        scene.pickupConsumable as () => void,
+        undefined,
+        scene
+    );
 }
 
 /**
@@ -146,6 +155,15 @@ export function setupMultiplayerCollisions(scene: GameScene): void {
             player,
             scene.enemyGroup,
             scene.hitPlayer as () => void,
+            undefined,
+            scene
+        );
+
+        // Player picks up consumables
+        scene.physics.add.overlap(
+            player,
+            scene.consumableGroup,
+            scene.pickupConsumable as () => void,
             undefined,
             scene
         );

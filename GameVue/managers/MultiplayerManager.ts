@@ -4,7 +4,6 @@ import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
 import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';
 import { BigSword } from '../src/gameObjects/Characters/BigSword';
 import type { GameScene } from '../src/scenes/GameScene.ts';
-import type { InputState, PlayerState } from '../network/StateSerializer';
 import { CharacterNamesEnum } from "../src/gameObjects/Characters/CharactersEnum.ts";
 
 // Manager class for handling multiple players in multiplayer

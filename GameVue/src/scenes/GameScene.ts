@@ -67,6 +67,7 @@ export class GameScene extends Scene
     playerBulletGroup: Group;
     enemyBulletDestroyersGroup: Group;
     wallGroup: Group;
+    consumableGroup: Group;
     cursors?: CursorKeys;
     timedEvent: TimerEvent;
 
@@ -84,6 +85,7 @@ export class GameScene extends Scene
     syncedEnemyBullets: Map<string, EnemyBullet> = new Map();  // Track network-synced enemy bullets
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
     syncedWalls: Map<string, Wall> = new Map();  // Track network-synced walls
+    syncedConsumables: Map<string, any> = new Map();  // Track network-synced consumables
     enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     currentMap: MapData;  // Current active map data
@@ -170,6 +172,7 @@ export class GameScene extends Scene
             this.playerBulletGroup = this.add.group();
             this.enemyBulletDestroyersGroup = this.add.group();
             this.wallGroup = this.add.group();
+            this.consumableGroup = this.add.group();
 
             // Set up physics collisions after groups are created
             this.initPhysics();
@@ -181,6 +184,7 @@ export class GameScene extends Scene
 
             this.initSpawners();  // Initialize enemy spawners from map config
             this.initWalls();     // Initialize walls from map config
+            this.initConsumables(); // Initialize consumable items from map config
 
             // Setup camera after players are created
             const playerToFollow = this.networkEnabled ? this.playerManager?.getLocalPlayer() : this.player;
@@ -400,6 +404,14 @@ export class GameScene extends Scene
     }
 
     /**
+     * Initialize consumables from current map configuration
+     * Delegates to LevelManager
+     */
+    initConsumables(): void {
+        LevelManager.initConsumables(this);
+    }
+
+    /**
      * Update all active spawners 
      * Called every frame from updateHost()
      * Delegates to LevelManager
@@ -470,6 +482,10 @@ export class GameScene extends Scene
 
     hitWall(bullet: any, wall: Wall) {
         LevelManager.hitWall(this, bullet, wall);
+    }
+
+    pickupConsumable(player: any, consumableView: any) {
+        LevelManager.pickupConsumable(this, player, consumableView);
     }
 
     destroyEnemyBullet(_bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {

@@ -18,7 +18,7 @@ export class Start extends Phaser.Scene {
 
         audioManager.init(this);
 
-        this.add.text(centerX, 100, 'Half-dozen Heros', {
+        this.add.text(centerX, 100, 'Half-dozen Heroz', {
             fontFamily: 'Arial Black',
             fontSize: 48,
             color: '#ffffff',

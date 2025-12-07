@@ -66,6 +66,15 @@ export interface MapData {
         frame?: number;
         health: number;
     }>;
+
+    // Optional: Consumable item configurations
+    consumables?: Array<{
+        x: number;
+        y: number;
+        type: string;  // 'HealthPack' | 'SpeedBoost' | 'InvincibilityGem'
+        value: number;
+        lifetime?: number;  // Optional lifetime in ms (undefined = no decay)
+    }>;
 }
 
 /**
@@ -116,12 +125,21 @@ export const SummonersRift: MapData = {
     // Enemy spawners
     spawners: [
         {
-            x: 800,              // Map center X
-            y: 672,              // Map center Y (1343/2 ≈ 672)
-            totalEnemies: 10,
-            spawnRate: 2000,     // 2 seconds between spawns
+            x: 300,              // Map center X
+            y: 800,              // Map center Y (1343/2 ≈ 672)
+            totalEnemies: -1, // Infinite spawns
+            spawnRate: 6000*10,     // 10 seconds between spawns
             timeOffset: 0,    // Start immediately
             enemyType: 'EnemyLizardWizard',
+            behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
+        },
+            {
+            x: 900,              // Map center X
+            y: 800,              // Map center Y (1343/2 ≈ 672)
+            totalEnemies: -1, // Infinite spawns
+            spawnRate: 6000*10,     // 10 seconds between spawns
+            timeOffset: 0,    // Start immediately
+            enemyType: 'EnemySlime',
             behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
         }
     ],
@@ -135,8 +153,13 @@ export const SummonersRift: MapData = {
         { x: 856, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
         { x: 920, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
         { x: 984, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+    ],
+
+    // Consumable items
+    consumables: [
+        { x: 900, y: 900, type: 'HealthPack', value: 1 },
     ]
-};
+}
 
 // Default export for convenience
 export default SummonersRift;

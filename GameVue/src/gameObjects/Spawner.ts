@@ -67,8 +67,8 @@ export class Spawner {
             return;
         }
 
-        // Check if spawner is done
-        if (!this.isActive || this.spawnCount >= this.totalEnemies) {
+        // Check if spawner is done (skip if totalEnemies is -1 for infinite spawns)
+        if (!this.isActive || (this.totalEnemies > 0 && this.spawnCount >= this.totalEnemies)) {
             return;
         }
 
@@ -92,8 +92,8 @@ export class Spawner {
         this.spawnCount++;
         this.nextSpawnTick = this.scene.tick + this.spawnRate;
 
-        // Deactivate if done
-        if (this.spawnCount >= this.totalEnemies) {
+        // Deactivate if done (only if totalEnemies is positive, not infinite)
+        if (this.totalEnemies > 0 && this.spawnCount >= this.totalEnemies) {
             this.isActive = false;
             console.log(`Spawner finished: spawned ${this.spawnCount}/${this.totalEnemies} enemies`);
         }
@@ -103,27 +103,41 @@ export class Spawner {
      * Spawn a single enemy at spawner location
      */
     private spawnEnemy(): void {
-        // Currently only supports EnemyLizardWizard
-        // Future: Add enemy type registry to support multiple enemy types
-        if (this.enemyType === 'EnemyLizardWizard') {
-            const enemy = this.scene.addSlimeEnemy(this.x, this.y);
+        let enemy: any = null;
 
-            // Apply custom behavior if provided
-            if (this.behavior && enemy && enemy.setBehavior) {
-                enemy.setBehavior(this.behavior);
-            }
-
-            console.log(`Spawner: spawned ${this.enemyType} #${this.spawnCount + 1}/${this.totalEnemies} at (${this.x}, ${this.y})`);
-        } else {
-            console.error(`Spawner: unknown enemy type "${this.enemyType}"`);
+        // Spawn based on enemy type
+        switch (this.enemyType) {
+            case 'EnemyLizardWizard':
+                enemy = this.scene.addLizardWizardEnemy(this.x, this.y);
+                break;
+            case 'EnemySlime':
+                enemy = this.scene.addSlimeEnemy(this.x, this.y);
+                break;
+            case 'EnemyFlying':
+                // EnemyFlying requires shipId, pathId, speed, power
+                // For now, use defaults - might need config options
+                enemy = this.scene.addEnemy(1, 0, 100, 1);
+                break;
+            default:
+                console.error(`Spawner: unknown enemy type "${this.enemyType}"`);
+                return;
         }
+
+        // Apply custom behavior if provided
+        if (this.behavior && enemy && enemy.setBehavior) {
+            enemy.setBehavior(this.behavior);
+        }
+
+        const totalDisplay = this.totalEnemies > 0 ? this.totalEnemies : '∞';
+        console.log(`Spawner: spawned ${this.enemyType} #${this.spawnCount + 1}/${totalDisplay} at (${this.x}, ${this.y})`);
     }
 
     /**
      * Check if spawner has finished spawning all enemies
+     * Returns false for infinite spawners (totalEnemies = -1)
      */
     isFinished(): boolean {
-        return this.spawnCount >= this.totalEnemies;
+        return this.totalEnemies > 0 && this.spawnCount >= this.totalEnemies;
     }
 
     /**

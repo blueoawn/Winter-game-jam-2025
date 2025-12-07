@@ -1,14 +1,14 @@
 import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
-import { Audio } from '../../../constants/Audio'; // Assuming Audio constants exist
+// Audio handled by AudioManager
 import { NinjaStar } from '../Projectile/NinjaStar';
 import Graphics = Phaser.GameObjects.Graphics;
 
 export class Railgun extends PlayerController {
     // Railgun specific properties
     private beamGraphics: Graphics | null = null;
-    private beamFadeTimer: Phaser.Time.TimerEvent | null = null;
+    // private beamFadeTimer: Phaser.Time.TimerEvent | null = null; // TODO: Implement fade effect if needed
     
     // Beam Stats
     private readonly maxBeamRange = 600;
@@ -63,7 +63,7 @@ export class Railgun extends PlayerController {
         let rechargeAmount = (this.baseRechargeRate * delta) / 1000;
 
         // "Standing still restores charge significantly faster"
-        if (this.body.velocity.length() < 10) {
+        if (this.body && this.body.velocity.length() < 10) {
             rechargeAmount *= this.staticRechargeMultiplier;
         }
 
@@ -175,7 +175,7 @@ export class Railgun extends PlayerController {
         // 3. Collision Logic (Piercing)
         // Check all enemies to see if they are touching the beam line
         const enemies = this.gameScene.enemyGroup.getChildren();
-        const walls = this.gameScene.wallGroup.getChildren();
+        // const walls = this.gameScene.wallGroup.getChildren(); // TODO: Add wall collision if needed
         // For this implementation, it pierces EVERYTHING (like a true Railgun).
 
         for (const enemy of enemies) {
