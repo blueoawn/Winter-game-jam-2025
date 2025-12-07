@@ -44,6 +44,10 @@ export default {
         shuriken: {
             key: 'shuriken',
             args: ['assets/Sprites/shurikenCropped.png']
+        },
+        sword: {
+            key: 'sword',
+            args: ['assets/Sprites/swordSpriteCropped.png']
         }
     },
     spritesheet: {
