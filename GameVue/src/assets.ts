@@ -17,6 +17,10 @@ export default {
             key: 'summoners-rift',
             args: ['assets/Backgrounds/summonersRift.png']
         },
+        eggMap: {
+            key: 'egg-map',
+            args: ['assets/Backgrounds/Egg_map.png']
+        },
         dungeonTileset: {
             key: 'dungeon-tilemap',
             args: ['assets/Sprites/MapSpriteSheets/spritesheet_dungeon.png']

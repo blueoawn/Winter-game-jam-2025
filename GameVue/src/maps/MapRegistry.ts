@@ -4,6 +4,7 @@
 import { MapData } from './SummonerRift';
 import SummonersRift from './SummonerRift';
 import DungeonCrawl from './DungeonCrawl';
+import EggMap from './EggMap';
 
 /**
  * Registry of all available maps
@@ -12,6 +13,7 @@ import DungeonCrawl from './DungeonCrawl';
 export const MapRegistry: Record<string, MapData> = {
     'summoners-rift': SummonersRift,
     'dungeon-crawl': DungeonCrawl,
+    'egg-map': EggMap,
     // Add more maps here as they're created:
     // 'howling-abyss': HowlingAbyss,
 };
@@ -26,11 +28,11 @@ export function getMapById(mapId: string): MapData | undefined {
 }
 
 /**
- * Get the default map (Summoners Rift)
+ * Get the default map (Egg Map)
  * @returns The default map data
  */
 export function getDefaultMap(): MapData {
-    return SummonersRift;
+    return EggMap;
 }
 
 /**
