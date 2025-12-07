@@ -189,6 +189,9 @@ export class BoomStick extends PlayerController {
 
             this.burstDirX = dx;
             this.burstDirY = dy;
+
+            // Temporarily override max velocity for burst
+            // Store current modifiers and apply burst speed directly
             this.setMaxVelocity(this.burstSpeed);
         }
     }
@@ -209,7 +212,8 @@ export class BoomStick extends PlayerController {
 
     endBurst(): void {
         this.isBursting = false;
-        this.setMaxVelocity(this.velocityMax);
+        // Restore max velocity considering all active modifiers (area, speed boosts)
+        this.updateMaxVelocity();
     }
 
     /**

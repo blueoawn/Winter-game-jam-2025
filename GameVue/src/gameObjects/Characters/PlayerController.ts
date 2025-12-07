@@ -55,11 +55,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     protected maxSkillMeter: number = 100;
     protected currentAim: Vector2;  // Store current aim position for abilities
     
-    // Speed boost properties
-    protected baseSpeed: number = 0;  // Will be set to characterSpeed in constructor
+    // Speed modification properties
+    protected baseVelocityMax: number = 0;  // Will be set to velocityMax in constructor
     protected speedBoostActive: boolean = false;
     protected speedBoostTimer: Phaser.Time.TimerEvent | null = null;
-    public areaSpeedMultiplier: number = 1.0;  // Multiplier from area boundaries (public for area boundary access)
+    protected areaSpeedMultiplier: number = 1.0;  // Multiplier from area boundaries
+    protected speedBoostMultiplier: number = 1.0;  // Multiplier from consumables
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
         super(scene, x, y, ASSETS.spritesheet.ships.key, shipId);
@@ -69,7 +70,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.setCollideWorldBounds(true); // prevent ship from leaving the screen
         this.setDepth(Depth.PLAYER); // make character appear on top of other game objects
         this.gameScene = scene;
-        this.baseSpeed = this.characterSpeed;  // Store base speed for speed boost restoration
+        this.baseVelocityMax = this.velocityMax;  // Store base max velocity for speed modifications
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
@@ -116,10 +117,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
 
     /**
      * Apply area speed modifier (from area boundary zones)
+     * Uses setMaxVelocity similar to BoomStick dash
      * @param multiplier Speed multiplier (e.g., 1.5 for 50% increase, 0.5 for mud)
      */
     public applyAreaSpeedModifier(multiplier: number): void {
         this.areaSpeedMultiplier = multiplier;
+        this.updateMaxVelocity();
         console.log(`Applied area speed modifier: ${multiplier}x to ${this.constructor.name}`)
     }
 
@@ -128,11 +131,22 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
      */
     public removeAreaSpeedModifier(): void {
         this.areaSpeedMultiplier = 1.0;
+        this.updateMaxVelocity();
         console.log(`Removed area speed modifier from ${this.constructor.name}`);
     }
 
     /**
+     * Update max velocity based on all active modifiers
+     * Similar to BoomStick's setMaxVelocity approach
+     */
+    protected updateMaxVelocity(): void {
+        const newMaxVelocity = this.baseVelocityMax * this.areaSpeedMultiplier * this.speedBoostMultiplier;
+        this.setMaxVelocity(newMaxVelocity);
+    }
+
+    /**
      * Apply a temporary speed boost to the player
+     * Uses setMaxVelocity similar to BoomStick dash
      * @param multiplier Speed multiplier (e.g., 1.5 = 50% faster)
      * @param duration Duration in milliseconds
      */
@@ -142,16 +156,14 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
             this.speedBoostTimer.destroy();
         }
 
-        // Save current speed as base only if not already boosted
-        // This captures the child class's overridden characterSpeed
-        if (!this.speedBoostActive) {
-            this.baseSpeed = this.characterSpeed;
-        }
-
-        // Apply speed boost
+        // Apply speed boost multiplier
         this.speedBoostActive = true;
-        this.characterSpeed = this.baseSpeed * multiplier;
-        console.log(`Speed boost applied: ${this.baseSpeed} -> ${this.characterSpeed} for ${duration}ms`);
+        this.speedBoostMultiplier = multiplier;
+        this.updateMaxVelocity();
+
+        const oldMaxVel = this.baseVelocityMax * this.areaSpeedMultiplier;
+        const newMaxVel = oldMaxVel * multiplier;
+        console.log(`Speed boost applied: ${oldMaxVel.toFixed(0)} -> ${newMaxVel.toFixed(0)} for ${duration}ms`);
 
         // Set timer to remove boost after duration
         this.speedBoostTimer = this.gameScene.time.addEvent({
@@ -169,9 +181,10 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     protected removeSpeedBoost(): void {
         if (this.speedBoostActive) {
             this.speedBoostActive = false;
-            this.characterSpeed = this.baseSpeed;
+            this.speedBoostMultiplier = 1.0;
+            this.updateMaxVelocity();
             this.speedBoostTimer = null;
-            console.log(`Speed boost expired, speed restored to ${this.baseSpeed}`);
+            console.log(`Speed boost expired, max velocity restored to ${this.baseVelocityMax * this.areaSpeedMultiplier}`);
         }
     }
 
@@ -186,10 +199,9 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         }
 
         movement.normalize();
-        // Always use this.characterSpeed (host is authoritative for speed boosts)
-        // The host's copy of the player has the correct speed including any active boosts
-        const speed = this.characterSpeed * this.areaSpeedMultiplier;
-        this.setVelocity(movement.x * speed, movement.y * speed);
+        // Use characterSpeed for acceleration, max velocity is handled by setMaxVelocity
+        // All speed modifications (area modifiers, boosts) are applied through setMaxVelocity
+        this.setVelocity(movement.x * this.characterSpeed, movement.y * this.characterSpeed);
 
         // Handle rotation and aim
         if ('aim' in input && input.aim) {
