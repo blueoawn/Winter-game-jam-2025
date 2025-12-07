@@ -49,6 +49,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     protected skillMeter: number = 0;
     protected maxSkillMeter: number = 100;
     protected currentAim: Vector2;  // Store current aim position for abilities
+    
+    // Speed boost properties
+    protected baseSpeed: number = 0;  // Will be set to characterSpeed in constructor
+    protected speedBoostActive: boolean = false;
+    protected speedBoostTimer: Phaser.Time.TimerEvent | null = null;
+    public areaSpeedMultiplier: number = 1.0;  // Multiplier from area boundaries (public for area boundary access)
 
     constructor(scene: GameScene, x: number, y: number, shipId: number) {
         super(scene, x, y, ASSETS.spritesheet.ships.key, shipId);
@@ -58,6 +64,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.setCollideWorldBounds(true); // prevent ship from leaving the screen
         this.setDepth(Depth.PLAYER); // make character appear on top of other game objects
         this.gameScene = scene;
+        this.baseSpeed = this.characterSpeed;  // Store base speed for speed boost restoration
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
@@ -97,6 +104,61 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.ability2Cooldown = this.ability2Rate;
     }
 
+    /**
+     * Apply area speed modifier (from area boundary zones)
+     * @param multiplier Speed multiplier (e.g., 1.5 for 50% increase, 0.5 for mud)
+     */
+    public applyAreaSpeedModifier(multiplier: number): void {
+        this.areaSpeedMultiplier = multiplier;
+        console.log(`Applied area speed modifier: ${multiplier}x to ${this.constructor.name}`)
+    }
+
+    /**
+     * Remove area speed modifier (return to normal)
+     */
+    public removeAreaSpeedModifier(): void {
+        this.areaSpeedMultiplier = 1.0;
+        console.log(`Removed area speed modifier from ${this.constructor.name}`);
+    }
+
+    /**
+     * Apply a temporary speed boost to the player
+     * @param multiplier Speed multiplier (e.g., 1.5 = 50% faster)
+     * @param duration Duration in milliseconds
+     */
+    applyTemporarySpeedBoost(multiplier: number, duration: number): void {
+        // If already boosted, clear the existing timer
+        if (this.speedBoostTimer) {
+            this.speedBoostTimer.destroy();
+        }
+
+        // Apply speed boost
+        this.speedBoostActive = true;
+        this.characterSpeed = this.baseSpeed * multiplier;
+        console.log(`Speed boost applied: ${this.baseSpeed} -> ${this.characterSpeed} for ${duration}ms`);
+
+        // Set timer to remove boost after duration
+        this.speedBoostTimer = this.gameScene.time.addEvent({
+            delay: duration,
+            callback: () => {
+                this.removeSpeedBoost();
+            },
+            callbackScope: this
+        });
+    }
+
+    /**
+     * Remove active speed boost
+     */
+    protected removeSpeedBoost(): void {
+        if (this.speedBoostActive) {
+            this.speedBoostActive = false;
+            this.characterSpeed = this.baseSpeed;
+            this.speedBoostTimer = null;
+            console.log(`Speed boost expired, speed restored to ${this.baseSpeed}`);
+        }
+    }
+
     // Process input from ButtonMapper or network
     processInput(input: any): void {
         // Handle movement
@@ -108,7 +170,9 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         }
 
         movement.normalize();
-        const speed = ('movementSpeed' in input) ? input.movementSpeed : this.characterSpeed;
+        // Always use this.characterSpeed (host is authoritative for speed boosts)
+        // The host's copy of the player has the correct speed including any active boosts
+        const speed = this.characterSpeed * this.areaSpeedMultiplier;
         this.setVelocity(movement.x * speed, movement.y * speed);
 
         // Handle rotation and aim
@@ -176,6 +240,11 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
 
         if (state.frame !== undefined && state.frame !== null) {
             this.setFrame(state.frame);
+        }
+
+        // Sync speed from host (for speed boost effects)
+        if (state.characterSpeed !== undefined) {
+            this.characterSpeed = state.characterSpeed;
         }
     }
 

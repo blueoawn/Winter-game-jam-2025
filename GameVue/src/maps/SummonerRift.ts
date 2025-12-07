@@ -3,6 +3,7 @@
 
 import { AggressiveBehavior } from "../behaviorScripts/Aggressive";
 import { IBehavior } from "../behaviorScripts/Behavior";
+import { AreaEffectType } from "../gameObjects/AreaBoundary";
 
 /**
  * Spawner configuration for enemy spawning
@@ -74,6 +75,23 @@ export interface MapData {
         type: string;  // 'HealthPack' | 'SpeedBoost' | 'InvincibilityGem'
         value: number;
         lifetime?: number;  // Optional lifetime in ms (undefined = no decay)
+    }>;
+
+    // Optional: Area boundary configurations for zone effects
+    areaBoundaries?: Array<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        effectType: AreaEffectType;
+        speedMultiplier?: number;
+        pushVelocity?: { x: number; y: number };
+        damageRate?: number;
+        healRate?: number;
+        tickInterval?: number;
+        visible?: boolean;
+        fillColor?: number;
+        fillAlpha?: number;
     }>;
 }
 
@@ -158,6 +176,21 @@ export const SummonersRift: MapData = {
     // Consumable items
     consumables: [
         { x: 900, y: 900, type: 'HealthPack', value: 1 },
+    ],
+
+    // Area boundaries - Zone effects
+    areaBoundaries: [
+        {
+            x: 45,              // Center at 45px (half of 90px width)
+            y: 672,             // Center vertically (1343/2)
+            width: 90,
+            height: 1343,       // Full map height
+            effectType: AreaEffectType.SpeedModifier,
+            speedMultiplier: 1.5,  // 50% speed boost
+            visible: true,
+            fillColor: 0x00BFFF,   // Deep sky blue
+            fillAlpha: 0.25
+        }
     ]
 }
 

@@ -16,11 +16,8 @@ export default class EnemySlime extends EnemyController {
     static readonly ANIM_UP = 'slime_up';
 
     constructor(scene: GameScene, x: number, y: number) {
-        // Pass frame 0 temporarily, we'll set the texture after
-        super(scene, x, y, 0);
-
-        // Override texture to use slime spritesheet
-        this.setTexture(ASSETS.spritesheet.slime.key, 0);
+        // Pass slime texture directly to avoid wrong sprite flash
+        super(scene, x, y, 0, ASSETS.spritesheet.slime.key);
 
         this.enemyType = 'EnemySlime';
 

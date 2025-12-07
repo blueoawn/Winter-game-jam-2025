@@ -160,10 +160,13 @@ function broadcastState(scene: GameScene, playerManager: PlayerManager | null): 
             return acc;
         }, {}),
         enemies: enemies.reduce((acc: any, e: any) => {
+            const body = e.body as Phaser.Physics.Arcade.Body | null;
             const enemyState = {
                 id: (e as any).enemyId || `enemy_${e.x}_${e.y}`,
                 x: Math.round(e.x),
                 y: Math.round(e.y),
+                vx: body?.velocity?.x ? Math.round(body.velocity.x) : 0,
+                vy: body?.velocity?.y ? Math.round(body.velocity.y) : 0,
                 health: (e as any).health || 1,
                 enemyType: e.constructor.name,
                 shipId: (e as any).shipId || 0,

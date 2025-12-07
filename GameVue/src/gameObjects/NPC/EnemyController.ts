@@ -18,8 +18,8 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
 
     private static nextId = 0;
 
-    constructor(scene: GameScene, x: number, y: number, frame: number) {
-        super(scene, x, y, ASSETS.spritesheet.ships.key, frame);
+    constructor(scene: GameScene, x: number, y: number, frame: number, textureKey?: string) {
+        super(scene, x, y, textureKey || ASSETS.spritesheet.ships.key, frame);
 
         scene.add.existing(this);
         scene.physics.add.existing(this);

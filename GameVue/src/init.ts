@@ -34,8 +34,8 @@ export function initVariables(scene: Scene, _currentMap: MapData): {
         mapHeight: Math.ceil(scene.scale.height / 32) + 10 + 1,
         mapWidth: Math.ceil(scene.scale.width / 32),
         spawnEnemyCounter: 0,
-        stateSyncRate: 1000 / 15, // 15 times per second (host broadcasts state)
-        inputSendRate: 1000 / 15, // 15 times per second (clients send input)
+        stateSyncRate: 1000 / 20, // 20 times per second (host broadcasts state)
+        inputSendRate: 1000 / 20, // 20 times per second (clients send input)
         tick: 0
     };
 }

@@ -9,6 +9,7 @@ import type { GameScene } from '../src/scenes/GameScene';
 import NetworkManager from '../managers/NetworkManager';
 import EnemyBullet from '../src/gameObjects/Projectile/EnemyBullet';
 import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';
+import EnemySlime from '../src/gameObjects/NPC/EnemySlime';
 import { MagicMissile } from '../src/gameObjects/Projectile/MagicMissile';
 import { ShotgunPellet } from '../src/gameObjects/Projectile/ShotgunPellet';
 import { NinjaStar } from '../src/gameObjects/Projectile/NinjaStar';
@@ -126,8 +127,11 @@ function syncEnemies(scene: GameScene, enemies: Record<string, any>): void {
                     if (enemyState.enemyType === 'EnemyLizardWizard') {
                         const lizardEnemy = scene.addLizardWizardEnemy(enemyState.x, enemyState.y);
                         (lizardEnemy as any).enemyId = id;
-                        // Cast to EnemyFlying for storage (type mismatch handled)
                         scene.syncedEnemies.set(id, lizardEnemy as any);
+                    } else if (enemyState.enemyType === 'EnemySlime') {
+                        const slimeEnemy = scene.addSlimeEnemy(enemyState.x, enemyState.y);
+                        (slimeEnemy as any).enemyId = id;
+                        scene.syncedEnemies.set(id, slimeEnemy as any);
                     } else {
                         enemy = new EnemyFlying(
                             scene,
@@ -146,10 +150,14 @@ function syncEnemies(scene: GameScene, enemies: Record<string, any>): void {
                     console.error(`[NETWORK] Error creating enemy ${id}:`, err);
                 }
             } else {
-                // Update existing enemy
+                // Update existing enemy with position and velocity for smooth prediction
                 try {
                     if (typeof enemyState.x === 'number' && typeof enemyState.y === 'number') {
                         enemy.setPosition(enemyState.x, enemyState.y);
+                    }
+                    // Apply velocity so enemy continues moving between sync updates
+                    if (enemy.body && typeof enemyState.vx === 'number' && typeof enemyState.vy === 'number') {
+                        (enemy.body as Phaser.Physics.Arcade.Body).setVelocity(enemyState.vx, enemyState.vy);
                     }
                     if (typeof enemyState.health === 'number') {
                         (enemy as any).health = enemyState.health;
