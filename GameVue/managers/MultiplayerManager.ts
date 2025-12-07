@@ -5,6 +5,7 @@ import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';
 import { BigSword } from '../src/gameObjects/Characters/BigSword';
 import type { GameScene } from '../src/scenes/GameScene.ts';
 import { CharacterNamesEnum } from "../src/gameObjects/Characters/CharactersEnum.ts";
+import { FollowAndAttackBehavior } from '../src/behaviorScripts/FollowAndAttack';
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
@@ -75,6 +76,69 @@ export class PlayerManager {
             this.players.delete(playerId);
             console.log('Removed player:', playerId);
         }
+    }
+
+    /**
+     * Convert a player to CPU control (e.g., when they disconnect)
+     * Instead of removing the player, enables AI behavior to take over
+     * @param playerId The ID of the player to convert
+     * @returns true if successful, false if player not found
+     */
+    convertToCpu(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        if (!player) {
+            console.warn(`[CPU] Cannot convert player ${playerId} to CPU - not found`);
+            return false;
+        }
+
+        // Don't convert if already CPU controlled
+        if (player.isCpuControlled) {
+            console.log(`[CPU] Player ${playerId} is already CPU controlled`);
+            return true;
+        }
+
+        // Enable CPU control with default follow-and-attack behavior
+        const behavior = new FollowAndAttackBehavior({
+            followDistance: 150,
+            followThreshold: 250,
+            attackRange: 350,
+            ability1Interval: 500,
+            ability2Interval: 3000
+        });
+
+        player.enableCpuControl(behavior);
+        console.log(`[CPU] Player ${playerId} converted to CPU control`);
+        return true;
+    }
+
+    /**
+     * Convert a CPU-controlled player back to network control (e.g., when they reconnect)
+     * @param playerId The ID of the player to restore
+     * @returns true if successful, false if player not found
+     */
+    restoreFromCpu(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        if (!player) {
+            console.warn(`[CPU] Cannot restore player ${playerId} from CPU - not found`);
+            return false;
+        }
+
+        if (!player.isCpuControlled) {
+            console.log(`[CPU] Player ${playerId} is not CPU controlled`);
+            return true;
+        }
+
+        player.disableCpuControl();
+        console.log(`[CPU] Player ${playerId} restored from CPU control`);
+        return true;
+    }
+
+    /**
+     * Check if a player is CPU controlled
+     */
+    isCpuControlled(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        return player?.isCpuControlled ?? false;
     }
 
     // Get a specific player

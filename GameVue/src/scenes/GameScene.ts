@@ -322,6 +322,29 @@ export class GameScene extends Scene
                 applyDeltaState(this, storage.lastStateDelta);
             }
         });
+
+        // Handle player disconnections - convert to CPU control instead of removing
+        NetworkManager.onPlayerLeft((playerId: string) => {
+            console.log(`[NETWORK] Player ${playerId} disconnected`);
+
+            // Only host manages CPU takeover
+            if (this.isHost && this.playerManager) {
+                this.playerManager.convertToCpu(playerId);
+            }
+        });
+
+        // Handle player reconnections - restore from CPU control
+        NetworkManager.onPlayerJoined((playerId: string) => {
+            console.log(`[NETWORK] Player ${playerId} connected/reconnected`);
+
+            // Only host manages CPU restoration
+            if (this.isHost && this.playerManager) {
+                // Check if this player was previously CPU-controlled
+                if (this.playerManager.isCpuControlled(playerId)) {
+                    this.playerManager.restoreFromCpu(playerId);
+                }
+            }
+        });
     }
 
     updateSinglePlayer() {
