@@ -1,3 +1,0 @@
-- Potential sources of inspiration
-	-  "The last spell", the game could be set in a world where death is extremely imminent and the hero's must accomplish their mission or meet their ultimate demise
-	- "Stranger things" - an unknown source of corruption/evil is infecting the world and will take over without immediate intervention
