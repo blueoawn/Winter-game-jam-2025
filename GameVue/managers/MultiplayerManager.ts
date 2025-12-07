@@ -163,7 +163,9 @@ export class PlayerManager {
                 velocityY: body?.velocity?.y || 0,
                 health: player.health,
                 frame: player.frame?.name || 0,
-                rotation: player.rotation
+                rotation: player.rotation,
+                // Include speed for speed boost sync
+                characterSpeed: (player as any).characterSpeed || 1000
             });
         });
 

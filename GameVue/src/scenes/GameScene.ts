@@ -86,6 +86,7 @@ export class GameScene extends Scene
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
     syncedWalls: Map<string, Wall> = new Map();  // Track network-synced walls
     syncedConsumables: Map<string, any> = new Map();  // Track network-synced consumables
+    areaBoundaries: any[] = [];  // Static area zones with effects (no network sync)
     enemyBulletIdCache: Set<string> = new Set();  // Reusable Set for enemy bullet ID tracking
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     currentMap: MapData;  // Current active map data
@@ -185,6 +186,7 @@ export class GameScene extends Scene
             this.initSpawners();  // Initialize enemy spawners from map config
             this.initWalls();     // Initialize walls from map config
             this.initConsumables(); // Initialize consumable items from map config
+            this.initAreaBoundaries(); // Initialize area effect zones from map config
 
             // Setup camera after players are created
             const playerToFollow = this.networkEnabled ? this.playerManager?.getLocalPlayer() : this.player;
@@ -342,6 +344,7 @@ export class GameScene extends Scene
         }
 
         this.updateSpawners();
+        this.updateAreaBoundaries();
     }
 
     updateMultiplayer() {
@@ -406,12 +409,29 @@ export class GameScene extends Scene
     }
 
     /**
+     * Initialize area boundaries from current map configuration
+     * Delegates to LevelManager
+     */
+    initAreaBoundaries(): void {
+        LevelManager.initAreaBoundaries(this);
+    }
+
+    /**
      * Update all active spawners 
      * Called every frame from updateHost()
      * Delegates to LevelManager
      */
     updateSpawners(): void {
         LevelManager.updateSpawners(this);
+    }
+
+    /**
+     * Update all area boundaries
+     * Called every frame to handle periodic effects
+     * Delegates to LevelManager
+     */
+    updateAreaBoundaries(): void {
+        LevelManager.updateAreaBoundaries(this);
     }
 
     // Note: initInput is handled by init.ts

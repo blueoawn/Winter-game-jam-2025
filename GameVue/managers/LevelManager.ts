@@ -19,7 +19,9 @@ import type { IBehavior } from '../src/behaviorScripts/Behavior';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
 import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
+import { SpeedBoost } from '../src/gameObjects/Consumable/SpeedBoost';
 import { Consumable } from '../src/gameObjects/Consumable/Consumable';
+import { AreaBoundary, AreaBoundaryConfig } from '../src/gameObjects/AreaBoundary';
 
 /**
  * Initialize spawners from map data
@@ -140,6 +142,14 @@ export function initConsumables(scene: GameScene): void {
                         consumableData.lifetime
                     );
                     break;
+                case 'SpeedBoost':
+                    consumable = new SpeedBoost(
+                        consumableData.x,
+                        consumableData.y,
+                        consumableData.value || 1.5,
+                        consumableData.lifetime
+                    );
+                    break;
                 default:
                     console.warn(`[LEVEL] Unknown consumable type: ${consumableData.type}`);
                     return;
@@ -151,6 +161,45 @@ export function initConsumables(scene: GameScene): void {
         console.log(`[LEVEL] Initialized ${scene.currentMap.consumables.length} consumable(s)`);
     } catch (err) {
         console.error('[LEVEL] Error initializing consumables:', err);
+    }
+}
+
+/**
+ * Initialize area boundaries from map data
+ * Creates static zones with effects (speed modifiers, damage, etc.)
+ */
+export function initAreaBoundaries(scene: GameScene): void {
+    try {
+        if (!scene.currentMap?.areaBoundaries) {
+            console.log('[LEVEL] No area boundaries defined for current map');
+            return;
+        }
+
+        // Create area boundary instances from map config
+        scene.currentMap.areaBoundaries.forEach((boundaryData: any) => {
+            const boundary = new AreaBoundary(scene, boundaryData as AreaBoundaryConfig);
+            addAreaBoundary(scene, boundary);
+        });
+
+        console.log(`[LEVEL] Initialized ${scene.currentMap.areaBoundaries.length} area boundaries`);
+    } catch (err) {
+        console.error('[LEVEL] Error initializing area boundaries:', err);
+    }
+}
+
+/**
+ * Update all area boundaries
+ * Called every frame to handle periodic effects
+ */
+export function updateAreaBoundaries(scene: GameScene): void {
+    try {
+        if (!scene.areaBoundaries) return;
+
+        scene.areaBoundaries.forEach(boundary => {
+            boundary.update();
+        });
+    } catch (err) {
+        console.error('[LEVEL] Error updating area boundaries:', err);
     }
 }
 
@@ -319,6 +368,60 @@ export function removeConsumable(scene: GameScene, consumable: Consumable): void
         scene.syncedConsumables.delete(consumable.id);
     } catch (err) {
         console.error('[LEVEL] Error removing consumable:', err);
+    }
+}
+
+/**
+ * Add area boundary to scene
+ */
+export function addAreaBoundary(scene: GameScene, boundary: AreaBoundary): void {
+    try {
+        if (!scene.areaBoundaries) {
+            scene.areaBoundaries = [];
+        }
+        scene.areaBoundaries.push(boundary);
+
+        // Setup overlap detection with players and enemies
+        // Players
+        if (scene.player) {
+            scene.physics.add.overlap(scene.player, boundary.getZone(), () => {
+                boundary.applyEffect(scene.player);
+            });
+        }
+
+        // Multiplayer players
+        if (scene.playerManager) {
+            scene.playerManager.getAllPlayers().forEach(player => {
+                scene.physics.add.overlap(player, boundary.getZone(), () => {
+                    boundary.applyEffect(player);
+                });
+            });
+        }
+
+        // Enemies
+        scene.physics.add.overlap(scene.enemyGroup, boundary.getZone(), (enemy: any) => {
+            boundary.applyEffect(enemy);
+        });
+
+    } catch (err) {
+        console.error('[LEVEL] Error adding area boundary:', err);
+    }
+}
+
+/**
+ * Remove area boundary from scene
+ */
+export function removeAreaBoundary(scene: GameScene, boundary: AreaBoundary): void {
+    try {
+        if (scene.areaBoundaries) {
+            const index = scene.areaBoundaries.indexOf(boundary);
+            if (index > -1) {
+                scene.areaBoundaries.splice(index, 1);
+            }
+        }
+        boundary.destroy();
+    } catch (err) {
+        console.error('[LEVEL] Error removing area boundary:', err);
     }
 }
 
