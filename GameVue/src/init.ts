@@ -41,16 +41,33 @@ export function initVariables(scene: Scene, _currentMap: MapData): {
 }
 
 /**
- * Initialize background image from map data
+ * Initialize background image or tilemap from map data
  */
 export function initBackground(scene: Scene, currentMap: MapData): void {
-    scene.add.image(
-        currentMap.width / 2,
-        currentMap.height / 2,
-        currentMap.assetKey
-    )
-        .setOrigin(0.5, 0.5)
-        .setDepth(0);
+    if (currentMap.isTilemap) {
+        // Create tilemap from JSON
+        const map = scene.make.tilemap({ key: currentMap.assetKey });
+        
+        // Add tileset image (the spritesheet)
+        const tileset = map.addTilesetImage('dungeon', currentMap.tilemapTilesetKey!);
+        
+        // Create layer from tilemap
+        if (tileset) {
+            const layer = map.createLayer('Floor', tileset, 0, 0);
+            if (layer) {
+                layer.setDepth(0);
+            }
+        }
+    } else {
+        // Use static background image
+        scene.add.image(
+            currentMap.width / 2,
+            currentMap.height / 2,
+            currentMap.assetKey
+        )
+            .setOrigin(0.5, 0.5)
+            .setDepth(0);
+    }
 }
 
 /**

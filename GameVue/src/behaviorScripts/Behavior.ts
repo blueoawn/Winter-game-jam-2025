@@ -1,5 +1,4 @@
-import { GameScene } from '../../../scenes/Game';
-import type { EnemyController } from '../../../../managers/EnemyController';
+import type { EnemyController } from '../gameObjects/NPC/EnemyController';
 
 /**
  * Base interface for NPC behaviors

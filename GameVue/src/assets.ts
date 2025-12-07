@@ -6,10 +6,20 @@ export default {
             args: ['assets/SoundEffects/roblox-eating-sound-effect-nom-nom-nom.mp3']
         },
     },
+    tilemapTiledJSON: {
+        dungeonCrawl: {
+            key: 'dungeon-crawl-map',
+            args: ['src/maps/dungeonCrawl.json']
+        }
+    },
     image: {
         summonersRift: {
             key: 'summoners-rift',
             args: ['assets/Backgrounds/summonersRift.png']
+        },
+        dungeonTileset: {
+            key: 'dungeon-tilemap',
+            args: ['assets/Sprites/MapSpriteSheets/spritesheet_dungeon.png']
         },
         cookieCutterWall: {
             key: 'cookie-cutter-wall',

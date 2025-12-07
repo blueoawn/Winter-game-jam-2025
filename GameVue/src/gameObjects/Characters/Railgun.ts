@@ -219,7 +219,12 @@ export class Railgun extends PlayerController {
         return distSq < (hitRadius * hitRadius);
     }
 
-    updateAI(): void {
-        // Not implemented
+    /**
+     * Character-specific AI logic for Railgun
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // Railgun AI focuses on charged shots from range
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

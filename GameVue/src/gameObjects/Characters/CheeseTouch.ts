@@ -311,9 +311,12 @@ export class CheeseTouch extends PlayerController {
         return perpDist < 30;
     }
 
-    // TODO
-    updateAI(): void {
-        // For CPU-controlled characters
-        // Not implemented in this phase
+    /**
+     * Character-specific AI logic for CheeseTouch
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // CheeseTouch AI focuses on beam attacks and self-healing
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

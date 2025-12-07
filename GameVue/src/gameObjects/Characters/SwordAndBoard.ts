@@ -219,9 +219,12 @@ export class SwordAndBoard extends PlayerController {
         return this.velocityMax;
     }
 
-    // TODO
-    updateAI(): void {
-        // For CPU-controlled characters
-        // Not implemented in this phase
+    /**
+     * Character-specific AI logic for SwordAndBoard
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // SwordAndBoard AI is melee-focused and defensive
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

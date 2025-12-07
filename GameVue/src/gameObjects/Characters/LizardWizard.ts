@@ -99,9 +99,14 @@ export class LizardWizard extends PlayerController {
         this.startAbility2Cooldown();
     }
     
-    // TODO
-    updateAI(): void {
-        // For CPU-controlled characters
-        // Not implemented in this phase
+    /**
+     * Character-specific AI logic for LizardWizard
+     * The main AI behavior is handled by the AllyBehavior system
+     * This method can be used for character-specific adjustments
+     */
+    updateAI(_time: number, _delta: number): void {
+        // LizardWizard AI is ranged-focused
+        // The FollowAndAttackBehavior handles the general logic
+        // Character-specific tweaks can be added here if needed
     }
 }

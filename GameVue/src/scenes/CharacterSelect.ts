@@ -666,7 +666,7 @@ export class CharacterSelectScene extends Scene {
             bg.setStrokeStyle(6, 0x00ff00);
         }
 
-        console.log('Character selected:', characterId);
+        console.debug('Character selected locally:', characterId);
 
         // Update storage if multiplayer
         if (this.networkEnabled) {
@@ -790,7 +790,10 @@ export class CharacterSelectScene extends Scene {
             return;
         }
         if (!this.selectedCharacterId) {
-            console.log('No character selected, cannot start');
+            console.debug('Transition blocked: No character selected', {
+                characterSelections: Array.from(this.characterSelections.entries()),
+                localPlayerId: NetworkManager.getPlayerId()
+            });
             return;
         }
 
@@ -849,7 +852,7 @@ export class CharacterSelectScene extends Scene {
 
             // Check if all players are ready to transition to game
             if (storage.readyToStartGame === true) {
-                console.log('Host signaled readyToStartGame - transitioning to game scene!');
+                console.debug('Host signaled readyToStartGame, selectedCharacterId:', this.selectedCharacterId);
                 this.transitionToGameScene();
             }
         });

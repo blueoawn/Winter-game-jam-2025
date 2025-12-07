@@ -2,16 +2,21 @@ import { EnemyController } from './EnemyController';
 import { GameScene } from '../../scenes/GameScene';
 import { IBehavior } from '../../behaviorScripts/Behavior';
 import { AggressiveBehavior } from '../../behaviorScripts/Aggressive';
+import ASSETS from '../../assets';
 
 export default class EnemyLizardWizard extends EnemyController {
     private behavior: IBehavior;
 
     constructor(scene: GameScene, x: number, y: number, behavior?: IBehavior) {
-        const lizardWizardFrame = 12;  // Frame 0 is LizardWizard
-        super(scene, x, y, lizardWizardFrame);
+        // Use the same lizardWizard texture as the player character
+        super(scene, x, y, 0, ASSETS.image.lizardWizard.key);
 
         // Set enemy type for network sync
         this.enemyType = 'EnemyLizardWizard';
+
+        // Match player lizard wizard scale
+        this.setScale(0.5, 0.5);
+        this.setBodySize(this.width, this.height);
 
         // Set enemy stats
         this.health = 5;

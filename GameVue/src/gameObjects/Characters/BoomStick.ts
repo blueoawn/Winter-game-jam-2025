@@ -174,6 +174,12 @@ export class BoomStick extends PlayerController {
         this.setMaxVelocity(this.velocityMax);
     }
 
-    updateAI(): void {
+    /**
+     * Character-specific AI logic for BoomStick
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // BoomStick AI is close-range shotgun focused
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

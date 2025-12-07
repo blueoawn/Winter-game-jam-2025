@@ -34,6 +34,14 @@ export interface MapData {
 
     // Asset reference
     assetKey: string;  // Key used in assets.ts
+    isTilemap?: boolean;  // If true, assetKey refers to a tilemap JSON, not an image
+    tilemapTilesetKey?: string;  // Spritesheet key for tilemap tiles
+    
+    // Tilemap-specific fields (only used when isTilemap is true)
+    tileWidth?: number;  // Width of each tile in pixels
+    tileHeight?: number;  // Height of each tile in pixels
+    mapWidth?: number;  // Map width in tiles
+    mapHeight?: number;  // Map height in tiles
 
     // Spawn points
     spawnPoints: {

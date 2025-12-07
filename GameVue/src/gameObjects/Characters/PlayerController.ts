@@ -3,6 +3,7 @@ import { GameScene } from "../../scenes/GameScene.ts";
 import { Depth } from '../../constants.ts';
 // Note: InputState and PlayerState should be defined in network module
 import { SyncableEntity } from '../../../network/SyncableEntity';
+import { IAllyBehavior } from '../../behaviorScripts/AllyBehavior';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
 
@@ -24,6 +25,10 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
+
+    // CPU control properties
+    isCpuControlled: boolean = false;
+    protected allyBehavior: IAllyBehavior | null = null;
 
     // Appearance can be a standalone texture/image or a frame from a spritesheet/atlas
     appearance: { texture: string; frame?: string | number } | null = null;
@@ -81,6 +86,11 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         if (this.fireCounter > 0) this.fireCounter--;
         if (this.ability1Cooldown > 0) this.ability1Cooldown--;
         if (this.ability2Cooldown > 0) this.ability2Cooldown--;
+
+        // Run AI behavior if CPU controlled
+        if (this.isCpuControlled && this.allyBehavior) {
+            this.allyBehavior.update(this, time, delta);
+        }
     }
 
     // Abstract methods for character implementations
@@ -130,6 +140,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         // If already boosted, clear the existing timer
         if (this.speedBoostTimer) {
             this.speedBoostTimer.destroy();
+        }
+
+        // Save current speed as base only if not already boosted
+        // This captures the child class's overridden characterSpeed
+        if (!this.speedBoostActive) {
+            this.baseSpeed = this.characterSpeed;
         }
 
         // Apply speed boost
@@ -259,6 +275,74 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
             ability2: false
         };
     }
+
+    // CPU Control methods
+
+    /**
+     * Enable CPU control for this character (e.g., when player disconnects)
+     * @param behavior The AI behavior to use
+     */
+    enableCpuControl(behavior: IAllyBehavior): void {
+        this.isCpuControlled = true;
+        this.isLocal = false;  // No longer locally controlled
+
+        // Cleanup old behavior if exists
+        if (this.allyBehavior?.cleanup) {
+            this.allyBehavior.cleanup(this);
+        }
+
+        this.allyBehavior = behavior;
+
+        // Initialize new behavior
+        if (this.allyBehavior.initialize) {
+            this.allyBehavior.initialize(this);
+        }
+
+        console.log(`CPU control enabled for ${this.playerId}`);
+    }
+
+    /**
+     * Disable CPU control (e.g., when player reconnects)
+     */
+    disableCpuControl(): void {
+        if (this.allyBehavior?.cleanup) {
+            this.allyBehavior.cleanup(this);
+        }
+
+        this.isCpuControlled = false;
+        this.allyBehavior = null;
+
+        console.log(`CPU control disabled for ${this.playerId}`);
+    }
+
+    /**
+     * Set a new behavior for CPU control
+     */
+    setAllyBehavior(behavior: IAllyBehavior): void {
+        if (this.allyBehavior?.cleanup) {
+            this.allyBehavior.cleanup(this);
+        }
+
+        this.allyBehavior = behavior;
+
+        if (this.allyBehavior.initialize) {
+            this.allyBehavior.initialize(this);
+        }
+    }
+
+    /**
+     * Get the current ally behavior
+     */
+    getAllyBehavior(): IAllyBehavior | null {
+        return this.allyBehavior;
+    }
+
+    /**
+     * Abstract method for character-specific AI logic
+     * Called by behaviors that need character-specific actions
+     * Each character implementation should provide its own AI logic
+     */
+    abstract updateAI(time: number, delta: number): void;
 
     createHealthBar(): void {
         // Create rectangles at (0, 0) since they're relative to the container

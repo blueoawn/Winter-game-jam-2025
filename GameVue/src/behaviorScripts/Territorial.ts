@@ -1,5 +1,5 @@
 import { Behavior } from './Behavior';
-import type { EnemyController } from '../../../../managers/EnemyController';
+import type { EnemyController } from '../gameObjects/NPC/EnemyController';
 
 /**
  * Territorial behavior - Defends a specific area

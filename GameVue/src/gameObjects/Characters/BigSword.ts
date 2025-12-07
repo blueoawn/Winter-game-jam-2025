@@ -380,6 +380,12 @@ export class BigSword extends PlayerController {
         }
     }
 
-    updateAI(): void {
+    /**
+     * Character-specific AI logic for BigSword
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // BigSword AI is aggressive melee with dash attacks
+        // The FollowAndAttackBehavior handles the general logic
     }
 }
