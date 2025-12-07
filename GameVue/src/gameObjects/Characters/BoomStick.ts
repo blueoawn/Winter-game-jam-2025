@@ -1,6 +1,7 @@
 import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
+import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import { ShotgunPellet } from '../Projectile/ShotgunPellet';
 
@@ -10,6 +11,11 @@ export class BoomStick extends PlayerController {
     spreadAngle = Math.PI / 4;
     pelletCount = 7;
     maxRange = 250;
+
+    // Barrel offset config (adjust these to position the shot origin)
+    barrelOffsetForward = 50;  // Distance in front of character
+    barrelOffsetRight = 16;     // Offset to the right (negative = left)
+    barrelOffsetUp = 5;        // Vertical offset (negative = down)
 
     // Damage falloff config
     baseDamage = 3;
@@ -29,7 +35,7 @@ export class BoomStick extends PlayerController {
     private muzzleFlash: Graphics | null = null;
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 4);
+        super(scene, x, y, 1);
 
         this.characterSpeed = 720;
         this.velocityMax = 420;
@@ -37,6 +43,23 @@ export class BoomStick extends PlayerController {
         this.health = this.maxHealth;
         this.ability1Rate = 80;
         this.ability2Rate = 90;
+
+        // Use playable characters sprite sheet - frame 1 is BoomStick
+        this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 1);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 60;
+        const frameHeight = 77;
+
+        const bodyWidth = frameWidth * 0.5;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
 
         this.on('destroy', () => {
             if (this.muzzleFlash) {
@@ -76,18 +99,34 @@ export class BoomStick extends PlayerController {
         const dy = this.currentAim.y - this.y;
         const baseAngle = Math.atan2(dy, dx);
 
+        // Calculate barrel position with configurable offsets
+        const cos = Math.cos(baseAngle);
+        const sin = Math.sin(baseAngle);
+
+        // Forward offset (in the direction of aim)
+        const forwardX = cos * this.barrelOffsetForward;
+        const forwardY = sin * this.barrelOffsetForward;
+
+        // Right offset (perpendicular to aim direction)
+        const rightX = -sin * this.barrelOffsetRight;
+        const rightY = cos * this.barrelOffsetRight;
+
+        // Combine all offsets to get barrel position
+        const barrelX = this.x + forwardX + rightX;
+        const barrelY = this.y + forwardY + rightY + this.barrelOffsetUp;
+
         const startAngle = baseAngle - this.spreadAngle / 2;
         const angleStep = this.spreadAngle / (this.pelletCount - 1);
 
         for (let i = 0; i < this.pelletCount; i++) {
             const angle = startAngle + (i * angleStep);
-            const targetX = this.x + Math.cos(angle) * this.maxRange;
-            const targetY = this.y + Math.sin(angle) * this.maxRange;
+            const targetX = barrelX + Math.cos(angle) * this.maxRange;
+            const targetY = barrelY + Math.sin(angle) * this.maxRange;
 
             const pellet = new ShotgunPellet(
                 this.gameScene,
-                this.x,
-                this.y,
+                barrelX,
+                barrelY,
                 targetX,
                 targetY,
                 this.baseDamage,
@@ -98,25 +137,24 @@ export class BoomStick extends PlayerController {
 
             this.pellets.add(pellet);
 
-            // Remove from set when destroyed
             pellet.once('destroy', () => {
                 this.pellets.delete(pellet);
             });
 
-            // Add to player bullet group for collision detection
             this.gameScene.playerBulletGroup.add(pellet);
         }
 
-        this.showMuzzleFlash(baseAngle);
+        this.showMuzzleFlash(baseAngle, barrelX, barrelY);
         this.applyRecoil(baseAngle);
     }
 
-    showMuzzleFlash(angle: number): void {
+    showMuzzleFlash(angle: number, barrelX: number, barrelY: number): void {
         this.muzzleFlash = this.gameScene.add.graphics();
         this.muzzleFlash.setDepth(Depth.ABILITIES);
 
-        const flashX = this.x + Math.cos(angle) * 30;
-        const flashY = this.y + Math.sin(angle) * 30;
+        // Muzzle flash appears slightly in front of barrel
+        const flashX = barrelX + Math.cos(angle) * 15;
+        const flashY = barrelY + Math.sin(angle) * 15;
 
         this.muzzleFlash.fillStyle(0xffaa00, 0.9);
         this.muzzleFlash.fillCircle(flashX, flashY, 20);
