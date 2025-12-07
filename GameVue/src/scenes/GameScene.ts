@@ -315,9 +315,13 @@ export class GameScene extends Scene
 
         // Listen for ALL storage updates to debug what's being received
         NetworkManager.onStorageUpdate((storage: any) => {
-            // Log ALL storage updates to debug
-            const keys = storage ? Object.keys(storage) : [];
-            console.log('[NETWORK] Storage update received, keys:', keys);
+            // For host, specifically log inputs changes
+            if (this.isHost && storage?.inputs) {
+                const inputKeys = Object.keys(storage.inputs);
+                if (inputKeys.length > 0) {
+                    console.log('[NETWORK-HOST] Inputs in storage:', inputKeys);
+                }
+            }
 
             if (storage?.lastStateDelta) {
                 console.log('[NETWORK] Found lastStateDelta, tick:', storage.lastStateDelta.tick);

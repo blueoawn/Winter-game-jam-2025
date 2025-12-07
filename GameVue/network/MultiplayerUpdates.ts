@@ -53,30 +53,101 @@ export function updateHost(
  * Apply remote player inputs from storage
  * Host reads inputs.{playerId} from storage and applies them to remote player objects
  */
+let lastInputDebugTime = 0;
+let hasLoggedPlayerMapping = false;
+let hasLoggedFunctionCall = false;
 function applyRemoteInputs(playerManager: PlayerManager): void {
+    // Log once to confirm this function is being called
+    if (!hasLoggedFunctionCall) {
+        console.log('[HOST-INPUT] applyRemoteInputs() called');
+        hasLoggedFunctionCall = true;
+    }
+
     const storage = NetworkManager.getStorage();
-    if (!storage || !storage.inputs) return;
+
+    // Debug: log what getStorage() returns (once)
+    if (!hasLoggedPlayerMapping && storage) {
+        console.log('[HOST-INPUT] getStorage() returned:', {
+            hasInputs: !!storage.inputs,
+            inputKeys: storage.inputs ? Object.keys(storage.inputs) : 'N/A',
+            storageKeys: Object.keys(storage)
+        });
+    }
+
+    // Debug logging every second
+    const now = Date.now();
+    const shouldDebug = now - lastInputDebugTime > 1000;
+
+    if (!storage) {
+        if (shouldDebug) {
+            console.log('[HOST-INPUT] No storage available');
+            lastInputDebugTime = now;
+        }
+        return;
+    }
+
+    // Note: We no longer check for storage.inputs because PlaySocketJS uses flat keys
+    // Input data is stored as "inputs.{playerId}" at the top level, not nested
 
     const localPlayerId = NetworkManager.getPlayerId();
     const allPlayerIds = playerManager.getAllPlayerIds();
+
+    // PlaySocketJS stores "inputs.{playerId}" as flat top-level keys, not nested under inputs
+    // Find all input keys by looking for keys that start with "inputs."
+    const inputKeyPrefix = 'inputs.';
+    const storageInputKeys = Object.keys(storage)
+        .filter(key => key.startsWith(inputKeyPrefix))
+        .map(key => key.slice(inputKeyPrefix.length)); // Extract player ID from key
+
+    // Log player mapping once at startup to help debug ID mismatches
+    if (!hasLoggedPlayerMapping && storageInputKeys.length > 0) {
+        console.log('[HOST-INPUT] === Player ID Mapping ===');
+        console.log('[HOST-INPUT] Local player ID:', localPlayerId);
+        console.log('[HOST-INPUT] PlayerManager IDs:', allPlayerIds);
+        console.log('[HOST-INPUT] Storage input keys (extracted):', storageInputKeys);
+        hasLoggedPlayerMapping = true;
+    }
+
+    if (shouldDebug && storageInputKeys.length > 0) {
+        console.log('[HOST-INPUT] Storage inputs:', storageInputKeys, 'All players:', allPlayerIds);
+        lastInputDebugTime = now;
+    }
 
     for (const playerId of allPlayerIds) {
         // Skip local player (already processed via ButtonMapper)
         if (playerId === localPlayerId) continue;
 
-        const inputData = storage.inputs[playerId];
-        if (!inputData) continue;
+        // Read from flat key "inputs.{playerId}" instead of nested storage.inputs[playerId]
+        const inputKey = `inputs.${playerId}`;
+        const inputData = storage[inputKey];
+        if (!inputData) {
+            if (shouldDebug) {
+                console.log(`[HOST-INPUT] No input data for remote player ${playerId} (key: ${inputKey})`);
+            }
+            continue;
+        }
 
         const player = playerManager.getPlayer(playerId);
-        if (!player) continue;
+        if (!player) {
+            if (shouldDebug) {
+                console.log(`[HOST-INPUT] No player object for ${playerId}`);
+            }
+            continue;
+        }
 
         // Convert stored input to the format expected by processInput
+        // Use 'velocity' instead of 'movement' so processInput creates a Vector2 from plain {x,y}
         const input = {
-            movement: inputData.velocity || { x: 0, y: 0 },
+            velocity: inputData.velocity || { x: 0, y: 0 },
+            movementSpeed: inputData.movementSpeed,
             aim: inputData.aim || { x: 0, y: 0 },
             ability1: inputData.ability1 || false,
             ability2: inputData.ability2 || false
         };
+
+        if (shouldDebug) {
+            console.log(`[HOST-INPUT] Applying input to ${playerId}:`, input.velocity);
+        }
 
         // Apply the input to the remote player
         (player as PlayerController).processInput(input);

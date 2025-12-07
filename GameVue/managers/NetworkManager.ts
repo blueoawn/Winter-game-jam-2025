@@ -104,11 +104,36 @@ export class NetworkManager {
             this.storage = initialStorage;
             this.connectedPlayers.add(this.localPlayerId!);
 
+            // Attach storage listener early to capture all updates
+            this.attachStorageListener();
+
             console.log('Hosting game with room code:', roomCode);
             return roomCode;
         } catch (error) {
             console.error('Failed to create room:', error);
             throw error;
+        }
+    }
+
+    // Attach storage listener early to capture all storage updates
+    private attachStorageListener() {
+        if (!this.storageListenerAttached && this.socket) {
+            console.log('[NetworkManager] Attaching early storageUpdated listener');
+            this.socket.onEvent('storageUpdated', (storage: any) => {
+                // Debug: log when storage is updated with inputs
+                if (storage?.inputs) {
+                    const inputPlayerIds = Object.keys(storage.inputs);
+                    if (inputPlayerIds.length > 0) {
+                        console.log('[NetworkManager] Storage updated with inputs from:', inputPlayerIds);
+                    }
+                }
+                this.storage = storage;
+                // Call ALL registered handlers
+                for (const h of this.storageUpdateHandlers) {
+                    h(storage);
+                }
+            });
+            this.storageListenerAttached = true;
         }
     }
 
@@ -124,6 +149,9 @@ export class NetworkManager {
 
             console.log('Joining room:', roomCode);
             await this.socket.joinRoom(roomCode);
+
+            // Attach storage listener early to capture all updates
+            this.attachStorageListener();
 
             // Add self to players list in storage
             this.socket.updateStorage('players', 'array-add-unique', this.localPlayerId);
@@ -202,17 +230,8 @@ export class NetworkManager {
             handler(this.storage);
         }
 
-        // Attach listener to socket only once
-        if (!this.storageListenerAttached && this.socket) {
-            this.socket.onEvent('storageUpdated', (storage: any) => {
-                this.storage = storage;
-                // Call ALL registered handlers
-                for (const h of this.storageUpdateHandlers) {
-                    h(storage);
-                }
-            });
-            this.storageListenerAttached = true;
-        }
+        // Attach listener if not already attached (fallback for late registration)
+        this.attachStorageListener();
     }
 
     // Stop listening to storage updates
@@ -254,10 +273,16 @@ export class NetworkManager {
     }
 
     getStorage() {
+        // Return the locally tracked storage which is updated via storageUpdated events
+        // This ensures we get the most up-to-date storage including updates from other clients
+        if (this.storage) {
+            return this.storage;
+        }
+        // Fallback to socket's internal storage if local storage not yet initialized
         if (this.socket) {
             return this.socket.getStorage;
         }
-        return this.storage;
+        return null;
     }
 
     getStats() {
