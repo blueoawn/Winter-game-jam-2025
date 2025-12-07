@@ -451,11 +451,11 @@ export class GameScene extends Scene
         LevelManager.removeEnemyBullet(this, bullet);
     }
 
-    addEnemyBulletDestroyer(destroyer: Rectangle) {
+    addEnemyBulletDestroyer(destroyer: Phaser.GameObjects.GameObject) {
         LevelManager.addEnemyBulletDestroyer(this, destroyer);
     }
 
-    removeEnemyBulletDestroyer(destroyer: Rectangle) {
+    removeEnemyBulletDestroyer(destroyer: Phaser.GameObjects.GameObject) {
         LevelManager.removeEnemyBulletDestroyer(this, destroyer);
     }
 

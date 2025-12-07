@@ -32,6 +32,10 @@ export default {
         lizardWizardBackgroundSmall: {
             key: 'lizard-wizard-bg',
             args: ['assets/Backgrounds/lizardWizardBackgroundSmall.png']
+        },
+        shield: {
+            key: 'shield',
+            args: ['assets/Sprites/shieldSpriteCropped.png']
         }
     },
     spritesheet: {
@@ -68,6 +72,13 @@ export default {
             args: ['assets/Sprites/cheeseTouchAttackSpriteSheetCropped.png', {
                 frameWidth: 49,
                 frameHeight: 44
+            }]
+        },
+        playableCharacters: {
+            key: 'playable-characters',
+            args: ['assets/Sprites/playableCharacterSpriteSheetCropped.png', {
+                frameWidth: 60,
+                frameHeight: 77
             }]
         },
     }

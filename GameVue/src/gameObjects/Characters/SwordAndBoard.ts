@@ -1,14 +1,15 @@
 import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
-import Rectangle = Phaser.GameObjects.Rectangle;
+import ASSETS from '../../assets';
+import Image = Phaser.GameObjects.Image;
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
-import { NinjaStar } from '../Projectile/NinjaStar'; // TODO - Depricate this
+import { NinjaStar } from '../Projectile/NinjaStar';
 
 export class SwordAndBoard extends PlayerController {
     private slashes: Set<NinjaStar> = new Set();
-    shield: Rectangle | null;
+    shield: Image | null;
     shieldTimer: TimerEvent | null;
 
     // Ability 1 - Heavy Slash config
@@ -27,15 +28,31 @@ export class SwordAndBoard extends PlayerController {
     private hitEnemiesSlash: Set<any> = new Set();
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 1);  // Frame 1 for SwordAndBoard
+        super(scene, x, y, 3);
 
-        // Override stats - slow but tanky
         this.characterSpeed = 600;
         this.velocityMax = 350;
-        this.maxHealth = 3;  // More health
+        this.maxHealth = 3;
         this.health = this.maxHealth;
-        this.ability1Rate = 20;   // Slower attack
-        this.ability2Rate = 180;  // Shield every 3 seconds
+        this.ability1Rate = 20;
+        this.ability2Rate = 180;
+
+        // Use playable characters sprite sheet - frame 3 is SwordAndBoard
+        this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 3);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 60;
+        const frameHeight = 77;
+
+        const bodyWidth = frameWidth * 0.5;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
 
         this.on('destroy', () => {
             this.removeShield();
@@ -54,76 +71,76 @@ export class SwordAndBoard extends PlayerController {
             this.updateSlash(time);
         }
     }
-    
+
     startSlash(): void {
             this.isSlashing = true;
             this.slashStartTime = this.gameScene.time.now;
             this.slashBaseAngle = this.rotation - Math.PI / 2;
             this.hitEnemiesSlash.clear();
-    
+
             this.slashGraphics = this.gameScene.add.graphics();
             this.slashGraphics.setDepth(Depth.ABILITIES);
         }
-    
+
         updateSlash(time: number): void {
             if (!this.slashGraphics) return;
-    
+
             const elapsed = time - this.slashStartTime;
             const progress = Math.min(elapsed / this.slashDuration, 1);
-    
+
             this.slashGraphics.clear();
-    
+
             const startAngle = this.slashBaseAngle - this.slashArc / 2;
             const currentAngle = startAngle + this.slashArc * progress;
-    
+
             const slashX = this.x + Math.cos(currentAngle) * this.slashOffset;
             const slashY = this.y + Math.sin(currentAngle) * this.slashOffset;
-    
+
             this.slashGraphics.fillStyle(0xffffff, 0.9);
             this.slashGraphics.save();
             this.slashGraphics.translateCanvas(slashX, slashY);
             this.slashGraphics.rotateCanvas(currentAngle);
             this.slashGraphics.fillRect(-this.slashWidth / 2, -this.slashHeight / 2, this.slashWidth, this.slashHeight);
             this.slashGraphics.restore();
-    
+
             // Draw trail
             this.slashGraphics.lineStyle(3, 0xffffff, 0.4);
             this.slashGraphics.beginPath();
             this.slashGraphics.arc(this.x, this.y, this.slashOffset, startAngle, currentAngle);
             this.slashGraphics.strokePath();
-    
+
             this.checkSlashHits(slashX, slashY, currentAngle);
-    
+
             if (progress >= 1) {
                 this.endSlash();
             }
         }
-    
+
         endSlash(): void {
             this.isSlashing = false;
             this.hitEnemiesSlash.clear();
-    
+
             if (this.slashGraphics) {
                 this.slashGraphics.destroy();
                 this.slashGraphics = null;
             }
         }
-    
+
         checkSlashHits(slashX: number, slashY: number, slashAngle: number): void {
             // Check walls
             const walls = this.gameScene.wallGroup.getChildren();
             for (const wall of walls) {
                 const w = wall as any;
                 if (!w.active || this.hitEnemiesSlash.has(w)) continue;
-    
+
                 const dx = w.x - slashX;
                 const dy = w.y - slashY;
-    
+
                 const cos = Math.cos(-slashAngle);
                 const sin = Math.sin(-slashAngle);
                 const localX = dx * cos - dy * sin;
                 const localY = dx * sin + dy * cos;
-    
+
                 if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
                     Math.abs(localY) < this.slashHeight / 2 + 20) {
                     if (w.hit && !w.isIndestructible) {
@@ -132,22 +149,22 @@ export class SwordAndBoard extends PlayerController {
                     }
                 }
             }
-    
+
             // Check enemies
             const enemies = this.gameScene.enemyGroup.getChildren();
-    
+
             for (const enemy of enemies) {
                 const e = enemy as Phaser.Physics.Arcade.Sprite;
                 if (!e.active || this.hitEnemiesSlash.has(e)) continue;
-    
+
                 const dx = e.x - slashX;
                 const dy = e.y - slashY;
-    
+
                 const cos = Math.cos(-slashAngle);
                 const sin = Math.sin(-slashAngle);
                 const localX = dx * cos - dy * sin;
                 const localY = dx * sin + dy * cos;
-    
+
                 if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
                     Math.abs(localY) < this.slashHeight / 2 + 20) {
                     if ((e as any).hit) {
@@ -180,13 +197,18 @@ export class SwordAndBoard extends PlayerController {
     }
 
     spawnShield(): void {
-        // TODO Use a proper shield graphic
-        this.shield = this.gameScene.add.rectangle(0, 0, 100, 10, 0x4c4c4c);
+        this.shield = this.gameScene.add.image(0, 0, ASSETS.image.shield.key);
+        this.shield.setOrigin(0.5, 0.5);
+        this.shield.setScale(1.5);
+        this.shield.setDepth(Depth.ABILITIES);
+
         this.gameScene.physics.add.existing(this.shield);
-        // Make it a dynamic body
         (this.shield.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
-        // Make collision body bigger to catch fast bullets
-        (this.shield.body as Phaser.Physics.Arcade.Body).setSize(120, 30);
+        (this.shield.body as Phaser.Physics.Arcade.Body).setSize(
+            this.shield.width * 1.2,
+            this.shield.height * 1.2
+        );
+
         this.gameScene.addEnemyBulletDestroyer(this.shield);
     }
 

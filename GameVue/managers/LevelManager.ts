@@ -247,7 +247,7 @@ export function removeEnemyBullet(scene: GameScene, bullet: EnemyBullet): void {
 /**
  * Add enemy bullet destroyer (used for player collision areas)
  */
-export function addEnemyBulletDestroyer(scene: GameScene, destroyer: Rectangle): void {
+export function addEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
     try {
         scene.enemyBulletDestroyersGroup.add(destroyer);
     } catch (err) {
@@ -258,9 +258,9 @@ export function addEnemyBulletDestroyer(scene: GameScene, destroyer: Rectangle):
 /**
  * Remove enemy bullet destroyer
  */
-export function removeEnemyBulletDestroyer(scene: GameScene, destroyer: Rectangle): void {
+export function removeEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
     try {
-        scene.playerBulletGroup.remove(destroyer, true, true);
+        scene.enemyBulletDestroyersGroup.remove(destroyer, true, true);
     } catch (err) {
         console.error('[LEVEL] Error removing bullet destroyer:', err);
     }
