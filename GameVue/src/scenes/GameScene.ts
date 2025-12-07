@@ -311,23 +311,13 @@ export class GameScene extends Scene
     }
 
     setupNetworkHandlers() {
-        console.log('[NETWORK] Setting up network handlers, isHost:', this.isHost);
+        console.info('[NETWORK] Setting up network handlers, isHost:', this.isHost);
 
-        // Listen for ALL storage updates to debug what's being received
+        // Listen for storage updates to sync state from host
         NetworkManager.onStorageUpdate((storage: any) => {
-            // For host, specifically log inputs changes
-            if (this.isHost && storage?.inputs) {
-                const inputKeys = Object.keys(storage.inputs);
-                if (inputKeys.length > 0) {
-                    console.log('[NETWORK-HOST] Inputs in storage:', inputKeys);
-                }
-            }
-
-            if (storage?.lastStateDelta) {
-                console.log('[NETWORK] Found lastStateDelta, tick:', storage.lastStateDelta.tick);
-                if (!this.isHost) {
-                    applyDeltaState(this, storage.lastStateDelta);
-                }
+            if (storage?.lastStateDelta && !this.isHost) {
+                console.debug('[NETWORK] Applying state delta, tick:', storage.lastStateDelta.tick);
+                applyDeltaState(this, storage.lastStateDelta);
             }
         });
     }

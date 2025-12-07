@@ -118,17 +118,9 @@ export class NetworkManager {
     // Attach storage listener early to capture all storage updates
     private attachStorageListener() {
         if (!this.storageListenerAttached && this.socket) {
-            console.log('[NetworkManager] Attaching early storageUpdated listener');
+            console.debug('[NetworkManager] Attaching storageUpdated listener');
             this.socket.onEvent('storageUpdated', (storage: any) => {
-                // Debug: log when storage is updated with inputs
-                if (storage?.inputs) {
-                    const inputPlayerIds = Object.keys(storage.inputs);
-                    if (inputPlayerIds.length > 0) {
-                        console.log('[NetworkManager] Storage updated with inputs from:', inputPlayerIds);
-                    }
-                }
                 this.storage = storage;
-                // Call ALL registered handlers
                 for (const h of this.storageUpdateHandlers) {
                     h(storage);
                 }
@@ -304,7 +296,7 @@ export class NetworkManager {
             console.error(`[NetworkManager] sendRequest: socket is null! Cannot send ${requestName}`);
             return;
         }
-        console.log(`[NetworkManager] Sending request: ${requestName}`);
+        console.debug(`[NetworkManager] Sending request: ${requestName}`);
         this.socket.sendRequest(requestName, data);
     }
 
