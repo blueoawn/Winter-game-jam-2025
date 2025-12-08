@@ -119,7 +119,9 @@ export class Railgun extends PlayerController {
                 this.y,
                 xTarget,
                 yTarget,
-                baseDamage
+                baseDamage,
+                this.playerId,
+                this.team
             );
 
             this.gameScene.playerBulletGroup.add(star);

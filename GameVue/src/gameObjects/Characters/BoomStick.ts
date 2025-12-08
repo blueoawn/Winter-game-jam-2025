@@ -132,7 +132,9 @@ export class BoomStick extends PlayerController {
                 this.baseDamage,
                 this.minDamageMultiplier,
                 this.falloffStart,
-                this.falloffEnd
+                this.falloffEnd,
+                this.playerId,
+                this.team
             );
 
             this.pellets.add(pellet);

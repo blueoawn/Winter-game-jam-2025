@@ -229,7 +229,11 @@ export class PlayerManager {
                 frame: player.frame?.name || 0,
                 rotation: player.rotation,
                 // Include speed for speed boost sync
-                characterSpeed: (player as any).characterSpeed || 1000
+                characterSpeed: (player as any).characterSpeed || 1000,
+                // PvP properties
+                team: player.team,
+                lives: player.lives,
+                isRespawning: player.isRespawning
             });
         });
 

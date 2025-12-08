@@ -513,3 +513,43 @@ export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle
         console.error('[LEVEL] Error destroying enemy bullet:', err);
     }
 }
+
+/**
+ * Handle player hit by another player's projectile (PvP)
+ */
+export function hitPlayerPvP(scene: GameScene, bullet: any, player: PlayerController): void {
+    try {
+        // Skip if player is respawning
+        if (player.isRespawning) return;
+
+        addExplosion(scene, player.x, player.y);
+        player.hit(bullet.getPower(), bullet.ownerPlayerId, bullet.ownerTeam);
+        bullet.remove();
+
+        console.log(`[PVP] ${bullet.ownerPlayerId} (${bullet.ownerTeam}) hit ${player.playerId} (${player.team}) for ${bullet.getPower()} damage`);
+    } catch (err) {
+        console.error('[LEVEL] Error handling PvP player hit:', err);
+    }
+}
+
+/**
+ * Handle body collision between two players
+ * Applies damage and knockback to both players
+ */
+export function handlePlayerCollision(scene: GameScene, player1: PlayerController, player2: PlayerController): void {
+    try {
+        // Skip if either is respawning
+        if (player1.isRespawning || player2.isRespawning) return;
+
+        const bodyCollisionDamage = 1;
+
+        // Both players take damage and knockback
+        player1.handlePlayerBodyCollision(player2, bodyCollisionDamage);
+        player2.handlePlayerBodyCollision(player1, bodyCollisionDamage);
+
+        // Add explosion at collision point
+        addExplosion(scene, (player1.x + player2.x) / 2, (player1.y + player2.y) / 2);
+    } catch (err) {
+        console.error('[LEVEL] Error handling player collision:', err);
+    }
+}

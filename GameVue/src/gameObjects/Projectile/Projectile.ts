@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import { EntityState, EntityDelta, SyncableEntity } from '../../../network/SyncableEntity';
+import { Team } from '../../types/Team';
 
 /**
  * Base Projectile class with common network-sync helpers.
@@ -20,6 +21,10 @@ export abstract class Projectile extends Phaser.Physics.Arcade.Sprite implements
 
   // Optional damage/power fields - many projectiles will set these
   public damage: number = 1;
+
+  // PvP ownership tracking
+  public ownerPlayerId: string = '';
+  public ownerTeam: Team = Team.Neutral;
 
   constructor(scene: GameScene, x: number, y: number, texture: string, frame?: string | number) {
     super(scene, x, y, texture as string, frame as any);
@@ -78,6 +83,8 @@ export abstract class Projectile extends Phaser.Physics.Arcade.Sprite implements
       velocityY: vy,
       rotation: this.rotation,
       damage: this.damage,
+      ownerPlayerId: this.ownerPlayerId,
+      ownerTeam: this.ownerTeam,
       netVersion: 0,
       isDead: false
     } as unknown as EntityState;
@@ -100,6 +107,14 @@ export abstract class Projectile extends Phaser.Physics.Arcade.Sprite implements
 
     if (state.rotation !== undefined) this.rotation = state.rotation;
     if ((state as any).damage !== undefined) this.damage = (state as any).damage;
+
+    // PvP ownership sync
+    if ((state as any).ownerPlayerId !== undefined) {
+      this.ownerPlayerId = (state as any).ownerPlayerId;
+    }
+    if ((state as any).ownerTeam !== undefined) {
+      this.ownerTeam = (state as any).ownerTeam;
+    }
 
     // Refresh lastSyncedState snapshot
     this.lastSyncedState = { ...(state as EntityState) };

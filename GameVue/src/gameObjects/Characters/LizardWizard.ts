@@ -135,7 +135,9 @@ export class LizardWizard extends PlayerController {
             spawnY,
             this.currentAim.x,
             this.currentAim.y,
-            1
+            1,
+            this.playerId,
+            this.team
         );
 
         this.missiles.add(missile);
@@ -185,7 +187,9 @@ export class LizardWizard extends PlayerController {
                 spawnY,
                 xLeftTo,
                 yLeftTo,
-                1
+                1,
+                this.playerId,
+                this.team
             );
 
             this.missiles.add(missile);
