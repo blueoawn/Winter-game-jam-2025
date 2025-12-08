@@ -1,6 +1,7 @@
 import NetworkManager from '../../managers/NetworkManager';
 import { LobbyUI } from '../ui/LobbyUI';
 import { Team } from '../types/Team';
+import { audioManager } from '../../managers/AudioManager';
 
 interface LobbyInitData {
     mode?: 'host' | 'join';
@@ -40,6 +41,9 @@ export class Lobby extends Phaser.Scene {
     }
 
     async create(): Promise<void> {
+        audioManager.init(this);
+        audioManager.play('character-select-music', { loop: true, volume: 0.5 });
+
         // Create UI
         this.ui = new LobbyUI(this);
         this.ui.create();

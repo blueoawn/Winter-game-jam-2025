@@ -124,6 +124,7 @@ export class GameScene extends Scene
         try {
             // Initialize audio manager
             audioManager.init(this);
+            audioManager.play('battle-theme-1', { loop: true, volume: 0.5 });
 
             // Load current map (default to Summoners Rift)
             this.currentMap = getDefaultMap();

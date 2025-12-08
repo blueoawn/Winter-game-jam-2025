@@ -3,6 +3,7 @@ import ASSETS from '../assets';
 import NetworkManager from '../../managers/NetworkManager.ts';
 import { CharacterIdsEnum } from "../gameObjects/Characters/CharactersEnum.ts";
 import { Team } from '../types/Team';
+import { audioManager } from '../../managers/AudioManager';
 
 interface CharacterData {
     id: string;
@@ -205,6 +206,9 @@ export class CharacterSelectScene extends Scene {
     create(): void {
         const centerX = this.scale.width / 2;
         const centerY = this.scale.height / 2;
+
+        audioManager.init(this);
+        audioManager.play('character-select-music', { loop: true, volume: 0.5 });
 
         // Title
         this.titleText = this.add.text(centerX, 80, 'SELECT YOUR CHARACTER', {
