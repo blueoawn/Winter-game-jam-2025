@@ -5,6 +5,7 @@ import { Depth } from '../../constants.ts';
 import { SyncableEntity } from '../../../network/SyncableEntity';
 import { IAllyBehavior } from '../../behaviorScripts/AllyBehavior';
 import { Team } from '../../types/Team';
+import { audioManager } from '../../../managers/AudioManager';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
 
@@ -285,6 +286,9 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
      */
     handleDeath(): void {
         if (this.isRespawning) return;  // Prevent multiple death triggers
+
+        // Play death sound
+        audioManager.play('lizard-death-2');
 
         this.lives--;
         this.gameScene.addExplosion(this.x, this.y);

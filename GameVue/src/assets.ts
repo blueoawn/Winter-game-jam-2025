@@ -50,6 +50,14 @@ export default {
             key: 'wall-shield-collision',
             args: ['assets/SoundEffects/Wall_-shield-collision-sound.m4a']
         },
+        lizardDeath1: {
+            key: 'lizard-death-1',
+            args: ['assets/SoundEffects/lizard-ded-1.m4a']
+        },
+        lizardDeath2: {
+            key: 'lizard-death-2',
+            args: ['assets/SoundEffects/lizard-ded-2.m4a']
+        },
     },
     tilemapTiledJSON: {
         dungeonCrawl: {
