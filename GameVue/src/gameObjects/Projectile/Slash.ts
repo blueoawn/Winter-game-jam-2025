@@ -20,7 +20,7 @@ export class Slash extends Phaser.GameObjects.Graphics {
     public width: number = 60;
     public height: number = 15;
     public offset: number = 50; // Distance from player
-    public arc: number = Math.PI * 0.8; // Slash arc angle
+    public arcAngle: number = Math.PI * 0.8; // Slash arc angle
     public color: number = 0xffffff;
     public alpha: number = 0.9;
 
@@ -51,7 +51,7 @@ export class Slash extends Phaser.GameObjects.Graphics {
         width: number = 60,
         height: number = 15,
         offset: number = 50,
-        arc: number = Math.PI * 0.8,
+        arcAngle: number = Math.PI * 0.8,
         duration: number = 250,
         ownerPlayerId: string = '',
         ownerTeam: Team = Team.Neutral
@@ -68,14 +68,14 @@ export class Slash extends Phaser.GameObjects.Graphics {
         this.width = width;
         this.height = height;
         this.offset = offset;
-        this.arc = arc;
+        this.arcAngle = arcAngle;
         this.duration = duration;
         this.maxLifetime = duration;
         this.ownerPlayerId = ownerPlayerId;
         this.ownerTeam = ownerTeam;
 
         this.startTime = scene.time.now;
-        this.currentAngle = baseAngle - arc / 2;
+        this.currentAngle = baseAngle - arcAngle / 2;
 
         scene.add.existing(this);
         this.setDepth(Depth.ABILITIES);
@@ -94,8 +94,8 @@ export class Slash extends Phaser.GameObjects.Graphics {
         const progress = Math.min(elapsed / this.duration, 1);
 
         // Update current angle based on progress
-        const startAngle = this.baseAngle - this.arc / 2;
-        this.currentAngle = startAngle + this.arc * progress;
+        const startAngle = this.baseAngle - this.arcAngle / 2;
+        this.currentAngle = startAngle + this.arcAngle * progress;
 
         // Redraw slash at new angle
         this.drawSlash();
@@ -125,7 +125,7 @@ export class Slash extends Phaser.GameObjects.Graphics {
         this.restore();
 
         // Draw trail arc
-        const startAngle = this.baseAngle - this.arc / 2;
+        const startAngle = this.baseAngle - this.arcAngle / 2;
         this.lineStyle(3, this.color, 0.4);
         this.beginPath();
         this.arc(this.ownerX, this.ownerY, this.offset, startAngle, this.currentAngle);
@@ -244,7 +244,7 @@ export class Slash extends Phaser.GameObjects.Graphics {
             width: this.width,
             height: this.height,
             offset: this.offset,
-            arc: this.arc,
+            arcAngle: this.arcAngle,
             baseAngle: this.baseAngle,
             duration: this.duration,
             startTime: this.startTime
@@ -284,8 +284,8 @@ export class Slash extends Phaser.GameObjects.Graphics {
             this.offset = slashState.offset;
         }
 
-        if (slashState.arc !== undefined) {
-            this.arc = slashState.arc;
+        if (slashState.arcAngle !== undefined) {
+            this.arcAngle = slashState.arcAngle;
         }
 
         if (slashState.baseAngle !== undefined) {
