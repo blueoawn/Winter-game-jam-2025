@@ -27,21 +27,21 @@ export class AudioManager {
     play(key: string, config?: Phaser.Types.Sound.SoundConfig): void {
         if (!this.scene || this.muted) return;
 
-        // Check if audio exists in cache before attempting to play
-        if (!this.scene.cache.audio.exists(key)) {
-            console.warn(`Audio key "${key}" not found in cache, skipping playback`);
-            return;
-        }
-
-        // If config has a volume, multiply it with global volume, otherwise use global volume
-        const configVolume = config?.volume ?? 1.0;
-
-        const soundConfig: Phaser.Types.Sound.SoundConfig = {
-            ...config,
-            volume: this.volume * configVolume
-        };
-
         try {
+            // Check if audio cache exists and has the key
+            if (!this.scene.cache || !this.scene.cache.audio || !this.scene.cache.audio.exists(key)) {
+                console.warn(`Audio key "${key}" not found in cache, skipping playback`);
+                return;
+            }
+
+            // If config has a volume, multiply it with global volume, otherwise use global volume
+            const configVolume = config?.volume ?? 1.0;
+
+            const soundConfig: Phaser.Types.Sound.SoundConfig = {
+                ...config,
+                volume: this.volume * configVolume
+            };
+
             this.scene.sound.play(key, soundConfig);
         } catch (error) {
             console.warn(`Failed to play audio "${key}":`, error);
@@ -57,25 +57,25 @@ export class AudioManager {
     playMusic(key: string, config?: Phaser.Types.Sound.SoundConfig): void {
         if (!this.scene) return;
 
-        // Check if audio exists in cache before attempting to play
-        if (!this.scene.cache.audio.exists(key)) {
-            console.warn(`Audio key "${key}" not found in cache, skipping music playback`);
-            return;
-        }
-
-        // Stop current music if playing
-        this.stopMusic();
-
-        // If config has a volume, multiply it with global volume, otherwise use 0.7 (quieter than SFX)
-        const configVolume = config?.volume ?? 0.5;
-
-        const musicConfig: Phaser.Types.Sound.SoundConfig = {
-            loop: false,
-            ...config,
-            volume: this.volume * configVolume
-        };
-
         try {
+            // Check if audio cache exists and has the key
+            if (!this.scene.cache || !this.scene.cache.audio || !this.scene.cache.audio.exists(key)) {
+                console.warn(`Audio key "${key}" not found in cache, skipping music playback`);
+                return;
+            }
+
+            // Stop current music if playing
+            this.stopMusic();
+
+            // If config has a volume, multiply it with global volume, otherwise use 0.7 (quieter than SFX)
+            const configVolume = config?.volume ?? 0.5;
+
+            const musicConfig: Phaser.Types.Sound.SoundConfig = {
+                loop: false,
+                ...config,
+                volume: this.volume * configVolume
+            };
+
             this.currentMusic = this.scene.sound.add(key, musicConfig);
 
             // Only play if not muted
