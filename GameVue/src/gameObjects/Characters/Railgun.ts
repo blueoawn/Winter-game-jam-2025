@@ -42,8 +42,8 @@ export class Railgun extends PlayerController {
         const frameWidth = 60;
         const frameHeight = 77;
 
-        const bodyWidth = frameWidth * 0.5;
-        const bodyHeight = frameHeight * 0.5;
+        const bodyWidth = frameWidth * 0.7;
+        const bodyHeight = frameHeight * 0.7;
 
         this.setBodySize(bodyWidth, bodyHeight);
 

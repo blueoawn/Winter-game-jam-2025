@@ -25,11 +25,11 @@ export class LizardWizard extends PlayerController {
         this.setOrigin(0.5, 0.5);
         this.setScale(1.5, 1.5);
 
-        const frameWidth = 30;
-        const frameHeight = 106;
+        const frameWidth = 60;
+        const frameHeight = 77;
 
-        const bodyWidth = frameWidth * 0.6;
-        const bodyHeight = frameHeight * 0.4;
+        const bodyWidth = frameWidth * 0.7;
+        const bodyHeight = frameHeight * 0.7;
 
         this.setBodySize(bodyWidth, bodyHeight);
 

@@ -82,9 +82,36 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
+        
+        // Set default physics body size (75% of sprite size for better collision detection)
+        // Individual character classes can override this in their constructors
+        this.setDefaultBodySize();
+        
         this.createHealthBar();
         this.createSkillBar();
         this.handleDestruction();
+    }
+
+    /**
+     * Set default physics body size to 75% of sprite dimensions
+     * This provides better collision detection than the sprite's full size
+     * while still feeling responsive. Characters can override this method
+     * or call setBodySize() directly in their constructors.
+     */
+    protected setDefaultBodySize(): void {
+        const frameWidth = this.width;
+        const frameHeight = this.height;
+        
+        // Use 75% of sprite size for body (increased from typical 50%)
+        const bodyWidth = frameWidth * 0.75;
+        const bodyHeight = frameHeight * 0.75;
+        
+        this.setBodySize(bodyWidth, bodyHeight);
+        
+        // Center the body on the sprite
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2;
+        this.setOffset(offsetX, offsetY);
     }
 
     preUpdate(time: number, delta: number) {

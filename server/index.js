@@ -242,7 +242,7 @@ setInterval(() => {
                 meta.lastInputSeq.delete(clientId);
                 
                 // Actually disconnect the client from PlaySocketJS
-                server.disconnectClient(clientId);
+                server.kick(clientId, 'Connection timeout - no heartbeat');
                 
                 if (clientId === meta.hostId) {
                     const next = [...meta.heartbeats.keys()][0] || null;
