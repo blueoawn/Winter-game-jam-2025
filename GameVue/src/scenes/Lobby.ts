@@ -88,6 +88,12 @@ export class Lobby extends Phaser.Scene {
             this.teamAssignments[stats.playerId] = Team.Red;
         }
 
+        // Initialize teamAssignments in storage
+        const socket = NetworkManager.getSocket();
+        if (socket) {
+            socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
+        }
+
         this.updatePlayerList();
 
         // Listen for players joining
@@ -149,13 +155,17 @@ export class Lobby extends Phaser.Scene {
 
             this.ui!.updateRoomCode(roomCode);
             this.ui!.changeMode('host');
-            this.ui!.updateStatus('Connected! Waiting for host to initiate character select ', '#00ff00');
+            this.ui!.updateStatus('Connected! Waiting for host to start...', '#00ff00');
 
             // Get current players and team assignments from storage
-            const storage = NetworkManager.getStorage();
-            this.connectedPlayers = storage?.players || [];
-            this.teamAssignments = storage?.teamAssignments || {};
-            this.updatePlayerList();
+            // Wait a bit for storage to sync
+            setTimeout(() => {
+                const storage = NetworkManager.getStorage();
+                this.connectedPlayers = storage?.players || [];
+                this.teamAssignments = storage?.teamAssignments || {};
+                console.log('Initial storage after join:', storage);
+                this.updatePlayerList();
+            }, 100);
 
             // Listen for host disconnect
             NetworkManager.onPlayerLeave((peerId: string) => {
@@ -169,25 +179,27 @@ export class Lobby extends Phaser.Scene {
         } catch (error) {
             console.error('Failed to join game:', error);
             this.ui!.showError('Failed to join game. Check the room code.');
-            setTimeout(() => this.onBackToMenu(), 2000);
         }
     }
 
     setupStorageHandlers(): void {
         // Listen for storage updates
         NetworkManager.onStorageUpdate((storage: any) => {
-            console.log('Lobby storage updated:', storage, 'characterSelectionInProgress:', storage.characterSelectionInProgress);
+            console.log('Lobby storage updated:', storage);
 
             // Update player list
             if (storage.players) {
                 this.connectedPlayers = storage.players;
+                console.log('Updated connected players:', this.connectedPlayers);
             }
 
-            // Update team assignments
+            // Update team assignments from server
             if (storage.teamAssignments) {
                 this.teamAssignments = storage.teamAssignments;
+                console.log('Updated team assignments:', this.teamAssignments);
             }
 
+            // Update UI with latest data
             this.updatePlayerList();
 
             // Check if character selection phase has started - trigger for ALL clients when flag is true
@@ -203,21 +215,27 @@ export class Lobby extends Phaser.Scene {
     }
 
     assignPlayerTeam(playerId: string, team: Team): void {
+        // Update local assignment
         this.teamAssignments[playerId] = team;
 
-        // Sync to storage if host
-        if (this.isHost) {
-            const socket = NetworkManager.getSocket();
-            if (socket) {
-                socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
-            }
+        // Sync to storage - both host and clients update storage
+        // Server is authoritative and will broadcast to all clients
+        const socket = NetworkManager.getSocket();
+        if (socket) {
+            // Get current assignments from storage to avoid overwriting other players
+            const storage = NetworkManager.getStorage();
+            const currentAssignments = { ...(storage?.teamAssignments || {}), [playerId]: team };
+            console.log(`Updating teamAssignments in storage:`, currentAssignments);
+            socket.updateStorage('teamAssignments', 'set', currentAssignments);
         }
 
+        // Update UI immediately for responsive feedback
         this.updatePlayerList();
     }
 
     switchPlayerTeam(playerId: string, newTeam: Team): void {
         console.log(`Switching player ${playerId} to team ${newTeam}`);
+        // All clients can update storage directly - server will sync to everyone
         this.assignPlayerTeam(playerId, newTeam);
     }
 

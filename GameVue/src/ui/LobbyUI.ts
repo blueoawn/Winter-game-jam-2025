@@ -59,7 +59,9 @@ export class LobbyUI {
 
         this.elements.roomCodeInput = this.lobbyScene.add.dom(centerX, 190, 'input', `
             outline: none;
-            font-size: 24,
+            font-size: 24px;
+            padding: 5px;
+            text-align: center;
         `).setInteractive({useHandCursor: true})
             .addListener('input').on('input', async (event) => {
             if (event) {
@@ -68,8 +70,12 @@ export class LobbyUI {
                 }
 
                 if (this.lobbyCodeRegex.test(event.target.value.trim())) {
-                    // Don't change case - PeerJS IDs are case-sensitive!
-                    await this.lobbyScene.connectToHost(event.target.value.trim());
+                    try {
+                        // Don't change case - PeerJS IDs are case-sensitive!
+                        await this.lobbyScene.connectToHost(event.target.value.trim());
+                    } catch (error) {
+                        console.error('Error connecting to host:', error);
+                    }
                 }
                 if (this.elements.roomCodeInput) {
                     this.elements.roomCodeInput.pointerEvents = 'auto';

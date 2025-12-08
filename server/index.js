@@ -172,6 +172,7 @@ server.onEvent('storageUpdateRequested', (params) => {
 
     // Character selections and simple metadata (but NOT lastStateDelta from clients)
     if (key === 'characterSelections' || key.startsWith('characterSelections.') ||
+            key === 'teamAssignments' || key.startsWith('teamAssignments.') ||
             key === 'characterSelectionInProgress' || key === 'readyToStartGame' ||
             key === 'isGameStarted' || key === 'startGameData' ||
             key === 'allPlayersReady' || key === 'hostId' || key === 'meta') {
