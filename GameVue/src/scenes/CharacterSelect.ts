@@ -208,7 +208,7 @@ export class CharacterSelectScene extends Scene {
         const centerY = this.scale.height / 2;
 
         audioManager.init(this);
-        audioManager.play('character-select-music', { loop: true, volume: 0.5 });
+        // audioManager.play('character-select-music', { loop: true, volume: 0.5 }); // Audio file missing
 
         // Title
         this.titleText = this.add.text(centerX, 80, 'SELECT YOUR CHARACTER', {

@@ -1,25 +1,25 @@
-// Battle Map configuration
-// A PvP arena with enemy spawns and strategic consumables
+// Egg Map configuration
+// A large vacuous room with indestructible walls
 
 import { MapData } from './SummonerRift';
 import { TerritorialBehavior } from '../behaviorScripts/Territorial';
 import { AreaEffectType } from '../gameObjects/AreaBoundary';
 
 /**
- * Battle Map Data
- * Large battle arena designed for PvP with neutral enemies in corners
+ * Egg Map Data
+ * Single-room arena with egg-shaped boundaries
  */
-export const BattleMap: MapData = {
-    id: 'battle-map',
-    name: 'Battle Map',
-    description: 'A large battle arena with enemies guarding power-ups',
+export const EggMap: MapData = {
+    id: 'egg-map',
+    name: 'Egg Map',
+    description: 'A large vacuous room with indestructible walls',
 
-    // Map dimensions match BattleMap.png exactly
+    // Map dimensions match Egg_map.png exactly
     width: 4288,
     height: 5632,
 
     // Reference to loaded asset
-    assetKey: 'battle-map',
+    assetKey: 'egg-map',
 
     // Player spawn locations
     // Calculations: center=(2144, 2816), left-center=(1072, 2816), right-center=(3216, 2816)
@@ -158,4 +158,4 @@ export const BattleMap: MapData = {
     ]
 }
 
-export default BattleMap;
+export default EggMap;

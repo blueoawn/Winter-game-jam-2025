@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import { audioManager } from '../../../managers/AudioManager';
 import { NinjaStar } from '../Projectile/NinjaStar';
+import { Beam } from '../Projectile/Beam';
 
 export class Railgun extends PlayerController {
     // Railgun specific properties
@@ -181,10 +182,7 @@ export class Railgun extends PlayerController {
         const barrelX = this.x + forwardX + rightX;
         const barrelY = this.y + forwardY + rightY + this.barrelOffsetUp;
 
-        const endX = barrelX + Math.cos(angle) * this.maxBeamRange;
-        const endY = barrelY + Math.sin(angle) * this.maxBeamRange;
-
-        // 2. Create Beam Sprite
+        // 2. Create Beam Sprite for visual effect
         if (this.beamSprite) {
             this.beamSprite.destroy();
         }
@@ -225,50 +223,35 @@ export class Railgun extends PlayerController {
             }
         });
 
-        // 3. Collision Logic (Piercing) - apply damage when beam reaches full extension
+        // 3. Create Beam entity for collision detection (syncable for multiplayer)
+        const beamEntity = new Beam(
+            this.gameScene,
+            barrelX,
+            barrelY,
+            angle,
+            this.maxBeamRange,
+            damage,
+            width,
+            0x00ffff, // Cyan color for railgun
+            this.playerId,
+            this.team
+        );
+
+        // Add to player bullet group for network sync
+        this.gameScene.playerBulletGroup.add(beamEntity as any);
+
+        // Set short lifetime for the beam entity
+        beamEntity.maxLifetime = 200;
+
+        // 4. Collision Logic (Piercing) - apply damage when beam reaches full extension
         this.gameScene.time.delayedCall(expandDuration, () => {
-            const enemies = this.gameScene.enemyGroup.getChildren();
+            beamEntity.dealDamage();
 
-            for (const enemy of enemies) {
-                const e = enemy as Phaser.Physics.Arcade.Sprite;
-                if (!e.active) continue;
-
-                if (this.isInBeamPath(e.x, e.y, width, endX, endY, barrelX, barrelY)) {
-                    if ((e as any).hit) {
-                        (e as any).hit(damage);
-                    }
-                }
-            }
+            // Clean up beam entity after damage is dealt
+            this.gameScene.time.delayedCall(50, () => {
+                beamEntity.destroy();
+            });
         });
-    }
-
-    // Helper to check collision with beam line
-    private isInBeamPath(targetX: number, targetY: number, beamWidth: number, endX: number, endY: number, startX: number, startY: number): boolean {
-        // Vector from start to end
-        const dx = endX - startX;
-        const dy = endY - startY;
-        const beamLenSq = dx * dx + dy * dy;
-
-        if (beamLenSq === 0) return false;
-
-        // Vector from start to target
-        const tx = targetX - startX;
-        const ty = targetY - startY;
-
-        // Project target vector onto beam vector (dot product)
-        // t is the normalized distance along the line (0 to 1)
-        const t = Math.max(0, Math.min(1, (tx * dx + ty * dy) / beamLenSq));
-
-        // Closest point on line to target
-        const closestX = startX + t * dx;
-        const closestY = startY + t * dy;
-
-        // Distance from closest point to target center
-        const distSq = (targetX - closestX) ** 2 + (targetY - closestY) ** 2;
-
-        // Check if distance is within beam width + enemy radius approx (16px)
-        const hitRadius = (beamWidth / 2) + 16; 
-        return distSq < (hitRadius * hitRadius);
     }
 
     /**

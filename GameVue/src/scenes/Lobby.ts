@@ -42,7 +42,7 @@ export class Lobby extends Phaser.Scene {
 
     async create(): Promise<void> {
         audioManager.init(this);
-        audioManager.play('character-select-music', { loop: true, volume: 0.5 });
+        // audioManager.play('character-select-music', { loop: true, volume: 0.5 }); // Audio file missing
 
         // Create UI
         this.ui = new LobbyUI(this);

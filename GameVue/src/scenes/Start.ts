@@ -17,7 +17,7 @@ export class Start extends Phaser.Scene {
         const centerY = height * 0.5;
 
         audioManager.init(this);
-        audioManager.play('character-select-music', { loop: true, volume: 0.5 });
+        // audioManager.play('character-select-music', { loop: true, volume: 0.5 }); // Audio file missing
 
         this.add.text(centerX, 100, 'Half-dozen Heroz', {
             fontFamily: 'Arial Black',

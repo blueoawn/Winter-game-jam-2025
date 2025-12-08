@@ -5,6 +5,7 @@ import { audioManager } from '../../../managers/AudioManager';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
+import { Beam } from '../Projectile/Beam';
 
 // Cheese touch is a character that locks onto an enemy and does damage over time to them with their primary ability
 // Cheese touch has a secondary meter to show how much resource they have to heal themselves with their secondary ability
@@ -22,7 +23,7 @@ export class CheeseTouch extends PlayerController {
     static readonly ANIM_BEAM = 'cheese_beam';
 
     // Beam properties
-    beamGraphics: Graphics | null = null;
+    beam: Beam | null = null;
     isBeaming = false;
     beamDamageTimer: TimerEvent | null = null;
     beamRange = 300;
@@ -113,9 +114,9 @@ export class CheeseTouch extends PlayerController {
         super.preUpdate(time, delta);
 
         // Update beam visual if active
-        if (this.isBeaming && this.beamGraphics) {
+        if (this.isBeaming && this.beam) {
             this.updateLockOnTarget();
-            this.drawBeam();
+            this.updateBeamPosition();
             this.drawLockOnIndicator();
         }
     }
@@ -163,9 +164,25 @@ export class CheeseTouch extends PlayerController {
         // Play beam animation (hands up)
         this.play(CheeseTouch.ANIM_BEAM);
 
-        // Create beam graphics
-        this.beamGraphics = this.gameScene.add.graphics();
-        this.beamGraphics.setDepth(Depth.ABILITIES);
+        // Calculate initial beam angle
+        const angle = Math.atan2(this.currentAim.y - this.y, this.currentAim.x - this.x);
+
+        // Create beam entity
+        this.beam = new Beam(
+            this.gameScene,
+            this.x,
+            this.y,
+            angle,
+            this.beamRange,
+            this.beamDamage,
+            6, // width
+            0xffcc00, // yellow/orange cheese color
+            this.playerId,
+            this.team
+        );
+
+        // Add to player bullet group for collision detection
+        this.gameScene.playerBulletGroup.add(this.beam as any);
 
         // Create lock-on indicator graphics
         this.lockOnIndicator = this.gameScene.add.graphics();
@@ -187,9 +204,9 @@ export class CheeseTouch extends PlayerController {
         // Return to idle animation
         this.play(CheeseTouch.ANIM_IDLE);
 
-        if (this.beamGraphics) {
-            this.beamGraphics.destroy();
-            this.beamGraphics = null;
+        if (this.beam) {
+            this.beam.destroy();
+            this.beam = null;
         }
 
         if (this.beamDamageTimer) {
@@ -203,31 +220,18 @@ export class CheeseTouch extends PlayerController {
         }
     }
 
-    drawBeam(): void {
-        if (!this.beamGraphics) return;
-
-        this.beamGraphics.clear();
+    updateBeamPosition(): void {
+        if (!this.beam) return;
 
         // Use locked target position if available, otherwise use cursor aim
         const targetX = this.lockedTarget?.active ? this.lockedTarget.x : this.currentAim.x;
         const targetY = this.lockedTarget?.active ? this.lockedTarget.y : this.currentAim.y;
 
-        // Draw beam from player to target (clamped to range)
-        const dx = targetX - this.x;
-        const dy = targetY - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Calculate angle to target
+        const angle = Math.atan2(targetY - this.y, targetX - this.x);
 
-        // Clamp to beam range
-        const ratio = Math.min(1, this.beamRange / dist);
-        const endX = this.x + dx * ratio;
-        const endY = this.y + dy * ratio;
-
-        // Yellow/orange cheese beam
-        this.beamGraphics.lineStyle(6, 0xffcc00, 0.8);
-        this.beamGraphics.beginPath();
-        this.beamGraphics.moveTo(this.x, this.y);
-        this.beamGraphics.lineTo(endX, endY);
-        this.beamGraphics.strokePath();
+        // Update beam position and angle
+        this.beam.updateBeam(this.x, this.y, angle);
     }
 
     updateLockOnTarget(): void {
@@ -321,76 +325,41 @@ export class CheeseTouch extends PlayerController {
     }
 
     dealBeamDamage(): void {
-        if (!this.isBeaming) return;
+        if (!this.isBeaming || !this.beam) return;
+
+        // Store hit count before dealing damage
+        const initialHitCount = this.beam.hitEntities.size;
 
         // If we have a locked target, damage it directly
         if (this.lockedTarget && this.lockedTarget.active) {
-            if ((this.lockedTarget as any).hit) {
-                (this.lockedTarget as any).hit(this.beamDamage);
+            if ((this.lockedTarget as any).hit && !this.beam.hitEntities.has(this.lockedTarget)) {
+                const target = this.lockedTarget as any;
+                // Check if it's a player to pass PvP info
+                if (target.playerId && target.team) {
+                    target.hit(this.beamDamage, this.playerId, this.team);
+                } else {
+                    target.hit(this.beamDamage);
+                }
+                this.beam.hitEntities.add(this.lockedTarget);
                 this.skillMeter = Math.min(this.maxSkillMeter, this.skillMeter + 10);
                 this.updateSkillBarValue();
             }
             return;
         }
 
-        // Check for walls in beam path
-        const walls = this.gameScene.wallGroup.getChildren();
-        for (const wall of walls) {
-            const w = wall as any;
-            if (!w.active) continue;
+        // Use beam's damage method for all other targets
+        this.beam.dealDamage();
 
-            if (this.isInBeamPath(w.x, w.y)) {
-                if (w.hit && !w.isIndestructible) {
-                    w.hit(this.beamDamage);
-                }
-            }
+        // Check if we hit anything and update cheese meter accordingly
+        const newHitCount = this.beam.hitEntities.size;
+        if (newHitCount > initialHitCount) {
+            // Gained cheese meter for hitting something
+            this.skillMeter = Math.min(this.maxSkillMeter, this.skillMeter + 10);
+            this.updateSkillBarValue();
         }
 
-        // Fallback: Check for enemies in beam path
-        const enemies = this.gameScene.enemyGroup.getChildren();
-
-        for (const enemy of enemies) {
-            const e = enemy as Phaser.Physics.Arcade.Sprite;
-            if (!e.active) continue;
-
-            // Simple distance check to beam line
-            if (this.isInBeamPath(e.x, e.y)) {
-                // Deal damage to enemy
-                if ((e as any).hit) {
-                    (e as any).hit(this.beamDamage);
-                    // Gain cheese meter when dealing damage
-                    this.skillMeter = Math.min(this.maxSkillMeter, this.skillMeter + 10);
-                    this.updateSkillBarValue();
-                }
-            }
-        }
-    }
-
-    isInBeamPath(targetX: number, targetY: number): boolean {
-        // Calculate distance from point to beam line
-        const dx = this.currentAim.x - this.x;
-        const dy = this.currentAim.y - this.y;
-        const beamLength = Math.min(Math.sqrt(dx * dx + dy * dy), this.beamRange);
-
-        // Vector from player to target
-        const tx = targetX - this.x;
-        const ty = targetY - this.y;
-
-        // Project target onto beam line
-        const dot = (tx * dx + ty * dy) / (dx * dx + dy * dy);
-
-        // Check if projection is within beam length
-        if (dot < 0 || dot * Math.sqrt(dx * dx + dy * dy) > beamLength) {
-            return false;
-        }
-
-        // Calculate perpendicular distance
-        const projX = this.x + dot * dx;
-        const projY = this.y + dot * dy;
-        const perpDist = Math.sqrt((targetX - projX) ** 2 + (targetY - projY) ** 2);
-
-        // Beam has width of 30 pixels
-        return perpDist < 30;
+        // Clear hit entities each damage tick to allow continuous damage
+        this.beam.hitEntities.clear();
     }
 
     /**
