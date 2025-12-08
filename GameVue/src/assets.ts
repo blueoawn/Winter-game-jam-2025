@@ -26,6 +26,10 @@ export default {
             key: 'egg-map',
             args: ['assets/Backgrounds/Egg_map.png']
         },
+        battleMap: {
+            key: 'battle-map',
+            args: ['assets/Backgrounds/BattleMap.png']
+        },
         dungeonTileset: {
             key: 'dungeon-tilemap',
             args: ['assets/Sprites/MapSpriteSheets/spritesheet_dungeon.png']
