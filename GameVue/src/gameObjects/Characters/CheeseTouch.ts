@@ -255,6 +255,31 @@ export class CheeseTouch extends PlayerController {
             }
         }
 
+        // Check for players (in multiplayer mode)
+        const playerManager = (this.gameScene as any).playerManager;
+        if (playerManager) {
+            const players = playerManager.getAllPlayers();
+            for (const player of players) {
+                if (player.playerId === this.playerId) continue; // Skip self
+                if (!player.active) continue;
+                // Distance from cursor to player
+                const dx = player.x - this.currentAim.x;
+                const dy = player.y - this.currentAim.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Also check if player is within beam range from player
+                const playerDist = Math.sqrt((player.x - this.x) ** 2 + (player.y - this.y) ** 2);
+
+                if (dist < closestDist && playerDist <= this.beamRange) {
+                    closestDist = dist;
+                    closestTarget = player;
+                }
+            }
+        }
+
+        this.lockedTarget = closestTarget;
+    
+
         // Check destructible walls
         const walls = this.gameScene.wallGroup.getChildren();
         for (const wall of walls) {
