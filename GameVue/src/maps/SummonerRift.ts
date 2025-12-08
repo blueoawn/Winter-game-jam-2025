@@ -46,8 +46,8 @@ export interface MapData {
     // Spawn points
     spawnPoints: {
         default: { x: number; y: number };
-        team1?: { x: number; y: number };
-        team2?: { x: number; y: number };
+        teamRed?: { x: number; y: number };
+        teamBlue?: { x: number; y: number };
         spectator?: { x: number; y: number };
     };
 

@@ -4,6 +4,8 @@
  */
 
 import type { GameScene } from "../src/scenes/GameScene.ts";
+import type { PlayerController } from "../src/gameObjects/Characters/PlayerController";
+import { areEnemies } from "../src/types/Team";
 
 /**
  * Set up all collisions for singleplayer mode
@@ -170,4 +172,75 @@ export function setupMultiplayerCollisions(scene: GameScene): void {
     });
 
     console.log(`[COLLISION] Multiplayer collisions set up for ${allPlayers.length} players`);
+}
+
+/**
+ * Set up PvP collisions between players
+ * Handles both projectile damage and body collision with knockback
+ * @param scene The game scene
+ * @param friendlyFire Whether teammates can damage each other (default: true)
+ */
+export function setupPvPCollisions(scene: GameScene, friendlyFire: boolean = true): void {
+    if (!scene.playerManager) {
+        console.warn('[COLLISION] Cannot setup PvP collisions - playerManager not found');
+        return;
+    }
+
+    const allPlayers = scene.playerManager.getAllPlayers();
+
+    // Player bullets can damage OTHER players
+    scene.physics.add.overlap(
+        scene.playerBulletGroup,
+        allPlayers,
+        (bullet: any, player: any) => {
+            const targetPlayer = player as PlayerController;
+
+            // Skip if player is respawning
+            if (targetPlayer.isRespawning) return;
+
+            // Skip if bullet has no owner info
+            if (!bullet.ownerPlayerId) return;
+
+            // Skip self-damage
+            if (bullet.ownerPlayerId === targetPlayer.playerId) return;
+
+            // Check team rules (if friendly fire is disabled)
+            if (!friendlyFire && !areEnemies(bullet.ownerTeam, targetPlayer.team)) {
+                return;  // Same team, no damage
+            }
+
+            // Apply damage and remove bullet
+            scene.hitPlayerPvP(bullet, targetPlayer);
+        },
+        undefined,
+        scene
+    );
+
+    // Player vs Player body collision (knockback)
+    for (let i = 0; i < allPlayers.length; i++) {
+        for (let j = i + 1; j < allPlayers.length; j++) {
+            scene.physics.add.overlap(
+                allPlayers[i],
+                allPlayers[j],
+                (p1: any, p2: any) => {
+                    const player1 = p1 as PlayerController;
+                    const player2 = p2 as PlayerController;
+
+                    // Skip if either is respawning
+                    if (player1.isRespawning || player2.isRespawning) return;
+
+                    // Check team rules (if friendly fire is disabled)
+                    if (!friendlyFire && !areEnemies(player1.team, player2.team)) {
+                        return;  // Same team, no collision damage
+                    }
+
+                    scene.handlePlayerCollision(player1, player2);
+                },
+                undefined,
+                scene
+            );
+        }
+    }
+
+    console.log(`[COLLISION] PvP collisions set up for ${allPlayers.length} players (friendly fire: ${friendlyFire})`);
 }

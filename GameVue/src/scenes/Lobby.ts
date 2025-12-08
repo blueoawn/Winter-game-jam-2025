@@ -1,5 +1,7 @@
 import NetworkManager from '../../managers/NetworkManager';
 import { LobbyUI } from '../ui/LobbyUI';
+import { Team } from '../types/Team';
+import { audioManager } from '../../managers/AudioManager';
 
 interface LobbyInitData {
     mode?: 'host' | 'join';
@@ -13,6 +15,11 @@ interface GameSceneData {
     networkEnabled: boolean;
     isHost: boolean;
     players: string[];
+    teamAssignments: TeamAssignments;
+}
+
+interface TeamAssignments {
+    [playerId: string]: Team;
 }
 
 //TODO Background image?
@@ -20,6 +27,7 @@ interface GameSceneData {
 export class Lobby extends Phaser.Scene {
     private ui: LobbyUI | null = null;
     private connectedPlayers: string[] = [];
+    private teamAssignments: TeamAssignments = {};
     private isHost: boolean = false;
     private mode: 'host' | 'join' | null = null;
 
@@ -33,6 +41,9 @@ export class Lobby extends Phaser.Scene {
     }
 
     async create(): Promise<void> {
+        audioManager.init(this);
+        // audioManager.play('character-select-music', { loop: true, volume: 0.5 }); // Audio file missing
+
         // Create UI
         this.ui = new LobbyUI(this);
         this.ui.create();
@@ -75,6 +86,18 @@ export class Lobby extends Phaser.Scene {
         // Add self to player list
         const stats = NetworkManager.getStats();
         this.connectedPlayers = stats.playerId ? [stats.playerId] : [];
+
+        // Assign host to red team by default
+        if (stats.playerId) {
+            this.teamAssignments[stats.playerId] = Team.Red;
+        }
+
+        // Initialize teamAssignments in storage
+        const socket = NetworkManager.getSocket();
+        if (socket) {
+            socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
+        }
+
         this.updatePlayerList();
 
         // Listen for players joining
@@ -89,6 +112,23 @@ export class Lobby extends Phaser.Scene {
             }
 
             this.connectedPlayers = players;
+
+            // Assign new player to a team (alternate between Red and Blue)
+            if (!this.teamAssignments[peerId]) {
+                // Count current team sizes
+                const redCount = Object.values(this.teamAssignments).filter(t => t === Team.Red).length;
+                const blueCount = Object.values(this.teamAssignments).filter(t => t === Team.Blue).length;
+
+                // Assign to team with fewer players
+                this.teamAssignments[peerId] = redCount <= blueCount ? Team.Red : Team.Blue;
+
+                // Sync team assignments to all clients
+                const socket = NetworkManager.getSocket();
+                if (socket) {
+                    socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
+                }
+            }
+
             this.updatePlayerList();
             this.ui!.updateStatus(`${this.connectedPlayers.length} player(s) connected`, '#00ff00');
         });
@@ -119,12 +159,17 @@ export class Lobby extends Phaser.Scene {
 
             this.ui!.updateRoomCode(roomCode);
             this.ui!.changeMode('host');
-            this.ui!.updateStatus('Connected! Waiting for host to initiate character select ', '#00ff00');
+            this.ui!.updateStatus('Connected! Waiting for host to start...', '#00ff00');
 
-            // Get current players from storage
-            const storage = NetworkManager.getStorage();
-            this.connectedPlayers = storage?.players || [];
-            this.updatePlayerList();
+            // Get current players and team assignments from storage
+            // Wait a bit for storage to sync
+            setTimeout(() => {
+                const storage = NetworkManager.getStorage();
+                this.connectedPlayers = storage?.players || [];
+                this.teamAssignments = storage?.teamAssignments || {};
+                console.log('Initial storage after join:', storage);
+                this.updatePlayerList();
+            }, 100);
 
             // Listen for host disconnect
             NetworkManager.onPlayerLeave((peerId: string) => {
@@ -138,20 +183,28 @@ export class Lobby extends Phaser.Scene {
         } catch (error) {
             console.error('Failed to join game:', error);
             this.ui!.showError('Failed to join game. Check the room code.');
-            setTimeout(() => this.onBackToMenu(), 2000);
         }
     }
 
     setupStorageHandlers(): void {
         // Listen for storage updates
         NetworkManager.onStorageUpdate((storage: any) => {
-            console.log('Lobby storage updated:', storage, 'characterSelectionInProgress:', storage.characterSelectionInProgress);
+            console.log('Lobby storage updated:', storage);
 
             // Update player list
             if (storage.players) {
                 this.connectedPlayers = storage.players;
-                this.updatePlayerList();
+                console.log('Updated connected players:', this.connectedPlayers);
             }
+
+            // Update team assignments from server
+            if (storage.teamAssignments) {
+                this.teamAssignments = storage.teamAssignments;
+                console.log('Updated team assignments:', this.teamAssignments);
+            }
+
+            // Update UI with latest data
+            this.updatePlayerList();
 
             // Check if character selection phase has started - trigger for ALL clients when flag is true
             if (storage.characterSelectionInProgress === true) {
@@ -162,7 +215,32 @@ export class Lobby extends Phaser.Scene {
     }
 
     updatePlayerList(): void {
-        this.ui!.updatePlayerList(this.connectedPlayers, this.isHost);
+        this.ui!.updatePlayerList(this.connectedPlayers, this.teamAssignments, this.isHost);
+    }
+
+    assignPlayerTeam(playerId: string, team: Team): void {
+        // Update local assignment
+        this.teamAssignments[playerId] = team;
+
+        // Sync to storage - both host and clients update storage
+        // Server is authoritative and will broadcast to all clients
+        const socket = NetworkManager.getSocket();
+        if (socket) {
+            // Get current assignments from storage to avoid overwriting other players
+            const storage = NetworkManager.getStorage();
+            const currentAssignments = { ...(storage?.teamAssignments || {}), [playerId]: team };
+            console.log(`Updating teamAssignments in storage:`, currentAssignments);
+            socket.updateStorage('teamAssignments', 'set', currentAssignments);
+        }
+
+        // Update UI immediately for responsive feedback
+        this.updatePlayerList();
+    }
+
+    switchPlayerTeam(playerId: string, newTeam: Team): void {
+        console.log(`Switching player ${playerId} to team ${newTeam}`);
+        // All clients can update storage directly - server will sync to everyone
+        this.assignPlayerTeam(playerId, newTeam);
     }
 
     onSelectCharacters(): void {
@@ -193,11 +271,13 @@ export class Lobby extends Phaser.Scene {
 
     startCharacterSelection(players: string[]): void {
         console.log('Starting character selection with players:', players);
+        console.log('Team assignments:', this.teamAssignments);
 
         const gameData: GameSceneData = {
             networkEnabled: true,
             isHost: this.isHost,
-            players: players
+            players: players,
+            teamAssignments: this.teamAssignments
         };
 
         // Transition to Character Select scene

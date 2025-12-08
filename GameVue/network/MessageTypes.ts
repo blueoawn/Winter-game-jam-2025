@@ -5,6 +5,7 @@ export const MessageTypes = {
     PLAYER_LEAVE: 'PLAYER_LEAVE',
     PLAYER_READY: 'PLAYER_READY',
     START_GAME: 'START_GAME',
+    TEAM_SWITCH: 'TEAM_SWITCH',
 
     // Game messages
     INPUT: 'INPUT',

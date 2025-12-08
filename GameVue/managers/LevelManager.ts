@@ -22,6 +22,7 @@ import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
 import { SpeedBoost } from '../src/gameObjects/Consumable/SpeedBoost';
 import { Consumable } from '../src/gameObjects/Consumable/Consumable';
 import { AreaBoundary, AreaBoundaryConfig } from '../src/gameObjects/AreaBoundary';
+import { audioManager } from './AudioManager';
 
 /**
  * Initialize spawners from map data
@@ -476,6 +477,10 @@ export function hitWall(_scene: GameScene, bullet: any, wall: Wall): void {
         if (!wall.isIndestructible) {
             wall.hit(bullet.getPower());
         }
+        
+        // Play collision sound
+        audioManager.play('wall-shield-collision');
+        
         bullet.remove();
     } catch (err) {
         console.error('[LEVEL] Error handling wall hit:', err);
@@ -493,6 +498,9 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
                 // Apply effect to player
                 consumable.applyEffect(player);
                 
+                // Play pickup sound
+                audioManager.play('you-did-it');
+                
                 // Remove consumable
                 removeConsumable(scene, consumable);
                 break;
@@ -508,8 +516,51 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
  */
 export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, enemyBullet: EnemyBullet): void {
     try {
+        // Play collision sound
+        audioManager.play('wall-shield-collision');
+        
         removeEnemyBullet(scene, enemyBullet);
     } catch (err) {
         console.error('[LEVEL] Error destroying enemy bullet:', err);
+    }
+}
+
+/**
+ * Handle player hit by another player's projectile (PvP)
+ */
+export function hitPlayerPvP(scene: GameScene, bullet: any, player: PlayerController): void {
+    try {
+        // Skip if player is respawning
+        if (player.isRespawning) return;
+
+        addExplosion(scene, player.x, player.y);
+        player.hit(bullet.getPower(), bullet.ownerPlayerId, bullet.ownerTeam);
+        bullet.remove();
+
+        console.log(`[PVP] ${bullet.ownerPlayerId} (${bullet.ownerTeam}) hit ${player.playerId} (${player.team}) for ${bullet.getPower()} damage`);
+    } catch (err) {
+        console.error('[LEVEL] Error handling PvP player hit:', err);
+    }
+}
+
+/**
+ * Handle body collision between two players
+ * Applies damage and knockback to both players
+ */
+export function handlePlayerCollision(scene: GameScene, player1: PlayerController, player2: PlayerController): void {
+    try {
+        // Skip if either is respawning
+        if (player1.isRespawning || player2.isRespawning) return;
+
+        const bodyCollisionDamage = 1;
+
+        // Both players take damage and knockback
+        player1.handlePlayerBodyCollision(player2, bodyCollisionDamage);
+        player2.handlePlayerBodyCollision(player1, bodyCollisionDamage);
+
+        // Add explosion at collision point
+        addExplosion(scene, (player1.x + player2.x) / 2, (player1.y + player2.y) / 2);
+    } catch (err) {
+        console.error('[LEVEL] Error handling player collision:', err);
     }
 }

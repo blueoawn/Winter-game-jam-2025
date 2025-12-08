@@ -38,7 +38,7 @@ export default class Wall extends Phaser.Physics.Arcade.Sprite implements Syncab
      * @param scene - The game scene
      * @param x - X position
      * @param y - Y position
-     * @param spriteKey - Sprite sheet key (required)
+     * @param spriteKey - Sprite sheet key (optional, defaults to invisible wall)
      * @param frame - Sprite frame (defaults to 0)
      * @param health - Health value (-1 for indestructible, any positive number for destructible)
      */

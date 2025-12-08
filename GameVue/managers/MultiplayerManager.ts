@@ -29,8 +29,23 @@ export class PlayerManager {
             return this.players.get(playerId)!;
         }
 
-        // Get spawn position from current map data
-        const spawn = (this.scene as any).currentMap?.spawnPoints?.default || { x: 800, y: 1000 };
+        // Determine spawn position based on team assignment
+        // Team is assigned in GameScene.initMultiplayer() before this is called
+        const teamAssignments = (this.scene as any).teamAssignments || {};
+        const playerTeam = teamAssignments[playerId];
+        
+        let spawn = (this.scene as any).currentMap?.spawnPoints?.default || { x: 800, y: 1000 };
+        
+        // Use team-specific spawn points if available and team is assigned
+        if (playerTeam && (this.scene as any).currentMap?.spawnPoints) {
+            const spawnPoints = (this.scene as any).currentMap.spawnPoints;
+            if (playerTeam === 'red' && spawnPoints.teamRed) {
+                spawn = spawnPoints.teamRed;
+            } else if (playerTeam === 'blue' && spawnPoints.teamBlue) {
+                spawn = spawnPoints.teamBlue;
+            }
+        }
+        
         const spawnX = spawn.x;
         const spawnY = spawn.y;
 
@@ -229,7 +244,11 @@ export class PlayerManager {
                 frame: player.frame?.name || 0,
                 rotation: player.rotation,
                 // Include speed for speed boost sync
-                characterSpeed: (player as any).characterSpeed || 1000
+                characterSpeed: (player as any).characterSpeed || 1000,
+                // PvP properties
+                team: player.team,
+                lives: player.lives,
+                isRespawning: player.isRespawning
             });
         });
 

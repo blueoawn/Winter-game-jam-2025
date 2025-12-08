@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import { EntityState } from '../../../network/SyncableEntity';
 import Projectile from './Projectile';
+import { Team } from '../../types/Team';
 
 /**
  * ShotgunPellet - BoomStick's shotgun projectile
@@ -35,7 +36,9 @@ export class ShotgunPellet extends Projectile {
         baseDamage: number = 3,
         minDamageMultiplier: number = 0.2,
         falloffStart: number = 80,
-        falloffEnd: number = 220
+        falloffEnd: number = 220,
+        ownerPlayerId: string = '',
+        ownerTeam: Team = Team.Neutral
     ) {
         // Use orange/yellow frame from tiles spritesheet
         super(scene, x, y, ASSETS.spritesheet.tiles.key, 2); // Frame 2 for pellet
@@ -45,6 +48,8 @@ export class ShotgunPellet extends Projectile {
         this.minDamageMultiplier = minDamageMultiplier;
         this.falloffStart = falloffStart;
         this.falloffEnd = falloffEnd;
+        this.ownerPlayerId = ownerPlayerId;
+        this.ownerTeam = ownerTeam;
         this.createdTime = Date.now();
 
         // Track starting position for distance calculations
@@ -142,7 +147,11 @@ export class ShotgunPellet extends Projectile {
             startY: this.startY,  // Needed for falloff calculation
             minDamageMultiplier: this.minDamageMultiplier,
             falloffStart: this.falloffStart,
-            falloffEnd: this.falloffEnd
+            falloffEnd: this.falloffEnd,
+            ownerPlayerId: this.ownerPlayerId,
+            ownerTeam: this.ownerTeam,
+            netVersion: 0,
+            isDead: false
         };
     }
 
@@ -168,6 +177,14 @@ export class ShotgunPellet extends Projectile {
         if (state.minDamageMultiplier !== undefined) this.minDamageMultiplier = state.minDamageMultiplier;
         if (state.falloffStart !== undefined) this.falloffStart = state.falloffStart;
         if (state.falloffEnd !== undefined) this.falloffEnd = state.falloffEnd;
+
+        // PvP ownership sync
+        if ((state as any).ownerPlayerId !== undefined) {
+            this.ownerPlayerId = (state as any).ownerPlayerId;
+        }
+        if ((state as any).ownerTeam !== undefined) {
+            this.ownerTeam = (state as any).ownerTeam;
+        }
 
         // Recalculate distance traveled
         const dx = this.x - this.startX;

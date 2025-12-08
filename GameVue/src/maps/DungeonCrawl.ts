@@ -32,8 +32,8 @@ export const DungeonCrawl: MapData = {
     // Player spawn locations - Start in the bottom center room
     spawnPoints: {
         default: { x: 800, y: 1000 },  // Bottom center room (50*16, 62*16)
-        team1: { x: 400, y: 1000 },    // Bottom left
-        team2: { x: 1200, y: 1000 },   // Bottom right
+        teamRed: { x: 1200, y: 1000 }, // Bottom right (red team)
+        teamBlue: { x: 400, y: 1000 }, // Bottom left (blue team)
     },
 
     // Enemy spawners - Scattered throughout the dungeon

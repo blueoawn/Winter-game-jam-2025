@@ -4,6 +4,8 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
+import { Slash } from '../Projectile/Slash';
+import { audioManager } from '../../../managers/AudioManager';
 
 export class BigSword extends PlayerController {
     // Ability 1 - Heavy Slash config
@@ -28,6 +30,7 @@ export class BigSword extends PlayerController {
     dashHitboxHeight = 30;
 
     // Runtime state
+    private currentSlash: Slash | null = null;
     private slashSprite: Phaser.GameObjects.Image | null = null;
     private slashTrailGraphics: Graphics | null = null;
     private dashGraphics: Graphics | null = null;
@@ -37,9 +40,6 @@ export class BigSword extends PlayerController {
     private isSlashing = false;
     private isInvulnerable = false;
     private chargeTimer: TimerEvent | null = null;
-    private slashStartTime = 0;
-    private slashBaseAngle = 0;
-    private hitEnemiesSlash: Set<any> = new Set();
     private dashStartX = 0;
     private dashStartY = 0;
     private dashTargetX = 0;
@@ -65,8 +65,8 @@ export class BigSword extends PlayerController {
         const frameWidth = 60;
         const frameHeight = 77;
 
-        const bodyWidth = frameWidth * 0.5;
-        const bodyHeight = frameHeight * 0.5;
+        const bodyWidth = frameWidth * 0.7;
+        const bodyHeight = frameHeight * 0.7;
 
         this.setBodySize(bodyWidth, bodyHeight);
 
@@ -84,6 +84,11 @@ export class BigSword extends PlayerController {
 
         if (this.isSlashing) {
             this.updateSlash(time);
+            // Update slash entity position to follow player
+            if (this.currentSlash) {
+                this.currentSlash.updateOwnerPosition(this.x, this.y);
+                this.currentSlash.update(this.gameScene.time.now);
+            }
         }
 
         if (this.isCharging) {
@@ -101,6 +106,7 @@ export class BigSword extends PlayerController {
         if (this.isDashing || this.isCharging || this.isSlashing) return;
 
         this.startSlash();
+        audioManager.play('sword-slash');
         this.startAbility1Cooldown();
     }
 
@@ -114,12 +120,30 @@ export class BigSword extends PlayerController {
 
     startSlash(): void {
         this.isSlashing = true;
-        this.slashStartTime = this.gameScene.time.now;
-        // Calculate base angle to start from the character's right side
-        this.slashBaseAngle = this.rotation - Math.PI / 2;
-        this.hitEnemiesSlash.clear();
 
-        // Create sword sprite
+        // Calculate base angle to start from the character's right side
+        const baseAngle = this.rotation - Math.PI / 2;
+
+        // Create slash entity for hit detection
+        this.currentSlash = new Slash(
+            this.gameScene,
+            this.x,
+            this.y,
+            baseAngle,
+            this.slashDamage,
+            this.slashWidth,
+            this.slashHeight,
+            this.slashOffset,
+            this.slashArc,
+            this.slashDuration,
+            this.playerId,
+            this.team
+        );
+
+        // Add to player bullet group for network sync
+        this.gameScene.playerBulletGroup.add(this.currentSlash as any);
+
+        // Create sword sprite for visual effect
         this.slashSprite = this.gameScene.add.image(0, 0, ASSETS.image.sword.key);
         this.slashSprite.setOrigin(0.5, 1); // Bottom-center origin (handle) for proper sword swing pivot
         this.slashSprite.setDepth(Depth.ABILITIES);
@@ -131,13 +155,15 @@ export class BigSword extends PlayerController {
     }
 
     updateSlash(time: number): void {
-        if (!this.slashSprite || !this.slashTrailGraphics) return;
+        if (!this.slashSprite || !this.slashTrailGraphics || !this.currentSlash) return;
 
-        const elapsed = time - this.slashStartTime;
+        // Get progress from slash entity
+        const elapsed = time - this.currentSlash.startTime;
         const progress = Math.min(elapsed / this.slashDuration, 1);
 
         // Start from right side and swing to left (outward arc)
-        const startAngle = this.slashBaseAngle + this.slashArc / 2;
+        const baseAngle = this.currentSlash.baseAngle;
+        const startAngle = baseAngle + this.slashArc / 2;
         const currentAngle = startAngle - this.slashArc * progress;
 
         const slashX = this.x + Math.cos(currentAngle) * this.slashOffset;
@@ -168,7 +194,7 @@ export class BigSword extends PlayerController {
             this.slashTrailGraphics.fillCircle(segX, segY, width / 2);
         }
 
-        this.checkSlashHits(slashX, slashY, currentAngle);
+        // Slash entity handles hit detection automatically in its update method
 
         if (progress >= 1) {
             this.endSlash();
@@ -177,7 +203,11 @@ export class BigSword extends PlayerController {
 
     endSlash(): void {
         this.isSlashing = false;
-        this.hitEnemiesSlash.clear();
+
+        if (this.currentSlash) {
+            this.currentSlash.destroy();
+            this.currentSlash = null;
+        }
 
         if (this.slashSprite) {
             this.slashSprite.destroy();
@@ -187,55 +217,6 @@ export class BigSword extends PlayerController {
         if (this.slashTrailGraphics) {
             this.slashTrailGraphics.destroy();
             this.slashTrailGraphics = null;
-        }
-    }
-
-    checkSlashHits(slashX: number, slashY: number, slashAngle: number): void {
-        // Check walls
-        const walls = this.gameScene.wallGroup.getChildren();
-        for (const wall of walls) {
-            const w = wall as any;
-            if (!w.active || this.hitEnemiesSlash.has(w)) continue;
-
-            const dx = w.x - slashX;
-            const dy = w.y - slashY;
-
-            const cos = Math.cos(-slashAngle);
-            const sin = Math.sin(-slashAngle);
-            const localX = dx * cos - dy * sin;
-            const localY = dx * sin + dy * cos;
-
-            if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
-                Math.abs(localY) < this.slashHeight / 2 + 20) {
-                if (w.hit && !w.isIndestructible) {
-                    w.hit(this.slashDamage);
-                    this.hitEnemiesSlash.add(w);
-                }
-            }
-        }
-
-        // Check enemies
-        const enemies = this.gameScene.enemyGroup.getChildren();
-
-        for (const enemy of enemies) {
-            const e = enemy as Phaser.Physics.Arcade.Sprite;
-            if (!e.active || this.hitEnemiesSlash.has(e)) continue;
-
-            const dx = e.x - slashX;
-            const dy = e.y - slashY;
-
-            const cos = Math.cos(-slashAngle);
-            const sin = Math.sin(-slashAngle);
-            const localX = dx * cos - dy * sin;
-            const localY = dx * sin + dy * cos;
-
-            if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
-                Math.abs(localY) < this.slashHeight / 2 + 20) {
-                if ((e as any).hit) {
-                    (e as any).hit(this.slashDamage);
-                    this.hitEnemiesSlash.add(e);
-                }
-            }
         }
     }
 
@@ -388,6 +369,30 @@ export class BigSword extends PlayerController {
                 if ((e as any).hit) {
                     (e as any).hit(this.dashDamage);
                     this.hitEnemies.add(e);
+                }
+            }
+        }
+
+        // Check other players in multiplayer (PvP)
+        const playerManager = (this.gameScene as any).playerManager;
+        if (playerManager) {
+            const players = playerManager.getAllPlayers();
+            for (const player of players) {
+                // Skip self to prevent self-damage
+                if (player.playerId === this.playerId) continue;
+                if (!player.active || this.hitEnemies.has(player)) continue;
+                // Skip respawning players
+                if (player.isRespawning) continue;
+
+                const dx = Math.abs(player.x - this.x);
+                const dy = Math.abs(player.y - this.y);
+
+                if (dx < this.dashHitboxWidth / 2 + 20 && dy < this.dashHitboxHeight / 2 + 20) {
+                    if (player.hit) {
+                        player.hit(this.dashDamage, this.playerId, this.team);
+                        this.hitEnemies.add(player);
+                        console.log(`[PVP] ${this.playerId} dash hit ${player.playerId} for ${this.dashDamage} damage`);
+                    }
                 }
             }
         }

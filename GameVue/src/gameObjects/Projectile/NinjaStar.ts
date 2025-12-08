@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import { EntityState } from '../../../network/SyncableEntity';
 import Projectile from './Projectile';
+import { Team } from '../../types/Team';
 
 /**
  * ninjastar - Right now this is used by Sword and Board, but I think it makes more sense as ability1 of the railgun character
@@ -25,12 +26,16 @@ export class NinjaStar extends Projectile {
         y: number,
         targetX: number,
         targetY: number,
-        damage: number = 2
+        damage: number = 2,
+        ownerPlayerId: string = '',
+        ownerTeam: Team = Team.Neutral
     ) {
         super(scene, x, y, ASSETS.image.shuriken.key);
 
         this.id = `sword_slash_${Date.now()}_${NinjaStar.nextId++}`;
         this.damage = damage;
+        this.ownerPlayerId = ownerPlayerId;
+        this.ownerTeam = ownerTeam;
         this.createdTime = Date.now();
 
         this.setScale(0.5);
@@ -102,7 +107,11 @@ export class NinjaStar extends Projectile {
             velocityX: this.body ? Math.round(this.body.velocity.x) : 0,
             velocityY: this.body ? Math.round(this.body.velocity.y) : 0,
             rotation: this.rotation,
-            damage: this.damage
+            damage: this.damage,
+            ownerPlayerId: this.ownerPlayerId,
+            ownerTeam: this.ownerTeam,
+            netVersion: 0,
+            isDead: false
         };
     }
 
@@ -123,6 +132,14 @@ export class NinjaStar extends Projectile {
 
         if (state.damage !== undefined) {
             this.damage = state.damage;
+        }
+
+        // PvP ownership sync
+        if ((state as any).ownerPlayerId !== undefined) {
+            this.ownerPlayerId = (state as any).ownerPlayerId;
+        }
+        if ((state as any).ownerTeam !== undefined) {
+            this.ownerTeam = (state as any).ownerTeam;
         }
     }
 }

@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import { ShotgunPellet } from '../Projectile/ShotgunPellet';
+import { audioManager } from '../../../managers/AudioManager';
 
 export class BoomStick extends PlayerController {
     private pellets: Set<ShotgunPellet> = new Set();
@@ -52,8 +53,8 @@ export class BoomStick extends PlayerController {
         const frameWidth = 60;
         const frameHeight = 77;
 
-        const bodyWidth = frameWidth * 0.5;
-        const bodyHeight = frameHeight * 0.5;
+        const bodyWidth = frameWidth * 0.7;
+        const bodyHeight = frameHeight * 0.7;
 
         this.setBodySize(bodyWidth, bodyHeight);
 
@@ -99,6 +100,8 @@ export class BoomStick extends PlayerController {
         const dy = this.currentAim.y - this.y;
         const baseAngle = Math.atan2(dy, dx);
 
+        audioManager.play('shotgun-fire');
+
         // Calculate barrel position with configurable offsets
         const cos = Math.cos(baseAngle);
         const sin = Math.sin(baseAngle);
@@ -132,7 +135,9 @@ export class BoomStick extends PlayerController {
                 this.baseDamage,
                 this.minDamageMultiplier,
                 this.falloffStart,
-                this.falloffEnd
+                this.falloffEnd,
+                this.playerId,
+                this.team
             );
 
             this.pellets.add(pellet);
