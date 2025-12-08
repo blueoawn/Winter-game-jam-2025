@@ -4,7 +4,6 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import { EntityState } from '../../../network/SyncableEntity';
 import Projectile from './Projectile';
-import { Team } from '../../types/Team';
 
 /**
  * MagicMissile - LizardWizard's primary projectile
@@ -26,17 +25,13 @@ export class MagicMissile extends Projectile {
         y: number,
         targetX: number,
         targetY: number,
-        damage: number = 1,
-        ownerPlayerId: string = '',
-        ownerTeam: Team = Team.Neutral
+        damage: number = 1
     ) {
         // Use a purple/magic-looking frame from tiles spritesheet
         super(scene, x, y, ASSETS.spritesheet.tiles.key, 3); // Frame 3 for magic
 
         this.id = `magic_missile_${Date.now()}_${MagicMissile.nextId++}`;
         this.damage = damage;
-        this.ownerPlayerId = ownerPlayerId;
-        this.ownerTeam = ownerTeam;
         this.createdTime = Date.now();
 
         // Configure sprite
@@ -149,11 +144,7 @@ export class MagicMissile extends Projectile {
             velocityX: this.body ? Math.round(this.body.velocity.x) : 0,
             velocityY: this.body ? Math.round(this.body.velocity.y) : 0,
             rotation: this.rotation,
-            damage: this.damage,
-            ownerPlayerId: this.ownerPlayerId,
-            ownerTeam: this.ownerTeam,
-            netVersion: 0,
-            isDead: false
+            damage: this.damage
         };
     }
 
@@ -174,14 +165,6 @@ export class MagicMissile extends Projectile {
 
         if (state.damage !== undefined) {
             this.damage = state.damage;
-        }
-
-        // PvP ownership sync
-        if ((state as any).ownerPlayerId !== undefined) {
-            this.ownerPlayerId = (state as any).ownerPlayerId;
-        }
-        if ((state as any).ownerTeam !== undefined) {
-            this.ownerTeam = (state as any).ownerTeam;
         }
     }
 }

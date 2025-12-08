@@ -3,17 +3,10 @@
 
 import PlaySocketServer from 'playsocketjs/server';
 
-const MAX_MESSAGE_SIZE = 8 * 1024; // 8 KB max per message
-function isObject(o) {
-    return o && typeof o === 'object' && !Array.isArray(o);
-}
-
-// SECURITY CHANGE: bind ONLY to localhost
 const server = new PlaySocketServer({
     port: 3001,
-    host: '127.0.0.1',
-    // SECURITY CHANGE: reasonable public-facing rate limit
-    rateLimit: 300
+    host: '0.0.0.0',
+    rateLimit: 2000
 });
 
 console.log('🚀 PlaySocketJS Server Booted on port 3001');
@@ -70,62 +63,51 @@ server.onEvent('clientDisconnected', (clientId, roomId) => {
 // Handle custom requests from clients (heartbeat, state, snapshot)
 // Note: PlaySocketJS uses 'name' not 'requestName' in the event payload
 server.onEvent('requestReceived', ({ clientId, roomId, name, data }) => {
-
-    // ✅ SECURITY: basic validation
-    if (!clientId || !roomId || typeof name !== 'string') {
-        return;
-    }
-
-    // ✅ SECURITY: message size guard
-    try {
-        const size = JSON.stringify(data ?? {}).length;
-        if (size > MAX_MESSAGE_SIZE) {
-            console.warn(`⛔ Oversized message from ${clientId}`);
-            return;
-        }
-    } catch {
-        return;
-    }
-
+    // Debug: log all requests except heartbeat
     if (name !== 'heartbeat') {
-        console.log(`📨 ${name} from ${clientId} in ${roomId}`);
+        console.log(`📨 Request received: ${name} from ${clientId} in ${roomId}`);
     }
 
     const meta = roomData.get(roomId);
-    if (!meta) return;
+    if (!meta) {
+        console.warn(`⚠️ No room metadata for ${roomId}`);
+        return;
+    }
 
-    // ✅ Heartbeat: lowest-cost path
     if (name === 'heartbeat') {
         meta.heartbeats.set(clientId, now());
         return;
     }
 
-    // ✅ State updates: only accept objects with numeric tick
     if (name === 'state') {
-        if (!isObject(data) || typeof data.tick !== 'number') {
+        // Host or authoritative client may send a state delta; server will validate tick
+        const delta = data;
+        if (!delta || typeof delta.tick !== 'number') {
+            console.warn(`⛔ Invalid state request from ${clientId} in ${roomId}`);
             return;
         }
 
-        if (data.tick > meta.lastTick) {
-            meta.lastTick = data.tick;
-            server.updateRoomStorage(roomId, 'lastStateDelta', 'set', data);
+        if (delta.tick > meta.lastTick) {
+            meta.lastTick = delta.tick;
+            // Use updateRoomStorage to properly broadcast to all clients
+            // This triggers the CRDT update and sends to all room participants
+            console.log(`📡 Broadcasting state tick=${delta.tick} to room ${roomId}`);
+            server.updateRoomStorage(roomId, 'lastStateDelta', 'set', delta);
+        } else if (delta.tick === meta.lastTick) {
+            // duplicate - ignore
+        } else {
+            console.log(`⚠️ Out-of-order state tick=${delta.tick} from ${clientId} (server ${meta.lastTick})`);
         }
 
         return;
     }
 
-    // ✅ Snapshot: throttle to host only
     if (name === 'snapshot') {
-        if (clientId !== meta.hostId) {
-            console.warn(`⛔ Snapshot denied for non-host ${clientId}`);
-            return;
-        }
-
-        console.log(`📸 Snapshot requested by host ${clientId}`);
+        console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
+        // TODO: Implement snapshot response (e.g., send via request response or update storage)
         return;
     }
 });
-
 
 // Storage validation: enforce who can write which keys and validate input sequence numbers
 server.onEvent('storageUpdateRequested', (params) => {
@@ -172,7 +154,6 @@ server.onEvent('storageUpdateRequested', (params) => {
 
     // Character selections and simple metadata (but NOT lastStateDelta from clients)
     if (key === 'characterSelections' || key.startsWith('characterSelections.') ||
-            key === 'teamAssignments' || key.startsWith('teamAssignments.') ||
             key === 'characterSelectionInProgress' || key === 'readyToStartGame' ||
             key === 'isGameStarted' || key === 'startGameData' ||
             key === 'allPlayersReady' || key === 'hostId' || key === 'meta') {
@@ -240,10 +221,6 @@ setInterval(() => {
                 console.log(`💀 Removing dead client ${clientId} from ${roomId}`);
                 meta.heartbeats.delete(clientId);
                 meta.lastInputSeq.delete(clientId);
-                
-                // Actually disconnect the client from PlaySocketJS
-                server.kick(clientId, 'Connection timeout - no heartbeat');
-                
                 if (clientId === meta.hostId) {
                     const next = [...meta.heartbeats.keys()][0] || null;
                     meta.hostId = next;

@@ -4,8 +4,6 @@ import { Depth } from '../../constants.ts';
 // Note: InputState and PlayerState should be defined in network module
 import { SyncableEntity } from '../../../network/SyncableEntity';
 import { IAllyBehavior } from '../../behaviorScripts/AllyBehavior';
-import { Team } from '../../types/Team';
-import { audioManager } from '../../../managers/AudioManager';
 import Vector2 = Phaser.Math.Vector2;
 import Container = Phaser.GameObjects.Container;
 
@@ -27,13 +25,6 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
-
-    // PvP properties
-    team: Team = Team.Neutral;
-    lives: number = 3;
-    startingLives: number = 3;
-    isRespawning: boolean = false;
-    respawnDelay: number = 2000;  // 2 second respawn delay
 
     // CPU control properties
     isCpuControlled: boolean = false;
@@ -83,36 +74,9 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.setMaxVelocity(this.velocityMax); // limit maximum speed of ship
         this.setDrag(this.drag);
         this.currentAim = new Vector2(x, y);  // Initialize aim to player position
-        
-        // Set default physics body size (75% of sprite size for better collision detection)
-        // Individual character classes can override this in their constructors
-        this.setDefaultBodySize();
-        
         this.createHealthBar();
         this.createSkillBar();
         this.handleDestruction();
-    }
-
-    /**
-     * Set default physics body size to 75% of sprite dimensions
-     * This provides better collision detection than the sprite's full size
-     * while still feeling responsive. Characters can override this method
-     * or call setBodySize() directly in their constructors.
-     */
-    protected setDefaultBodySize(): void {
-        const frameWidth = this.width;
-        const frameHeight = this.height;
-        
-        // Use 75% of sprite size for body (increased from typical 50%)
-        const bodyWidth = frameWidth * 0.75;
-        const bodyHeight = frameHeight * 0.75;
-        
-        this.setBodySize(bodyWidth, bodyHeight);
-        
-        // Center the body on the sprite
-        const offsetX = (frameWidth - bodyWidth) / 2;
-        const offsetY = (frameHeight - bodyHeight) / 2;
-        this.setOffset(offsetX, offsetY);
     }
 
     preUpdate(time: number, delta: number) {
@@ -273,135 +237,15 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         };
     }
 
-    hit(damage: number, attackerPlayerId?: string, attackerTeam?: Team) {
-        if (this.isRespawning) return;  // Ignore damage while respawning
-
+    hit(damage: number) {
         this.health -= damage;
         this.updateHealthBarValue();
-        if (this.health <= 0) this.handleDeath();
+        if (this.health <= 0) this.die();
     }
 
-    /**
-     * Handle player death - decrement lives and respawn or eliminate
-     */
-    handleDeath(): void {
-        if (this.isRespawning) return;  // Prevent multiple death triggers
-
-        // Play death sound
-        audioManager.play('lizard-death-2');
-
-        this.lives--;
-        this.gameScene.addExplosion(this.x, this.y);
-
-        if (this.lives > 0) {
-            this.respawn();
-        } else {
-            this.eliminate();
-        }
-    }
-
-    /**
-     * Respawn player after death with full health
-     */
-    respawn(): void {
-        this.isRespawning = true;
-
-        // Make temporarily invulnerable and semi-transparent
-        this.setAlpha(0.3);
-        this.setActive(false);
-        if (this.body) {
-            (this.body as Phaser.Physics.Arcade.Body).enable = false;
-        }
-
-        // Get respawn position (can be overridden by map spawn points)
-        const spawnPoint = this.getTeamSpawnPoint();
-
-        this.gameScene.time.delayedCall(this.respawnDelay, () => {
-            // Reset position to spawn
-            this.setPosition(spawnPoint.x, spawnPoint.y);
-
-            // Reset health to max
-            this.health = this.maxHealth;
-            this.updateHealthBarValue();
-
-            // Re-enable
-            this.setAlpha(1.0);
-            this.setActive(true);
-            if (this.body) {
-                (this.body as Phaser.Physics.Arcade.Body).enable = true;
-            }
-            this.isRespawning = false;
-        });
-    }
-
-    /**
-     * Get spawn point based on team (can be extended to use map-specific spawn points)
-     */
-    getTeamSpawnPoint(): { x: number; y: number } {
-        // Default: respawn at current position (maps can override with team-specific spawns)
-        const map = (this.gameScene as any).currentMap;
-        if (map?.spawnPoints) {
-            if (this.team === Team.Red && map.spawnPoints.teamRed) {
-                return map.spawnPoints.teamRed;
-            } else if (this.team === Team.Blue && map.spawnPoints.teamBlue) {
-                return map.spawnPoints.teamBlue;
-            } else if (map.spawnPoints.default) {
-                return map.spawnPoints.default;
-            }
-        }
-        // Fallback to center of map
-        return { x: this.gameScene.cameras.main.centerX, y: this.gameScene.cameras.main.centerY };
-    }
-
-    /**
-     * Player eliminated - no lives remaining
-     */
-    eliminate(): void {
-        console.log(`[PVP] Player ${this.playerId} eliminated (${this.team} team)`);
-
-        // Hide but don't destroy (for spectating/stats)
-        this.setAlpha(0);
-        this.setActive(false);
-        if (this.body) {
-            (this.body as Phaser.Physics.Arcade.Body).enable = false;
-        }
-
-        // Notify game scene for win condition check
-        this.gameScene.events.emit('playerEliminated', this.playerId, this.team);
-    }
-
-    /**
-     * Handle body collision with another player
-     * Applies knockback perpendicular to collision angle
-     */
-    handlePlayerBodyCollision(otherPlayer: PlayerController, damage: number = 1): void {
-        if (this.isRespawning) return;
-
-        // Apply damage
-        this.hit(damage, otherPlayer.playerId, otherPlayer.team);
-
-        // Calculate knockback direction (away from other player)
-        const dx = this.x - otherPlayer.x;
-        const dy = this.y - otherPlayer.y;
-        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        // Normalize and apply knockback impulse
-        const knockbackForce = 750;  // Knockback velocity
-        const knockbackX = (dx / distance) * knockbackForce;
-        const knockbackY = (dy / distance) * knockbackForce;
-
-        // Apply impulse velocity
-        if (this.body) {
-            (this.body as Phaser.Physics.Arcade.Body).velocity.x += knockbackX;
-            (this.body as Phaser.Physics.Arcade.Body).velocity.y += knockbackY;
-        }
-    }
-
-    /**
-     * Original die() kept for backward compatibility with mobs hitting player
-     */
     die() {
-        this.handleDeath();
+        this.gameScene.addExplosion(this.x, this.y);
+        this.destroy(); // destroy sprite so it is no longer updated
     }
 
     // Network methods for multiplayer
@@ -429,18 +273,6 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         // Sync speed from host (for speed boost effects)
         if (state.characterSpeed !== undefined) {
             this.characterSpeed = state.characterSpeed;
-        }
-
-        // Sync PvP properties
-        if (state.team !== undefined) {
-            this.team = state.team as Team;
-        }
-        if (state.lives !== undefined) {
-            this.lives = state.lives;
-        }
-        if (state.isRespawning !== undefined) {
-            this.isRespawning = state.isRespawning;
-            this.setAlpha(state.isRespawning ? 0.3 : 1.0);
         }
     }
 

@@ -1,5 +1,4 @@
 import { Scene } from 'phaser';
-import { audioManager } from '../../managers/AudioManager';
 
 export class GameOver extends Scene
 {
@@ -9,9 +8,6 @@ export class GameOver extends Scene
 
     create() {
         const { width, height } = this.scale;
-
-        audioManager.init(this);
-        audioManager.play('game-over-music', { loop: true, volume: 0.5 });
 
         this.cameras.main.fadeIn(500, 0, 0, 0);
 

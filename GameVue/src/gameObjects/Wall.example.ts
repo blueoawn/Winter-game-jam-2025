@@ -9,7 +9,6 @@
 import Wall from './Wall';
 import type { GameScene } from '../scenes/GameScene';
 import ASSETS from '../assets';
-import { NONE } from 'phaser';
 
 /**
  * Example 1: Creating an indestructible wall
@@ -20,7 +19,7 @@ function createIndestructibleWall(scene: GameScene) {
         scene,
         400,                            // x position
         300,                            // y position
-        ASSETS.spritesheet.tiles.key || NONE,  // sprite key (optional)
+        ASSETS.spritesheet.tiles.key,  // sprite key (required)
         0,                              // sprite frame
         -1                              // -1 = indestructible
     );
@@ -110,7 +109,7 @@ function loadWallsFromMapData(scene: GameScene, mapData: any) {
                 scene,
                 wallData.x,
                 wallData.y,
-                wallData.spriteKey || ASSETS.spritesheet.tiles.key || NONE,
+                wallData.spriteKey || ASSETS.spritesheet.tiles.key,
                 wallData.frame || 0,
                 wallData.health || -1  // Default to indestructible
             );

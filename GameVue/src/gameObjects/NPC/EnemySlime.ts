@@ -1,7 +1,6 @@
 import { EnemyController } from './EnemyController';
 import { GameScene } from '../../scenes/GameScene';
 import ASSETS from '../../assets';
-import { audioManager } from '../../../managers/AudioManager';
 
 export default class EnemySlime extends EnemyController {
     private moveSpeed: number = 50;
@@ -145,7 +144,6 @@ export default class EnemySlime extends EnemyController {
     }
 
     die(): void {
-        audioManager.play('lizard-death-1');
         this.gameScene.addExplosion(this.x, this.y);
         this.gameScene.removeEnemy(this);
     }

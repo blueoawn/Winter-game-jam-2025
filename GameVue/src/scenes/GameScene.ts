@@ -39,7 +39,6 @@ import {
 } from '../init.ts';
 import { getCharacterType, createCharacter, CHARACTER_ID_MAP } from '../utils/CharacterFactory.ts';
 import * as CollisionManager from '../../managers/CollisionManager.ts';
-import { Team } from '../types/Team';
 
 
 export class GameScene extends Scene
@@ -105,7 +104,6 @@ export class GameScene extends Scene
         this.networkEnabled = data?.networkEnabled || false;
         this.isHost = data?.isHost || false;
         this.players = data?.players || [];
-        (this as any).teamAssignments = data?.teamAssignments || {};
 
         // Store selected character ID
         (this as any).selectedCharacterId = data?.characterId || 'lizard-wizard';
@@ -114,7 +112,6 @@ export class GameScene extends Scene
             networkEnabled: this.networkEnabled,
             isHost: this.isHost,
             players: this.players,
-            teamAssignments: (this as any).teamAssignments,
             characterId: (this as any).selectedCharacterId
         });
     }
@@ -124,7 +121,6 @@ export class GameScene extends Scene
         try {
             // Initialize audio manager
             audioManager.init(this);
-            audioManager.play('battle-theme-1', { loop: true, volume: 0.5 });
 
             // Load current map (default to Summoners Rift)
             this.currentMap = getDefaultMap();
@@ -284,15 +280,15 @@ export class GameScene extends Scene
 
         this.players.forEach((playerId) => {
             const isLocal = (playerId === localPlayerId);
-
+            
             // Get the character ID for this player from storage
             let characterType: CharacterNamesEnum | undefined;
             const selection = characterSelections[playerId];
-
+            
             if (selection && selection.characterId) {
                 characterType = CHARACTER_ID_MAP[selection.characterId];
             }
-
+            
             // Fall back to first character if not found
             if (!characterType) {
                 characterType = Object.values(CharacterNamesEnum)[0];
@@ -300,18 +296,7 @@ export class GameScene extends Scene
             }
 
             try {
-                const player = this.playerManager!.createPlayer(playerId, isLocal, characterType);
-
-                // Assign team based on teamAssignments
-                const teamAssignments = (this as any).teamAssignments || {};
-                if (teamAssignments[playerId]) {
-                    player.team = teamAssignments[playerId];
-                    console.log(`Assigned player ${playerId} to team ${teamAssignments[playerId]}`);
-                } else {
-                    // Default to Red team if no assignment
-                    player.team = Team.Red;
-                    console.warn(`No team assignment for ${playerId}, defaulting to Red`);
-                }
+                this.playerManager!.createPlayer(playerId, isLocal, characterType);
             } catch (err) {
                 console.error(`Error creating player ${playerId}:`, err);
             }
@@ -416,10 +401,6 @@ export class GameScene extends Scene
         } else if (this.networkEnabled && this.playerManager) {
             // Set up multiplayer damage collisions (player bullets vs enemies, etc.)
             CollisionManager.setupMultiplayerCollisions(this);
-            // Set up PvP collisions (player vs player damage)
-            CollisionManager.setupPvPCollisions(this, true);  // friendlyFire enabled
-            // Listen for player eliminations (PvP win condition)
-            this.events.on('playerEliminated', this.checkWinCondition, this);
         }
 
         // Set up common collisions for both modes
@@ -540,14 +521,6 @@ export class GameScene extends Scene
         LevelManager.hitWall(this, bullet, wall);
     }
 
-    hitPlayerPvP(bullet: any, player: PlayerController) {
-        LevelManager.hitPlayerPvP(this, bullet, player);
-    }
-
-    handlePlayerCollision(player1: PlayerController, player2: PlayerController) {
-        LevelManager.handlePlayerCollision(this, player1, player2);
-    }
-
     pickupConsumable(player: any, consumableView: any) {
         LevelManager.pickupConsumable(this, player, consumableView);
     }
@@ -564,72 +537,5 @@ export class GameScene extends Scene
     GameOver() {
         // Delegate to SceneManager for consistent scene transitions
         SceneManager.endGameSession(this);
-    }
-
-    /**
-     * Check if a team has won (all opposing team players eliminated)
-     * Called when a player is eliminated
-     */
-    checkWinCondition(eliminatedPlayerId: string, eliminatedTeam: Team): void {
-        if (!this.playerManager) return;
-
-        const allPlayers = this.playerManager.getAllPlayers();
-
-        // Count living players per team
-        const teamCounts: Record<string, number> = {
-            [Team.Red]: 0,
-            [Team.Blue]: 0
-        };
-
-        allPlayers.forEach(player => {
-            if (player.lives > 0) {
-                if (player.team === Team.Red) teamCounts[Team.Red]++;
-                if (player.team === Team.Blue) teamCounts[Team.Blue]++;
-            }
-        });
-
-        console.log(`[PVP] Team counts - Red: ${teamCounts[Team.Red]}, Blue: ${teamCounts[Team.Blue]}`);
-
-        // Check win conditions
-        if (teamCounts[Team.Red] === 0 && teamCounts[Team.Blue] > 0) {
-            this.declareWinner(Team.Blue);
-        } else if (teamCounts[Team.Blue] === 0 && teamCounts[Team.Red] > 0) {
-            this.declareWinner(Team.Red);
-        } else if (teamCounts[Team.Red] === 0 && teamCounts[Team.Blue] === 0) {
-            this.declareDraw();
-        }
-    }
-
-    /**
-     * Declare a team as winner
-     */
-    declareWinner(winningTeam: Team): void {
-        console.log(`[PVP] ${winningTeam} team wins!`);
-        this.gameStarted = false;
-
-        // Show victory UI
-        const teamName = winningTeam === Team.Red ? 'RED' : 'BLUE';
-        this.gameOverText.setText(`${teamName} TEAM WINS!`);
-        this.gameOverText.setVisible(true);
-
-        // Transition to game over after delay
-        this.time.delayedCall(3000, () => {
-            this.GameOver();
-        });
-    }
-
-    /**
-     * Declare a draw (both teams eliminated simultaneously)
-     */
-    declareDraw(): void {
-        console.log('[PVP] Match ended in a draw!');
-        this.gameStarted = false;
-
-        this.gameOverText.setText('DRAW!');
-        this.gameOverText.setVisible(true);
-
-        this.time.delayedCall(3000, () => {
-            this.GameOver();
-        });
     }
 }

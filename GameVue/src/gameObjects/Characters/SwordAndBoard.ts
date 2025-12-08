@@ -6,8 +6,6 @@ import Image = Phaser.GameObjects.Image;
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 import { NinjaStar } from '../Projectile/NinjaStar';
-import { Slash } from '../Projectile/Slash';
-import { audioManager } from '../../../managers/AudioManager';
 
 export class SwordAndBoard extends PlayerController {
     private slashes: Set<NinjaStar> = new Set();
@@ -23,8 +21,11 @@ export class SwordAndBoard extends PlayerController {
     slashArc = Math.PI * 0.8;
 
     // Runtime state
-    private currentSlash: Slash | null = null;
+    private slashGraphics: Graphics | null = null;
+    private slashStartTime = 0;
+    private slashBaseAngle = 0;
     private isSlashing = false;
+    private hitEnemiesSlash: Set<any> = new Set();
 
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 3);
@@ -44,8 +45,8 @@ export class SwordAndBoard extends PlayerController {
         const frameWidth = 60;
         const frameHeight = 77;
 
-        const bodyWidth = frameWidth * 0.7;
-        const bodyHeight = frameHeight * 0.7;
+        const bodyWidth = frameWidth * 0.5;
+        const bodyHeight = frameHeight * 0.5;
 
         this.setBodySize(bodyWidth, bodyHeight);
 
@@ -66,58 +67,119 @@ export class SwordAndBoard extends PlayerController {
         this.updateShieldPositionAndRotation();
 
         // Update slash animation if currently slashing
-        if (this.isSlashing && this.currentSlash) {
-            this.currentSlash.updateOwnerPosition(this.x, this.y);
-            this.currentSlash.update(this.gameScene.time.now);
+        if (this.isSlashing) {
+            this.updateSlash(time);
         }
     }
 
     startSlash(): void {
-        this.isSlashing = true;
+            this.isSlashing = true;
+            this.slashStartTime = this.gameScene.time.now;
+            this.slashBaseAngle = this.rotation - Math.PI / 2;
+            this.hitEnemiesSlash.clear();
 
-        // Calculate base angle for slash (facing direction)
-        const baseAngle = this.rotation - Math.PI / 2;
-
-        // Create slash entity
-        this.currentSlash = new Slash(
-            this.gameScene,
-            this.x,
-            this.y,
-            baseAngle,
-            this.slashDamage,
-            this.slashWidth,
-            this.slashHeight,
-            this.slashOffset,
-            this.slashArc,
-            this.slashDuration,
-            this.playerId,
-            this.team
-        );
-
-        // Add to player bullet group for network sync
-        this.gameScene.playerBulletGroup.add(this.currentSlash as any);
-
-        // Automatically end slash after duration
-        this.gameScene.time.delayedCall(this.slashDuration, () => {
-            this.endSlash();
-        });
-    }
-
-    endSlash(): void {
-        this.isSlashing = false;
-
-        if (this.currentSlash) {
-            this.currentSlash.destroy();
-            this.currentSlash = null;
+            this.slashGraphics = this.gameScene.add.graphics();
+            this.slashGraphics.setDepth(Depth.ABILITIES);
         }
-    }
+
+        updateSlash(time: number): void {
+            if (!this.slashGraphics) return;
+
+            const elapsed = time - this.slashStartTime;
+            const progress = Math.min(elapsed / this.slashDuration, 1);
+
+            this.slashGraphics.clear();
+
+            const startAngle = this.slashBaseAngle - this.slashArc / 2;
+            const currentAngle = startAngle + this.slashArc * progress;
+
+            const slashX = this.x + Math.cos(currentAngle) * this.slashOffset;
+            const slashY = this.y + Math.sin(currentAngle) * this.slashOffset;
+
+            this.slashGraphics.fillStyle(0xffffff, 0.9);
+            this.slashGraphics.save();
+            this.slashGraphics.translateCanvas(slashX, slashY);
+            this.slashGraphics.rotateCanvas(currentAngle);
+            this.slashGraphics.fillRect(-this.slashWidth / 2, -this.slashHeight / 2, this.slashWidth, this.slashHeight);
+            this.slashGraphics.restore();
+
+            // Draw trail
+            this.slashGraphics.lineStyle(3, 0xffffff, 0.4);
+            this.slashGraphics.beginPath();
+            this.slashGraphics.arc(this.x, this.y, this.slashOffset, startAngle, currentAngle);
+            this.slashGraphics.strokePath();
+
+            this.checkSlashHits(slashX, slashY, currentAngle);
+
+            if (progress >= 1) {
+                this.endSlash();
+            }
+        }
+
+        endSlash(): void {
+            this.isSlashing = false;
+            this.hitEnemiesSlash.clear();
+
+            if (this.slashGraphics) {
+                this.slashGraphics.destroy();
+                this.slashGraphics = null;
+            }
+        }
+
+        checkSlashHits(slashX: number, slashY: number, slashAngle: number): void {
+            // Check walls
+            const walls = this.gameScene.wallGroup.getChildren();
+            for (const wall of walls) {
+                const w = wall as any;
+                if (!w.active || this.hitEnemiesSlash.has(w)) continue;
+
+                const dx = w.x - slashX;
+                const dy = w.y - slashY;
+
+                const cos = Math.cos(-slashAngle);
+                const sin = Math.sin(-slashAngle);
+                const localX = dx * cos - dy * sin;
+                const localY = dx * sin + dy * cos;
+
+                if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
+                    Math.abs(localY) < this.slashHeight / 2 + 20) {
+                    if (w.hit && !w.isIndestructible) {
+                        w.hit(this.slashDamage);
+                        this.hitEnemiesSlash.add(w);
+                    }
+                }
+            }
+
+            // Check enemies
+            const enemies = this.gameScene.enemyGroup.getChildren();
+
+            for (const enemy of enemies) {
+                const e = enemy as Phaser.Physics.Arcade.Sprite;
+                if (!e.active || this.hitEnemiesSlash.has(e)) continue;
+
+                const dx = e.x - slashX;
+                const dy = e.y - slashY;
+
+                const cos = Math.cos(-slashAngle);
+                const sin = Math.sin(-slashAngle);
+                const localX = dx * cos - dy * sin;
+                const localY = dx * sin + dy * cos;
+
+                if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
+                    Math.abs(localY) < this.slashHeight / 2 + 20) {
+                    if ((e as any).hit) {
+                        (e as any).hit(this.slashDamage);
+                        this.hitEnemiesSlash.add(e);
+                    }
+                }
+            }
+        }
 
     protected ability1(): void {
         if (!this.canUseAbility1()) return;
         if (this.isSlashing) return;
 
         this.startSlash();
-        audioManager.play('sword-slash');
         this.startAbility1Cooldown();
     }
 
