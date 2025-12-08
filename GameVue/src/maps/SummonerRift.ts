@@ -1,6 +1,24 @@
 // Summoners Rift map configuration
 // A three-lane battle arena map
 
+import { AggressiveBehavior } from "../behaviorScripts/Aggressive";
+import { IBehavior } from "../behaviorScripts/Behavior";
+import { AreaEffectType } from "../gameObjects/AreaBoundary";
+
+/**
+ * Spawner configuration for enemy spawning
+ */
+export interface SpawnerConfig {
+    x: number;
+    y: number;
+    totalEnemies: number;
+    spawnRate: number;      // Milliseconds between spawns
+    timeOffset: number;     // Milliseconds before first spawn
+    enemyType: string;      // e.g., 'EnemyLizardWizard'
+    behaviorType?: IBehavior;  // 'Aggressive' | 'Territorial' | 'Pacifist'
+    behaviorOptions?: any;  // Behavior-specific configuration
+}
+
 /**
  * Map data interface for defining game maps
  * All maps should conform to this structure
@@ -16,6 +34,14 @@ export interface MapData {
 
     // Asset reference
     assetKey: string;  // Key used in assets.ts
+    isTilemap?: boolean;  // If true, assetKey refers to a tilemap JSON, not an image
+    tilemapTilesetKey?: string;  // Spritesheet key for tilemap tiles
+    
+    // Tilemap-specific fields (only used when isTilemap is true)
+    tileWidth?: number;  // Width of each tile in pixels
+    tileHeight?: number;  // Height of each tile in pixels
+    mapWidth?: number;  // Map width in tiles
+    mapHeight?: number;  // Map height in tiles
 
     // Spawn points
     spawnPoints: {
@@ -36,6 +62,44 @@ export interface MapData {
         id: string;
         type: string;
         position: { x: number; y: number };
+    }>;
+
+    // Optional: Enemy spawner configurations
+    spawners?: SpawnerConfig[];
+
+    // Optional: Wall configurations
+    walls?: Array<{
+        x: number;
+        y: number;
+        spriteKey: string;
+        frame?: number;
+        health: number;
+    }>;
+
+    // Optional: Consumable item configurations
+    consumables?: Array<{
+        x: number;
+        y: number;
+        type: string;  // 'HealthPack' | 'SpeedBoost' | 'InvincibilityGem'
+        value: number;
+        lifetime?: number;  // Optional lifetime in ms (undefined = no decay)
+    }>;
+
+    // Optional: Area boundary configurations for zone effects
+    areaBoundaries?: Array<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        effectType: AreaEffectType;
+        speedMultiplier?: number;
+        pushVelocity?: { x: number; y: number };
+        damageRate?: number;
+        healRate?: number;
+        tickInterval?: number;
+        visible?: boolean;
+        fillColor?: number;
+        fillAlpha?: number;
     }>;
 }
 
@@ -82,8 +146,61 @@ export const SummonersRift: MapData = {
     entities: [
         { id: 'dragon', type: 'neutral-objective', position: { x: 400, y: 800 } },
         { id: 'baron', type: 'neutral-objective', position: { x: 1200, y: 543 } },
+    ],
+
+    // Enemy spawners
+    spawners: [
+        {
+            x: 300,              // Map center X
+            y: 800,              // Map center Y (1343/2 ≈ 672)
+            totalEnemies: -1, // Infinite spawns
+            spawnRate: 6000*10,     // 10 seconds between spawns
+            timeOffset: 0,    // Start immediately
+            enemyType: 'EnemyLizardWizard',
+            behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
+        },
+            {
+            x: 900,              // Map center X
+            y: 800,              // Map center Y (1343/2 ≈ 672)
+            totalEnemies: -1, // Infinite spawns
+            spawnRate: 6000*10,     // 10 seconds between spawns
+            timeOffset: 0,    // Start immediately
+            enemyType: 'EnemySlime',
+            behaviorType: new AggressiveBehavior({moveSpeed: 100, attackRange: 500, ability1Rate: 1000, ability2Rate:3000})
+        }
+    ],
+
+    // Wall barriers - Destructible barrier across mid lane
+    walls: [
+        { x: 600, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 664, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 728, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 792, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 856, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 920, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        { x: 984, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+    ],
+
+    // Consumable items
+    consumables: [
+        { x: 900, y: 900, type: 'HealthPack', value: 1 },
+    ],
+
+    // Area boundaries - Zone effects
+    areaBoundaries: [
+        {
+            x: 45,              // Center at 45px (half of 90px width)
+            y: 672,             // Center vertically (1343/2)
+            width: 90,
+            height: 1343,       // Full map height
+            effectType: AreaEffectType.SpeedModifier,
+            speedMultiplier: 1.5,  // 50% speed boost
+            visible: true,
+            fillColor: 0x00BFFF,   // Deep sky blue
+            fillAlpha: 0.25
+        }
     ]
-};
+}
 
 // Default export for convenience
 export default SummonersRift;

@@ -1,11 +1,11 @@
-import { PlayerController } from './PlayerController';
+import { PlayerController } from '../src/gameObjects/Characters/PlayerController.ts';
 import { LizardWizard } from '../src/gameObjects/Characters/LizardWizard';
 import { SwordAndBoard } from '../src/gameObjects/Characters/SwordAndBoard';
 import { CheeseTouch } from '../src/gameObjects/Characters/CheeseTouch';
 import { BigSword } from '../src/gameObjects/Characters/BigSword';
-import type { GameScene } from '../src/scenes/Game';
-import type { InputState, PlayerState } from '../network/StateSerializer';
+import type { GameScene } from '../src/scenes/GameScene.ts';
 import { CharacterNamesEnum } from "../src/gameObjects/Characters/CharactersEnum.ts";
+import { FollowAndAttackBehavior } from '../src/behaviorScripts/FollowAndAttack';
 
 // Manager class for handling multiple players in multiplayer
 export class PlayerManager {
@@ -78,6 +78,69 @@ export class PlayerManager {
         }
     }
 
+    /**
+     * Convert a player to CPU control (e.g., when they disconnect)
+     * Instead of removing the player, enables AI behavior to take over
+     * @param playerId The ID of the player to convert
+     * @returns true if successful, false if player not found
+     */
+    convertToCpu(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        if (!player) {
+            console.warn(`[CPU] Cannot convert player ${playerId} to CPU - not found`);
+            return false;
+        }
+
+        // Don't convert if already CPU controlled
+        if (player.isCpuControlled) {
+            console.log(`[CPU] Player ${playerId} is already CPU controlled`);
+            return true;
+        }
+
+        // Enable CPU control with default follow-and-attack behavior
+        const behavior = new FollowAndAttackBehavior({
+            followDistance: 150,
+            followThreshold: 250,
+            attackRange: 350,
+            ability1Interval: 500,
+            ability2Interval: 3000
+        });
+
+        player.enableCpuControl(behavior);
+        console.log(`[CPU] Player ${playerId} converted to CPU control`);
+        return true;
+    }
+
+    /**
+     * Convert a CPU-controlled player back to network control (e.g., when they reconnect)
+     * @param playerId The ID of the player to restore
+     * @returns true if successful, false if player not found
+     */
+    restoreFromCpu(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        if (!player) {
+            console.warn(`[CPU] Cannot restore player ${playerId} from CPU - not found`);
+            return false;
+        }
+
+        if (!player.isCpuControlled) {
+            console.log(`[CPU] Player ${playerId} is not CPU controlled`);
+            return true;
+        }
+
+        player.disableCpuControl();
+        console.log(`[CPU] Player ${playerId} restored from CPU control`);
+        return true;
+    }
+
+    /**
+     * Check if a player is CPU controlled
+     */
+    isCpuControlled(playerId: string): boolean {
+        const player = this.players.get(playerId);
+        return player?.isCpuControlled ?? false;
+    }
+
     // Get a specific player
     getPlayer(playerId: string): PlayerController | undefined {
         return this.players.get(playerId);
@@ -117,12 +180,37 @@ export class PlayerManager {
 
     // Apply full player state from network (clients use this)
     applyPlayerState(playerStates: PlayerState[]): void {
-        playerStates.forEach(state => {
-            const player = this.players.get(state.id);
-            if (player && (player as any).applyState) {
-                (player as any).applyState(state);
+        try {
+            if (!Array.isArray(playerStates)) {
+                console.error('[MULTIPLAYER] applyPlayerState received non-array:', typeof playerStates);
+                return;
             }
-        });
+
+            playerStates.forEach(state => {
+                if (!state || !state.id) {
+                    console.warn('[MULTIPLAYER] Invalid player state (no id):', state);
+                    return;
+                }
+
+                const player = this.players.get(state.id);
+                if (!player) {
+                    console.warn('[MULTIPLAYER] Player not found:', state.id);
+                    return;
+                }
+
+                if ((player as any).applyState) {
+                    try {
+                        (player as any).applyState(state);
+                    } catch (err) {
+                        console.error(`[MULTIPLAYER] Error applying state to player ${state.id}:`, err);
+                    }
+                } else {
+                    console.warn(`[MULTIPLAYER] Player ${state.id} doesn't have applyState method`);
+                }
+            });
+        } catch (err) {
+            console.error('[MULTIPLAYER] Error in applyPlayerState:', err);
+        }
     }
 
     // Collect current state of all players for serialization
@@ -139,7 +227,9 @@ export class PlayerManager {
                 velocityY: body?.velocity?.y || 0,
                 health: player.health,
                 frame: player.frame?.name || 0,
-                rotation: player.rotation
+                rotation: player.rotation,
+                // Include speed for speed boost sync
+                characterSpeed: (player as any).characterSpeed || 1000
             });
         });
 

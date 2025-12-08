@@ -1,3 +1,5 @@
+/* Deprecated from when we were using pool instead of entity deltas
+
 import ASSETS from '../assets.js';
 import { GameScene } from "../scenes/Game.ts";
 import Vector2 = Phaser.Math.Vector2;
@@ -8,6 +10,8 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
     bulletSpeed = 1000;
     gameScene: GameScene;
     private static nextId = 0;
+    private createdTime: number = 0;  // Track when bullet was created/acquired
+    private maxLifetime: number = 3000;  // Auto-reclaim after 3 seconds
 
     // Damage falloff properties
     originX = 0;
@@ -22,6 +26,7 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         super(scene, from.x, from.y, ASSETS.spritesheet.tiles.key, power-1);
 
         this.id = `bullet_${Date.now()}_${PlayerBullet.nextId++}`;
+        this.createdTime = Date.now();  // Set creation time
 
         scene.add.existing(this);
         scene.physics.add.existing(this);
@@ -39,10 +44,22 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         velocityVector.normalize();
 
         this.setVelocity(velocityVector.x * this.bulletSpeed, velocityVector.y * this.bulletSpeed);
+
+        // Ensure physics body is enabled and active
+        if (this.body) {
+            this.body.enable = true;
+        }
     }
 
     preUpdate(time: number, delta: number) {
         super.preUpdate(time, delta);
+
+        // Auto-reclaim bullets after 3 seconds
+        if (Date.now() - this.createdTime > this.maxLifetime) {
+            console.log(`PlayerBullet: Auto-reclaiming bullet ${this.id} after ${this.maxLifetime}ms`);
+            this.remove();
+            return;
+        }
 
         this.checkWorldBounds();
     }
@@ -81,7 +98,12 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
 
     // is this bullet off the screen?
     checkWorldBounds() {
-        if (this.y < 0 || this.x < 0) {
+        const worldBounds = this.scene.physics.world.bounds;
+
+        if (this.x < worldBounds.x ||
+            this.x > worldBounds.x + worldBounds.width ||
+            this.y < worldBounds.y ||
+            this.y > worldBounds.y + worldBounds.height) {
             this.remove();
         }
     }
@@ -90,3 +112,4 @@ export default class PlayerBullet extends Phaser.Physics.Arcade.Sprite {
         this.gameScene.removeBullet(this);
     }
 }
+*/

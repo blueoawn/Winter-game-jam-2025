@@ -1,6 +1,7 @@
 import { Scene } from 'phaser';
 import ASSETS from '../assets';
-import NetworkManager from '../../network/NetworkManager';
+import NetworkManager from '../../managers/NetworkManager.ts';
+import { CharacterIdsEnum } from "../gameObjects/Characters/CharactersEnum.ts";
 
 interface CharacterData {
     id: string;
@@ -21,13 +22,6 @@ interface CharacterSelection {
     ready: boolean;
     timestamp: number;
 }
-
-// TODO There's several improvements to be made here, such as better UI/UX, gamepad support, etc.
-
-// The UI could display character stats as bars and abilities with icons
-
-// With 6 characters planned, the layout will need adjustment. I'm thinking a carousel would be nice with big cards showing details, but a grid could also work especially if we want to show all options at once.
-// Should some characters be locked initially and require unlocking?
 
 export class CharacterSelectScene extends Scene {
     private characters: CharacterData[] = [
@@ -95,13 +89,26 @@ export class CharacterSelectScene extends Scene {
             },
             ability1: 'Shotgun Blast (7 pellet spread)',
             ability2: 'Burst Dash (quick dodge)'
+        },
+        {
+            id: 'rail-gun',
+            name: 'Rail Gun',
+            frame: 5,
+            description: 'Stop and pop',
+            stats: {
+                speed: 'Medium',
+                health: 'Low',
+                fireRate: ''
+            },
+            ability1: 'Ninja stars',
+            ability2: 'Rail gun'
         }
     ];
-
     private selectedCharacterId: string | null = null;
     private networkEnabled: boolean = false;
     private isHost: boolean = false;
     private players: string[] = [];
+    private inCharacterSelection: boolean = false;  // Guard against multiple character selection transitions
     private characterSelections: Map<string, CharacterSelection> = new Map();
 
     private titleText!: Phaser.GameObjects.Text;
@@ -110,8 +117,68 @@ export class CharacterSelectScene extends Scene {
     private startButtonBg!: Phaser.GameObjects.Rectangle;
     private playerStatusText!: Phaser.GameObjects.Text;
 
+    // Carousel state
+    private currentIndex: number = 0;
+    private carouselContainer!: Phaser.GameObjects.Container;
+    private isAnimating: boolean = false;
+    private leftArrow!: Phaser.GameObjects.Text;
+    private rightArrow!: Phaser.GameObjects.Text;
+
+    // Unlocked characters - only these can be selected
+    private unlockedCharacters: Set<string> = new Set();
+    private static readonly STORAGE_KEY = 'unlockedCharacters';
+    // TODO modify this variable to have less characters when the game is ready
+    private static readonly DEFAULT_UNLOCKED: string[] = [
+        CharacterIdsEnum.LizardWizard,
+        CharacterIdsEnum.BigSword,
+        CharacterIdsEnum.SwordAndBoard,
+        CharacterIdsEnum.BoomStick,
+        CharacterIdsEnum.CheeseTouch,
+        CharacterIdsEnum.Railgun
+    ];
+
     constructor() {
         super('CharacterSelectScene');
+        this.loadUnlockedCharacters();
+    }
+
+    private loadUnlockedCharacters(): void {
+        try {
+            const stored = localStorage.getItem(CharacterSelectScene.STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored) as string[];
+                this.unlockedCharacters = new Set(parsed);
+                // Ensure any new default unlocks are present (migration)
+                let added = false;
+                (CharacterSelectScene.DEFAULT_UNLOCKED as string[]).forEach(def => {
+                    if (!this.unlockedCharacters.has(def)) {
+                        this.unlockedCharacters.add(def);
+                        added = true;
+                    }
+                });
+                if (added) {
+                    // Persist migration changes
+                    this.saveUnlockedCharacters();
+                }
+            } else {
+                // First time - set defaults
+                this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+                this.saveUnlockedCharacters();
+            }
+        } catch (e) {
+            console.warn('Failed to load unlocked characters from storage:', e);
+            this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+        }
+        console.log('Unlocked characters:', Array.from(this.unlockedCharacters));
+    }
+
+    private saveUnlockedCharacters(): void {
+        try {
+            const data = Array.from(this.unlockedCharacters);
+            localStorage.setItem(CharacterSelectScene.STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.warn('Failed to save unlocked characters to storage:', e);
+        }
     }
 
     init(data: any): void {
@@ -177,11 +244,20 @@ export class CharacterSelectScene extends Scene {
         if (this.networkEnabled) {
             this.setupStorageHandlers();
 
+            // Unregister storage listener when scene shuts down
+            this.events.on('shutdown', () => {
+                NetworkManager.offStorageUpdate();
+            });
+
+            this.events.on('sleep', () => {
+                NetworkManager.offStorageUpdate();
+            });
+
             // Initialize storage with character selections object if host
             if (this.isHost) {
                 const storage = NetworkManager.getStorage();
                 if (storage && !storage.characterSelections) {
-                    const socket = (NetworkManager as any).socket;
+                    const socket = NetworkManager.getSocket();
                     if (socket) {
                         socket.updateStorage('characterSelections', 'set', {});
                         socket.updateStorage('allPlayersReady', 'set', false);
@@ -192,201 +268,387 @@ export class CharacterSelectScene extends Scene {
     }
 
     private createCharacterCards(centerX: number, centerY: number): void {
-        const screenWidth = this.scale.width;
-        const screenPadding = 40;
-        const cardSpacing = 20;
-        const availableWidth = screenWidth - (screenPadding * 2);
+        // Reset carousel state
+        this.currentIndex = 0;
+        this.isAnimating = false;
+        this.characterCards.clear();
 
-        const minCardWidth = 200;
-        const maxCardWidth = 350;
-        const cardHeight = 450;
+        // Create carousel container centered on screen
+        this.carouselContainer = this.add.container(centerX, centerY);
 
-        const numCards = this.characters.length;
-        const totalSpacing = cardSpacing * (numCards - 1);
-        const widthPerCard = (availableWidth - totalSpacing) / numCards;
-        const cardWidth = Phaser.Math.Clamp(widthPerCard, minCardWidth, maxCardWidth);
-
-        const actualTotalWidth = (cardWidth * numCards) + totalSpacing;
-        const needsScroll = actualTotalWidth > availableWidth;
-
-        const startX = needsScroll
-            ? screenPadding + cardWidth / 2
-            : centerX - (actualTotalWidth / 2) + (cardWidth / 2);
-
-        const container = this.add.container(0, 0);
-
+        // Create all character cards at position 0,0 (we'll position them in updateCarouselPositions)
         this.characters.forEach((character, index) => {
-            const x = startX + (index * (cardWidth + cardSpacing));
-            const card = this.createCharacterCard(character, x, centerY, cardWidth, cardHeight);
+            const card = this.createCharacterCard(character, 0, 0, 320, 420, index);
             this.characterCards.set(character.id, card);
-            container.add(card);
+            this.carouselContainer.add(card);
         });
 
-        if (needsScroll) {
-            this.setupScrolling(container, actualTotalWidth, availableWidth);
+        // Create navigation arrows
+        this.createCarouselArrows(centerY);
+
+        // Set initial positions
+        this.updateCarouselPositions(false);
+
+        // Add keyboard navigation
+        this.input.keyboard?.on('keydown-LEFT', () => this.navigateCarousel(-1));
+        this.input.keyboard?.on('keydown-RIGHT', () => this.navigateCarousel(1));
+        this.input.keyboard?.on('keydown-A', () => this.navigateCarousel(-1));
+        this.input.keyboard?.on('keydown-D', () => this.navigateCarousel(1));
+    }
+
+    private createCarouselArrows(centerY: number): void {
+        this.leftArrow = this.add.text(60, centerY, '◀', {
+            fontSize: '64px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        this.rightArrow = this.add.text(this.scale.width - 60, centerY, '▶', {
+            fontSize: '64px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        this.leftArrow.on('pointerdown', () => this.navigateCarousel(-1));
+        this.rightArrow.on('pointerdown', () => this.navigateCarousel(1));
+
+        this.leftArrow.on('pointerover', () => this.leftArrow.setScale(1.2));
+        this.leftArrow.on('pointerout', () => this.leftArrow.setScale(1));
+        this.rightArrow.on('pointerover', () => this.rightArrow.setScale(1.2));
+        this.rightArrow.on('pointerout', () => this.rightArrow.setScale(1));
+
+        this.updateArrowVisibility();
+    }
+
+    private navigateCarousel(direction: number): void {
+        if (this.isAnimating) return;
+
+        const newIndex = this.currentIndex + direction;
+        if (newIndex < 0 || newIndex >= this.characters.length) return;
+
+        this.currentIndex = newIndex;
+        this.isAnimating = true;
+        this.updateCarouselPositions(true);
+        this.updateArrowVisibility();
+    }
+
+    private updateCarouselPositions(animate: boolean): void {
+        const centerScale = 1.0;
+        const sideScale = 0.7;
+        const sideOffset = 320;
+        const duration = 300;
+
+        let completed = 0;
+        const total = this.characters.length;
+
+        this.characters.forEach((character, index) => {
+            const card = this.characterCards.get(character.id);
+            if (!card) return;
+
+            const offset = index - this.currentIndex;
+            let targetX = 0;
+            let targetScale = 0;
+            let targetAlpha = 0;
+            let depth = 0;
+
+            if (offset === 0) {
+                // Center card - fully visible and large
+                targetX = 0;
+                targetScale = centerScale;
+                targetAlpha = 1;
+                depth = 10;
+            } else if (offset === -1) {
+                // Left card - smaller and darkened
+                targetX = -sideOffset;
+                targetScale = sideScale;
+                targetAlpha = 0.6;
+                depth = 5;
+            } else if (offset === 1) {
+                // Right card - smaller and darkened
+                targetX = sideOffset;
+                targetScale = sideScale;
+                targetAlpha = 0.6;
+                depth = 5;
+            } else {
+                // Hidden cards
+                targetX = offset < 0 ? -sideOffset * 2 : sideOffset * 2;
+                targetScale = 0.5;
+                targetAlpha = 0;
+                depth = 0;
+            }
+
+            card.setDepth(depth);
+
+            if (animate) {
+                this.tweens.add({
+                    targets: card,
+                    x: targetX,
+                    scaleX: targetScale,
+                    scaleY: targetScale,
+                    alpha: targetAlpha,
+                    duration: duration,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        completed++;
+                        if (completed === total) {
+                            this.isAnimating = false;
+                        }
+                    }
+                });
+            } else {
+                card.setPosition(targetX, 0);
+                card.setScale(targetScale);
+                card.setAlpha(targetAlpha);
+            }
+        });
+
+        if (!animate) {
+            this.isAnimating = false;
         }
     }
 
-    private setupScrolling(container: Phaser.GameObjects.Container, contentWidth: number, viewWidth: number): void {
-        const maxScroll = contentWidth - viewWidth;
-        let currentScroll = 0;
-
-        const leftArrow = this.add.text(20, this.scale.height / 2, '◀', {
-            fontSize: '48px',
-            color: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setAlpha(0.3);
-
-        const rightArrow = this.add.text(this.scale.width - 20, this.scale.height / 2, '▶', {
-            fontSize: '48px',
-            color: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        const updateArrows = () => {
-            leftArrow.setAlpha(currentScroll > 0 ? 1 : 0.3);
-            rightArrow.setAlpha(currentScroll < maxScroll ? 1 : 0.3);
-        };
-
-        const scrollAmount = 300;
-
-        leftArrow.on('pointerdown', () => {
-            if (currentScroll > 0) {
-                currentScroll = Math.max(0, currentScroll - scrollAmount);
-                this.tweens.add({
-                    targets: container,
-                    x: -currentScroll,
-                    duration: 200,
-                    ease: 'Power2'
-                });
-                updateArrows();
-            }
-        });
-
-        rightArrow.on('pointerdown', () => {
-            if (currentScroll < maxScroll) {
-                currentScroll = Math.min(maxScroll, currentScroll + scrollAmount);
-                this.tweens.add({
-                    targets: container,
-                    x: -currentScroll,
-                    duration: 200,
-                    ease: 'Power2'
-                });
-                updateArrows();
-            }
-        });
-
-        this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any, _deltaX: number, deltaY: number) => {
-            currentScroll = Phaser.Math.Clamp(currentScroll + deltaY, 0, maxScroll);
-            container.x = -currentScroll;
-            updateArrows();
-        });
+    private updateArrowVisibility(): void {
+        if (this.leftArrow) {
+            this.leftArrow.setAlpha(this.currentIndex > 0 ? 1 : 0.3);
+        }
+        if (this.rightArrow) {
+            this.rightArrow.setAlpha(this.currentIndex < this.characters.length - 1 ? 1 : 0.3);
+        }
     }
 
-    private createCharacterCard(character: CharacterData, x: number, y: number, cardWidth: number = 300, cardHeight: number = 450): Phaser.GameObjects.Container {
-        const container = this.add.container(x, y);
-        const scale = cardWidth / 300;
+    private onCardClick(index: number, characterId: string): void {
+        // Don't allow selecting locked characters
+        if (!this.isCharacterUnlocked(characterId)) {
+            console.log('Character is locked:', characterId);
+            return;
+        }
 
-        const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, 0x222222, 0.9);
-        bg.setStrokeStyle(4, 0x666666);
+        const offset = index - this.currentIndex;
+
+        if (offset === 0) {
+            // Center card clicked - select it
+            this.selectCharacter(characterId);
+        } else if (offset === -1 || offset === 1) {
+            // Side card clicked - navigate to it then select
+            this.navigateCarousel(offset);
+            // Select after animation
+            this.time.delayedCall(350, () => {
+                this.selectCharacter(characterId);
+            });
+        }
+    }
+
+    private isCharacterUnlocked(characterId: string): boolean {
+        return this.unlockedCharacters.has(characterId);
+    }
+
+    public unlockCharacter(characterId: string): void {
+        if (!this.unlockedCharacters.has(characterId)) {
+            this.unlockedCharacters.add(characterId);
+            this.saveUnlockedCharacters();
+        }
+    }
+
+    public lockCharacter(characterId: string): void {
+        // Don't allow locking default characters
+        if ((CharacterSelectScene.DEFAULT_UNLOCKED as string[]).includes(characterId)) {
+            console.warn('Cannot lock default character:', characterId);
+            return;
+        }
+        if (this.unlockedCharacters.has(characterId)) {
+            this.unlockedCharacters.delete(characterId);
+            this.saveUnlockedCharacters();
+        }
+    }
+
+    public unlockAllCharacters(): void {
+        this.characters.forEach(c => this.unlockedCharacters.add(c.id));
+        this.saveUnlockedCharacters();
+    }
+
+    public resetUnlockedCharacters(): void {
+        this.unlockedCharacters = new Set(CharacterSelectScene.DEFAULT_UNLOCKED);
+        this.saveUnlockedCharacters();
+    }
+
+    private createCharacterCard(character: CharacterData, x: number, y: number, cardWidth: number = 300, cardHeight: number = 450, index: number = 0): Phaser.GameObjects.Container {
+        const container = this.add.container(x, y);
+        const isLocked = !this.isCharacterUnlocked(character.id);
+
+        // Card background - darker for locked characters
+        const bg = this.add.rectangle(0, 0, cardWidth, cardHeight, isLocked ? 0x111111 : 0x222222, 0.95);
+        bg.setStrokeStyle(4, isLocked ? 0x333333 : 0x666666);
         container.add(bg);
 
-        const sprite = this.add.sprite(0, -120 * scale, ASSETS.spritesheet.ships.key, character.frame);
-        sprite.setScale(3 * scale);
-        container.add(sprite);
+        // Add decorative background image above character name if available
+        // Using the lizard-wizard background image as an example and repeating for all cards
+        if (this.textures.exists(ASSETS.image.lizardWizardBackgroundSmall.key)) {
+            const cardBgImage = this.add.image(0, -120, ASSETS.image.lizardWizardBackgroundSmall.key);
 
-        const nameText = this.add.text(0, -30 * scale, character.name, {
+            // Calculate scale to fit within 200x150 while maintaining aspect ratio
+            const maxWidth = 200;
+            const maxHeight = 150;
+            const texture = this.textures.get(ASSETS.image.lizardWizardBackgroundSmall.key);
+            const textureWidth = texture.source[0].width;
+            const textureHeight = texture.source[0].height;
+
+            const scaleX = maxWidth / textureWidth;
+            const scaleY = maxHeight / textureHeight;
+            const fitScale = Math.min(scaleX, scaleY);
+
+            cardBgImage.setScale(fitScale);
+            cardBgImage.setDepth(1);
+            cardBgImage.setAlpha(1);
+            if (isLocked) {
+                cardBgImage.setTint(0x000000);
+            }
+            container.add(cardBgImage);
+        }
+
+        // Character sprite - black silhouette for locked characters
+        // const sprite = this.add.sprite(0, -100, ASSETS.spritesheet.ships.key, character.frame);
+        // sprite.setScale(3.5);
+        // if (isLocked) {
+        //     sprite.setTint(0x000000);
+        // }
+        // container.add(sprite);
+
+        // Name - show "???" for locked characters
+        const nameText = this.add.text(0, -10, isLocked ? '???' : character.name, {
             fontFamily: 'Arial Black',
-            fontSize: `${Math.floor(24 * scale)}px`,
-            color: '#ffffff',
+            fontSize: '26px',
+            color: isLocked ? '#444444' : '#ffffff',
             stroke: '#000000',
             strokeThickness: 4,
             align: 'center'
         }).setOrigin(0.5);
         container.add(nameText);
 
-        const descText = this.add.text(0, 10 * scale, character.description, {
+        // Description - hidden for locked characters
+        const descText = this.add.text(0, 25, isLocked ? 'LOCKED' : character.description, {
             fontFamily: 'Arial',
-            fontSize: `${Math.floor(14 * scale)}px`,
-            color: '#aaaaaa',
+            fontSize: '16px',
+            color: isLocked ? '#ff4444' : '#aaaaaa',
             align: 'center',
-            wordWrap: { width: cardWidth - 20 }
+            wordWrap: { width: cardWidth - 30 }
         }).setOrigin(0.5);
         container.add(descText);
 
-        const contentWidth = cardWidth - 30;
-        const leftX = -contentWidth / 2 + 10;
-        const rightX = 10;
-        let yOffset = 40 * scale;
+        // Stats and abilities layout
+        const leftX = -70;
+        const rightX = 70;
+        const startY = 60;
 
-        const statsTitle = this.add.text(leftX, yOffset, 'Stats:', {
-            fontFamily: 'Arial Black',
-            fontSize: `${Math.floor(16 * scale)}px`,
-            color: '#ffff00',
-            align: 'left'
-        }).setOrigin(0, 0.5);
-        container.add(statsTitle);
+        if (isLocked) {
+            // Show lock icon/message for locked characters
+            const lockText = this.add.text(0, startY + 50, '🔒', {
+                fontSize: '48px'
+            }).setOrigin(0.5);
+            container.add(lockText);
 
-        let statsY = yOffset + 25 * scale;
-        Object.entries(character.stats).forEach(([key, value]) => {
-            const statText = this.add.text(leftX, statsY, `${this.capitalize(key)}: ${value}`, {
+            const unlockHint = this.add.text(0, startY + 100, 'Complete challenges\nto unlock!', {
                 fontFamily: 'Arial',
-                fontSize: `${Math.floor(12 * scale)}px`,
+                fontSize: '14px',
+                color: '#666666',
+                align: 'center'
+            }).setOrigin(0.5);
+            container.add(unlockHint);
+        } else {
+            // Show stats for unlocked characters
+            const statsTitle = this.add.text(leftX, startY, 'Stats:', {
+                fontFamily: 'Arial Black',
+                fontSize: '16px',
+                color: '#ffff00'
+            }).setOrigin(0.5);
+            container.add(statsTitle);
+
+            let statsY = startY + 25;
+            Object.entries(character.stats).forEach(([key, value]) => {
+                const statText = this.add.text(leftX, statsY, `${this.capitalize(key)}:`, {
+                    fontFamily: 'Arial',
+                    fontSize: '12px',
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+                container.add(statText);
+                statsY += 16;
+                const valueText = this.add.text(leftX, statsY, value, {
+                    fontFamily: 'Arial',
+                    fontSize: '11px',
+                    color: '#cccccc'
+                }).setOrigin(0.5);
+                container.add(valueText);
+                statsY += 20;
+            });
+
+            // Show abilities for unlocked characters
+            const abilitiesTitle = this.add.text(rightX, startY, 'Abilities:', {
+                fontFamily: 'Arial Black',
+                fontSize: '16px',
+                color: '#00ffff'
+            }).setOrigin(0.5);
+            container.add(abilitiesTitle);
+
+            const ability1Text = this.add.text(rightX, startY + 30, '1: ' + character.ability1, {
+                fontFamily: 'Arial',
+                fontSize: '11px',
                 color: '#ffffff',
-                align: 'left'
-            }).setOrigin(0, 0.5);
-            container.add(statText);
-            statsY += 20 * scale;
-        });
+                wordWrap: { width: 120 },
+                align: 'center'
+            }).setOrigin(0.5);
+            container.add(ability1Text);
 
-        const abilitiesTitle = this.add.text(rightX, yOffset, 'Abilities:', {
-            fontFamily: 'Arial Black',
-            fontSize: `${Math.floor(16 * scale)}px`,
-            color: '#00ffff',
-            align: 'left'
-        }).setOrigin(0, 0.5);
-        container.add(abilitiesTitle);
+            const ability2Text = this.add.text(rightX, startY + 80, '2: ' + character.ability2, {
+                fontFamily: 'Arial',
+                fontSize: '11px',
+                color: '#ffffff',
+                wordWrap: { width: 120 },
+                align: 'center'
+            }).setOrigin(0.5);
+            container.add(ability2Text);
+        }
 
-        let abilitiesY = yOffset + 25 * scale;
-        const ability1Text = this.add.text(rightX, abilitiesY, `1: ${character.ability1}`, {
-            fontFamily: 'Arial',
-            fontSize: `${Math.floor(12 * scale)}px`,
-            color: '#ffffff',
-            align: 'left',
-            wordWrap: { width: contentWidth / 2 - 20 }
-        }).setOrigin(0, 0.5);
-        container.add(ability1Text);
-        abilitiesY += 35 * scale;
-
-        const ability2Text = this.add.text(rightX, abilitiesY, `2: ${character.ability2}`, {
-            fontFamily: 'Arial',
-            fontSize: `${Math.floor(12 * scale)}px`,
-            color: '#ffffff',
-            align: 'left',
-            wordWrap: { width: contentWidth / 2 - 20 }
-        }).setOrigin(0, 0.5);
-        container.add(ability2Text);
-
-        bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerdown', () => this.selectCharacter(character.id));
-        bg.on('pointerover', () => {
-            if (this.selectedCharacterId !== character.id) {
-                bg.setStrokeStyle(4, 0xffffff);
-            }
-        });
-        bg.on('pointerout', () => {
-            if (this.selectedCharacterId !== character.id) {
-                bg.setStrokeStyle(4, 0x666666);
-            }
-        });
+        // Only make unlocked characters interactive for selection
+        if (!isLocked) {
+            bg.setInteractive({ useHandCursor: true });
+            bg.on('pointerdown', () => this.onCardClick(index, character.id));
+            bg.on('pointerover', () => {
+                if (this.selectedCharacterId !== character.id) {
+                    bg.setStrokeStyle(4, 0xffffff);
+                }
+            });
+            bg.on('pointerout', () => {
+                if (this.selectedCharacterId !== character.id) {
+                    bg.setStrokeStyle(4, 0x666666);
+                }
+            });
+        } else {
+            // Locked characters can still be clicked to navigate carousel, but not selected
+            bg.setInteractive({ useHandCursor: false });
+            bg.on('pointerdown', () => {
+                const offset = index - this.currentIndex;
+                if (offset === -1 || offset === 1) {
+                    this.navigateCarousel(offset);
+                }
+            });
+        }
 
         container.setData('bg', bg);
         container.setData('characterId', character.id);
+        container.setData('index', index);
+        container.setData('isLocked', isLocked);
 
         return container;
     }
 
-    //TODO Make character cards selectable with gamepad
-
     private selectCharacter(characterId: string): void {
+        // Safety check - don't allow selecting locked characters
+        if (!this.isCharacterUnlocked(characterId)) {
+            console.log('Cannot select locked character:', characterId);
+            return;
+        }
+
         // Deselect previous character
         if (this.selectedCharacterId) {
             const prevCard = this.characterCards.get(this.selectedCharacterId);
@@ -404,7 +666,7 @@ export class CharacterSelectScene extends Scene {
             bg.setStrokeStyle(6, 0x00ff00);
         }
 
-        console.log('Character selected:', characterId);
+        console.debug('Character selected locally:', characterId);
 
         // Update storage if multiplayer
         if (this.networkEnabled) {
@@ -419,7 +681,7 @@ export class CharacterSelectScene extends Scene {
                     timestamp: Date.now()
                 };
 
-                const socket = (NetworkManager as any).socket;
+                const socket = NetworkManager.getSocket();
                 if (socket) {
                     socket.updateStorage('characterSelections', 'set', characterSelections);
                 }
@@ -442,7 +704,7 @@ export class CharacterSelectScene extends Scene {
         this.startButtonBg.setStrokeStyle(4, 0x666666);
 
         // Button text
-        this.startButton = this.add.text(x, y, 'START GAME', {
+        this.startButton = this.add.text(x, y, 'READY', {
             fontFamily: 'Arial Black',
             fontSize: '32px',
             color: '#666666',
@@ -471,46 +733,107 @@ export class CharacterSelectScene extends Scene {
 
     private onStartButtonClick(): void {
         // This is called when the button is clicked
-        // Only host can manually start the game
-        if (!this.selectedCharacterId) return;
+        // Only host can manually signal ready to start the game
+        if (!this.selectedCharacterId) {
+            console.warn('Cannot start: No character selected');
+            return;
+        }
+
+        console.log('Start button clicked', {
+            isHost: this.isHost,
+            networkEnabled: this.networkEnabled,
+            playersCount: this.players.length,
+            selectedCharacterId: this.selectedCharacterId
+        });
 
         if (this.networkEnabled && this.players.length > 1) {
             if (!this.isHost) {
-                console.log('Only host can start the game');
+                console.log('Only host can signal game start');
                 return;
             }
 
             // Check if all players have selected characters
             const allReady = this.checkAllPlayersReady();
+            console.log('All players ready check:', {
+                allReady,
+                players: this.players,
+                characterSelectionsCount: this.characterSelections.size,
+                readyPlayers: Array.from(this.characterSelections.keys()),
+                storageCharacterSelections: NetworkManager.getStorage()?.characterSelections
+            });
+            
             if (!allReady) {
-                console.log('Not all players are ready');
+                console.warn('Not all players are ready', {
+                    players: this.players,
+                    ready: Array.from(this.characterSelections.keys()),
+                });
                 return;
             }
 
-            // Signal game start in storage (will trigger startGame on all clients)
-            const storage = NetworkManager.getStorage();
-            const socket = (NetworkManager as any).socket;
-            if (socket && storage) {
-                socket.updateStorage('gameStarting', 'set', true);
+            // Signal game ready in storage (will trigger transitionToGameScene on all clients)
+            const socket = NetworkManager.getSocket();
+            if (socket) {
+                console.log('Host signaling readyToStartGame');
+                socket.updateStorage('readyToStartGame', 'set', true);
             }
         }
 
-        // Start game immediately for host/single player
-        this.startGame();
+        // Transition to game scene immediately for host/single player
+        console.log('Transitioning to game for', this.isHost ? 'host' : 'non-host');
+        this.transitionToGameScene();
     }
 
-    private startGame(): void {
-        if (!this.selectedCharacterId) return;
+    private transitionToGameScene(): void {
+        // Guard: prevent transitioning to game multiple times
+        if (this.inCharacterSelection) {
+            console.log('Already transitioning to game scene, ignoring duplicate call');
+            return;
+        }
+        if (!this.selectedCharacterId) {
+            console.debug('Transition blocked: No character selected', {
+                characterSelections: Array.from(this.characterSelections.entries()),
+                localPlayerId: NetworkManager.getPlayerId()
+            });
+            return;
+        }
 
-        console.log('Starting game with character:', this.selectedCharacterId);
+        this.inCharacterSelection = true;
 
-        // Transition to Game scene with character selection and network data
-        this.scene.start('GameScene', {
-            characterId: this.selectedCharacterId,
-            networkEnabled: this.networkEnabled,
-            isHost: this.isHost,
-            players: this.players
-        });
+        console.log('Transitioning to game scene with character:', this.selectedCharacterId);
+
+        // Only host resets the readyToStartGame flag (to prevent race condition)
+        // Non-host clients will transition immediately when they see the flag
+        if (this.isHost) {
+            const socket = NetworkManager.getSocket();
+            if (socket) {
+                // Small delay to ensure other clients receive the update
+                setTimeout(() => {
+                    socket.updateStorage('readyToStartGame', 'set', false);
+                }, 100);
+            }
+        }
+
+        try {
+            // Transition to Game scene with character selection and network data
+            console.log('Transitioning to GameScene with data:', {
+                characterId: this.selectedCharacterId,
+                networkEnabled: this.networkEnabled,
+                isHost: this.isHost,
+                players: this.players
+            });
+
+            this.scene.start('GameScene', {
+                characterId: this.selectedCharacterId,
+                networkEnabled: this.networkEnabled,
+                isHost: this.isHost,
+                players: this.players
+            });
+
+            console.log('Scene transition started');
+        } catch (error) {
+            console.error('Error transitioning to GameScene:', error);
+            this.inCharacterSelection = false; // Reset flag on error
+        }
     }
 
     private setupStorageHandlers(): void {
@@ -527,16 +850,18 @@ export class CharacterSelectScene extends Scene {
                 this.updatePlayerStatus();
             }
 
-            // Check if game is starting
-            if (storage.gameStarting) {
-                console.log('Game starting from storage update!');
-                this.startGame();
+            // Check if all players are ready to transition to game
+            if (storage.readyToStartGame === true) {
+                console.debug('Host signaled readyToStartGame, selectedCharacterId:', this.selectedCharacterId);
+                this.transitionToGameScene();
             }
         });
     }
 
     private updatePlayerStatus(): void {
-        if (!this.playerStatusText || !this.networkEnabled) return;
+        // Guard: Check if scene is still active and UI elements exist
+        if (!this.scene.isActive() || !this.playerStatusText || !this.networkEnabled) return;
+        if (!this.startButton || !this.startButtonBg) return;
 
         const readyCount = this.characterSelections.size;
         const totalPlayers = this.players.length;
@@ -559,7 +884,6 @@ export class CharacterSelectScene extends Scene {
 
         this.playerStatusText.setText(statusText);
 
-        // Update start button state
         const allReady = this.checkAllPlayersReady();
         if (allReady && this.isHost) {
             this.startButtonBg.setFillStyle(0x00aa00);

@@ -3,6 +3,7 @@
 
 import { MapData } from './SummonerRift';
 import SummonersRift from './SummonerRift';
+import DungeonCrawl from './DungeonCrawl';
 
 /**
  * Registry of all available maps
@@ -10,6 +11,7 @@ import SummonersRift from './SummonerRift';
  */
 export const MapRegistry: Record<string, MapData> = {
     'summoners-rift': SummonersRift,
+    'dungeon-crawl': DungeonCrawl,
     // Add more maps here as they're created:
     // 'howling-abyss': HowlingAbyss,
 };

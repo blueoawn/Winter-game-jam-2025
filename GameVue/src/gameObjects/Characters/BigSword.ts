@@ -1,17 +1,23 @@
-import { PlayerController } from '../../../managers/PlayerController';
-import { GameScene } from '../../scenes/Game';
+import { PlayerController } from './PlayerController';
+import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
+import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 
 export class BigSword extends PlayerController {
     // Ability 1 - Heavy Slash config
     slashDamage = 2;
-    slashWidth = 60;
-    slashHeight = 15;
-    slashOffset = 50;
-    slashDuration = 250;
+    slashWidth = 80;        // Hitbox width (reduced to better match blade sprite)
+    slashHeight = 230;      // Hitbox height (increased to match blade length)
+    slashOffset = 40;       // Distance from character to slash position
+    slashDuration = 400;    // Duration of the swing in milliseconds (higher = slower)
     slashArc = Math.PI * 0.8;
+
+    // Trail config
+    trailMaxWidth = 40;     // Maximum trail width at the end of slash
+    trailOffset = 85;       // Distance from character for trail (further than sword)
+    trailSegments = 35;     // Number of trail segments
 
     // Ability 2 - Piercing Strike config
     dashDamage = 3;
@@ -22,7 +28,8 @@ export class BigSword extends PlayerController {
     dashHitboxHeight = 30;
 
     // Runtime state
-    private slashGraphics: Graphics | null = null;
+    private slashSprite: Phaser.GameObjects.Image | null = null;
+    private slashTrailGraphics: Graphics | null = null;
     private dashGraphics: Graphics | null = null;
     private arrowGraphics: Graphics | null = null;
     private isCharging = false;
@@ -41,14 +48,31 @@ export class BigSword extends PlayerController {
     private hitEnemies: Set<any> = new Set();
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 3);
+        super(scene, x, y, 2);
 
         this.characterSpeed = 650;
         this.velocityMax = 380;
-        this.maxHealth = 5;
+        this.maxHealth = 25;
         this.health = this.maxHealth;
         this.ability1Rate = 40;
         this.ability2Rate = 180;
+
+        // Use playable characters sprite sheet - frame 2 is BigSword
+        this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 2);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 60;
+        const frameHeight = 77;
+
+        const bodyWidth = frameWidth * 0.5;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
 
         this.on('destroy', () => {
             this.cleanupGraphics();
@@ -91,39 +115,58 @@ export class BigSword extends PlayerController {
     startSlash(): void {
         this.isSlashing = true;
         this.slashStartTime = this.gameScene.time.now;
+        // Calculate base angle to start from the character's right side
         this.slashBaseAngle = this.rotation - Math.PI / 2;
         this.hitEnemiesSlash.clear();
 
-        this.slashGraphics = this.gameScene.add.graphics();
-        this.slashGraphics.setDepth(Depth.ABILITIES);
+        // Create sword sprite
+        this.slashSprite = this.gameScene.add.image(0, 0, ASSETS.image.sword.key);
+        this.slashSprite.setOrigin(0.5, 1); // Bottom-center origin (handle) for proper sword swing pivot
+        this.slashSprite.setDepth(Depth.ABILITIES);
+        this.slashSprite.setScale(1.5);
+
+        // Create trail graphics
+        this.slashTrailGraphics = this.gameScene.add.graphics();
+        this.slashTrailGraphics.setDepth(Depth.ABILITIES);
     }
 
     updateSlash(time: number): void {
-        if (!this.slashGraphics) return;
+        if (!this.slashSprite || !this.slashTrailGraphics) return;
 
         const elapsed = time - this.slashStartTime;
         const progress = Math.min(elapsed / this.slashDuration, 1);
 
-        this.slashGraphics.clear();
-
-        const startAngle = this.slashBaseAngle - this.slashArc / 2;
-        const currentAngle = startAngle + this.slashArc * progress;
+        // Start from right side and swing to left (outward arc)
+        const startAngle = this.slashBaseAngle + this.slashArc / 2;
+        const currentAngle = startAngle - this.slashArc * progress;
 
         const slashX = this.x + Math.cos(currentAngle) * this.slashOffset;
         const slashY = this.y + Math.sin(currentAngle) * this.slashOffset;
 
-        this.slashGraphics.fillStyle(0xffffff, 0.9);
-        this.slashGraphics.save();
-        this.slashGraphics.translateCanvas(slashX, slashY);
-        this.slashGraphics.rotateCanvas(currentAngle);
-        this.slashGraphics.fillRect(-this.slashWidth / 2, -this.slashHeight / 2, this.slashWidth, this.slashHeight);
-        this.slashGraphics.restore();
+        // Position and rotate sword sprite
+        // Sprite is bottom-to-top with origin at bottom (handle)
+        // We need to add PI/2 to make it point outward correctly
+        this.slashSprite.setPosition(slashX, slashY);
+        this.slashSprite.setRotation(currentAngle + Math.PI / 2);
 
-        // Draw trail
-        this.slashGraphics.lineStyle(3, 0xffffff, 0.4);
-        this.slashGraphics.beginPath();
-        this.slashGraphics.arc(this.x, this.y, this.slashOffset, startAngle, currentAngle);
-        this.slashGraphics.strokePath();
+        // Draw widening trail
+        this.slashTrailGraphics.clear();
+
+        // Draw trail segments that widen as the slash progresses
+        for (let i = 0; i < this.trailSegments; i++) {
+            const segmentProgress = (i / this.trailSegments) * progress;
+            const segmentAngle = startAngle - this.slashArc * segmentProgress;
+
+            // Width increases as we progress through the slash
+            const width = this.trailMaxWidth * segmentProgress;
+            const alpha = 0.6 * segmentProgress;
+
+            const segX = this.x + Math.cos(segmentAngle) * this.trailOffset;
+            const segY = this.y + Math.sin(segmentAngle) * this.trailOffset;
+
+            this.slashTrailGraphics.fillStyle(0x01FFFF, alpha);
+            this.slashTrailGraphics.fillCircle(segX, segY, width / 2);
+        }
 
         this.checkSlashHits(slashX, slashY, currentAngle);
 
@@ -136,13 +179,42 @@ export class BigSword extends PlayerController {
         this.isSlashing = false;
         this.hitEnemiesSlash.clear();
 
-        if (this.slashGraphics) {
-            this.slashGraphics.destroy();
-            this.slashGraphics = null;
+        if (this.slashSprite) {
+            this.slashSprite.destroy();
+            this.slashSprite = null;
+        }
+
+        if (this.slashTrailGraphics) {
+            this.slashTrailGraphics.destroy();
+            this.slashTrailGraphics = null;
         }
     }
 
     checkSlashHits(slashX: number, slashY: number, slashAngle: number): void {
+        // Check walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || this.hitEnemiesSlash.has(w)) continue;
+
+            const dx = w.x - slashX;
+            const dy = w.y - slashY;
+
+            const cos = Math.cos(-slashAngle);
+            const sin = Math.sin(-slashAngle);
+            const localX = dx * cos - dy * sin;
+            const localY = dx * sin + dy * cos;
+
+            if (Math.abs(localX) < this.slashWidth / 2 + 20 &&
+                Math.abs(localY) < this.slashHeight / 2 + 20) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.slashDamage);
+                    this.hitEnemiesSlash.add(w);
+                }
+            }
+        }
+
+        // Check enemies
         const enemies = this.gameScene.enemyGroup.getChildren();
 
         for (const enemy of enemies) {
@@ -285,6 +357,24 @@ export class BigSword extends PlayerController {
     }
 
     checkDashHits(): void {
+        // Check walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || this.hitEnemies.has(w)) continue;
+
+            const dx = Math.abs(w.x - this.x);
+            const dy = Math.abs(w.y - this.y);
+
+            if (dx < this.dashHitboxWidth / 2 + 20 && dy < this.dashHitboxHeight / 2 + 20) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.dashDamage);
+                    this.hitEnemies.add(w);
+                }
+            }
+        }
+
+        // Check enemies
         const enemies = this.gameScene.enemyGroup.getChildren();
 
         for (const enemy of enemies) {
@@ -320,9 +410,13 @@ export class BigSword extends PlayerController {
     }
 
     cleanupGraphics(): void {
-        if (this.slashGraphics) {
-            this.slashGraphics.destroy();
-            this.slashGraphics = null;
+        if (this.slashSprite) {
+            this.slashSprite.destroy();
+            this.slashSprite = null;
+        }
+        if (this.slashTrailGraphics) {
+            this.slashTrailGraphics.destroy();
+            this.slashTrailGraphics = null;
         }
         if (this.dashGraphics) {
             this.dashGraphics.destroy();
@@ -338,6 +432,12 @@ export class BigSword extends PlayerController {
         }
     }
 
-    updateAI(): void {
+    /**
+     * Character-specific AI logic for BigSword
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // BigSword AI is aggressive melee with dash attacks
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

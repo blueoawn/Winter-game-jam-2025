@@ -18,18 +18,26 @@ export class ButtonMapper {
     private currentScheme: ControlScheme;
     private keys: any;
     private gamepad: Phaser.Input.Gamepad.Gamepad | null = null;
+    private keyboardInitialized: boolean = false;
+    private setupRetryCount: number = 0;
+    private maxRetries: number = 50;  // Try for up to 5 seconds (50 * 100ms)
 
     // Mapping dictionaries for remappable controls
     // Action -> button index
     private keyboardMap: Map<string, number> = new Map();
-    private gamepadMap: Map<string, number> = new Map();  
+    private gamepadMap: Map<string, number> = new Map();
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
+        this.keys = {};  // Initialize as empty object to prevent undefined errors
         this.initializeDefaultMappings();
         this.detectControlScheme();
         this.setupKeyboard();
         this.setupGamepad();
+        this.setupFocusListener();
+
+        // Prevent the browser context menu from appearing on right-click so the game can use the right mouse button
+        this.scene.input.mouse?.disableContextMenu();
     }
 
     private initializeDefaultMappings(): void {
@@ -67,15 +75,62 @@ export class ButtonMapper {
     }
 
     private setupKeyboard(): void {
-        if (!this.scene.input.keyboard) return;
+        if (!this.scene.input.keyboard) {
+            this.setupRetryCount++;
 
-        // Build keys object from mapping dictionary
-        const keyConfig: any = {};
-        this.keyboardMap.forEach((keyCode, action) => {
-            keyConfig[action] = keyCode;
+            if (this.setupRetryCount <= this.maxRetries) {
+                console.warn(`ButtonMapper: Keyboard input not available, retrying... (attempt ${this.setupRetryCount}/${this.maxRetries})`);
+                // Initialize with empty object to prevent undefined access
+                this.keys = {};
+
+                // Retry setup
+                this.scene.time.delayedCall(100, () => {
+                    this.setupKeyboard();
+                });
+            } else {
+                console.error('ButtonMapper: Keyboard initialization failed after max retries. Using empty input.');
+                this.keys = {};  // Ensure keys is initialized even on failure
+            }
+            return;
+        }
+
+        // Enable keyboard input (Phaser sometimes needs this explicitly)
+        // Note: Phaser 3 doesn't have a global preventDefault method
+        // Individual keys should have their events prevented if needed
+
+        // Register each key individually (addKeys was causing all keys to share same object)
+        this.keys = {
+            moveLeft: this.scene.input.keyboard.addKey(this.keyboardMap.get('moveLeft')!),
+            moveRight: this.scene.input.keyboard.addKey(this.keyboardMap.get('moveRight')!),
+            moveUp: this.scene.input.keyboard.addKey(this.keyboardMap.get('moveUp')!),
+            moveDown: this.scene.input.keyboard.addKey(this.keyboardMap.get('moveDown')!),
+            ability1: this.scene.input.keyboard.addKey(this.keyboardMap.get('ability1')!),
+            ability2: this.scene.input.keyboard.addKey(this.keyboardMap.get('ability2')!)
+        };
+
+        this.keyboardInitialized = true;
+        this.setupRetryCount = 0;  // Reset counter on success
+
+        console.log('ButtonMapper: Keyboard input initialized successfully');
+        console.log('ButtonMapper: Individual keys registered:', {
+            moveLeft: this.keys.moveLeft.keyCode,
+            moveRight: this.keys.moveRight.keyCode,
+            moveUp: this.keys.moveUp.keyCode,
+            moveDown: this.keys.moveDown.keyCode,
+            ability1: this.keys.ability1.keyCode,
+            ability2: this.keys.ability2.keyCode
         });
+    }
 
-        this.keys = this.scene.input.keyboard.addKeys(keyConfig);
+    private setupFocusListener(): void {
+        // Reinitialize keyboard when window gains focus (fixes tab-in issue)
+        window.addEventListener('focus', () => {
+            if (!this.keyboardInitialized && this.scene.input.keyboard) {
+                console.log('ButtonMapper: Window gained focus, reinitializing keyboard...');
+                this.setupRetryCount = 0;  // Reset retry counter
+                this.setupKeyboard();
+            }
+        });
     }
 
     private setupGamepad(): void {
@@ -86,6 +141,11 @@ export class ButtonMapper {
     }
 
     getInput(): AbstractInputState {
+        // If keyboard isn't initialized yet, try to initialize it now
+        if (!this.keyboardInitialized && this.scene.input.keyboard) {
+            this.setupKeyboard();
+        }
+
         switch (this.currentScheme) {
             case ControlScheme.KEYBOARD_MOUSE:
                 return this.getKeyboardMouseInput();
@@ -99,22 +159,50 @@ export class ButtonMapper {
     private getKeyboardMouseInput(): AbstractInputState {
         const movement = new Phaser.Math.Vector2(0, 0);
 
-        // Read from mapped keys
-        if (this.keys.moveLeft?.isDown) movement.x -= 1;
-        if (this.keys.moveRight?.isDown) movement.x += 1;
-        if (this.keys.moveUp?.isDown) movement.y -= 1;
-        if (this.keys.moveDown?.isDown) movement.y += 1;
+        // Read from mapped keys (with safety check)
+        if (this.keys) {
+            if (this.keys.moveLeft?.isDown) {
+                movement.x -= 1;
+            }
+            if (this.keys.moveRight?.isDown) {
+                movement.x += 1;
+            }
+            if (this.keys.moveUp?.isDown) {
+                movement.y -= 1;
+            }
+            if (this.keys.moveDown?.isDown) {
+                movement.y += 1;
+            }
+        }
 
         movement.normalize();
 
         const worldPoints = this.scene.cameras.main.getWorldPoint(this.scene.input.mousePointer.x, this.scene.input.mousePointer.y);
         const aim = new Phaser.Math.Vector2(worldPoints);
 
+        // Read mouse buttons: left click => ability1, right click => ability2
+        const pointer = this.scene.input.activePointer;
+        let leftMouseDown = false;
+        let rightMouseDown = false;
+        if (pointer) {
+            // Use pointer helper methods if available (Phaser Pointer API)
+            try {
+                leftMouseDown = !!(pointer.leftButtonDown && pointer.leftButtonDown());
+            } catch (e) {
+                leftMouseDown = pointer.isDown && pointer.button === 0;
+            }
+            try {
+                rightMouseDown = !!(pointer.rightButtonDown && pointer.rightButtonDown());
+            } catch (e) {
+                rightMouseDown = pointer.isDown && pointer.button === 2;
+            }
+        }
+
         return {
             movement,
             aim,
-            ability1: this.keys.ability1?.isDown || false,
-            ability2: this.keys.ability2?.isDown || false
+            ability1: (this.keys?.ability1?.isDown || false) || leftMouseDown,
+            ability2: (this.keys?.ability2?.isDown || false) || rightMouseDown
         };
     }
 
@@ -160,5 +248,25 @@ export class ButtonMapper {
 
     getCurrentScheme(): ControlScheme {
         return this.currentScheme;
+    }
+
+    isKeyboardInitialized(): boolean {
+        return this.keyboardInitialized;
+    }
+
+    getDebugInfo(): any {
+        return {
+            scheme: this.currentScheme,
+            keyboardInitialized: this.keyboardInitialized,
+            keysRegistered: this.keys ? Object.keys(this.keys).length : 0,
+            keysState: this.keys ? {
+                moveLeft: this.keys.moveLeft?.isDown,
+                moveRight: this.keys.moveRight?.isDown,
+                moveUp: this.keys.moveUp?.isDown,
+                moveDown: this.keys.moveDown?.isDown,
+                ability1: this.keys.ability1?.isDown,
+                ability2: this.keys.ability2?.isDown
+            } : null
+        };
     }
 }

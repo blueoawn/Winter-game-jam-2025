@@ -1,7 +1,8 @@
-import { PlayerController } from '../../../managers/PlayerController';
-import { GameScene } from '../../scenes/Game';
+import { PlayerController } from './PlayerController';
+import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import { audioManager } from '../../../managers/AudioManager';
+import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 
@@ -16,6 +17,10 @@ import TimerEvent = Phaser.Time.TimerEvent;
 // Description: Consumes the secondary meter to heal self, restoring a portion of health based on the amount of meter consumed
 
 export class CheeseTouch extends PlayerController {
+    // Animation keys
+    static readonly ANIM_IDLE = 'cheese_idle';
+    static readonly ANIM_BEAM = 'cheese_beam';
+
     // Beam properties
     beamGraphics: Graphics | null = null;
     isBeaming = false;
@@ -24,26 +29,45 @@ export class CheeseTouch extends PlayerController {
     beamDamage = 1;
 
     // Lock-on properties
-    lockOnRadius = 100;  // Configurable radius around cursor to find targets
+    lockOnRadius = 100;
     lockedTarget: Phaser.Physics.Arcade.Sprite | null = null;
     lockOnIndicator: Graphics | null = null;
 
     constructor(scene: GameScene, x: number, y: number) {
-        super(scene, x, y, 2);  // Frame 2 for CheeseTouc
+        super(scene, x, y, 2);
 
-        // Balanced stats
         this.characterSpeed = 700;
         this.velocityMax = 400;
-        this.maxHealth = 10;
+        this.maxHealth = 15;
         this.health = this.maxHealth;
-        this.ability1Rate = 5;    // Can use beam frequently
-        this.ability2Rate = 60;   // Heal every 1 second
+        this.ability1Rate = 5;
+        this.ability2Rate = 60*2;
+
+        // Use sprite sheet
+        this.setAppearance(ASSETS.spritesheet.cheeseTouchAttack.key, 0);
+        this.setOrigin(0.5, 0.5);
+        this.setScale(1.5, 1.5);
+
+        const frameWidth = 49;
+        const frameHeight = 44;
+
+        const bodyWidth = frameWidth * 0.6;
+        const bodyHeight = frameHeight * 0.5;
+
+        this.setBodySize(bodyWidth, bodyHeight);
+
+        const offsetX = (frameWidth - bodyWidth) / 2;
+        const offsetY = (frameHeight - bodyHeight) / 2 + frameHeight * 0.1;
+        this.setOffset(offsetX, offsetY);
+
+        // Create animations
+        this.createAnimations();
 
         // Enable skill bar for cheese meter
         this.skillBarEnabled = true;
         this.maxSkillMeter = 100;
         this.skillMeter = 0;
-        this.createSkillBar();  // Create it now that it's enabled
+        this.createSkillBar();
 
         this.ability1Rate = 60;
         this.ability1Cooldown = 0;
@@ -56,6 +80,33 @@ export class CheeseTouch extends PlayerController {
                 this.lockOnIndicator = null;
             }
         });
+    }
+
+    private createAnimations(): void {
+        const anims = this.scene.anims;
+
+        // Idle animation: just frame 0
+        if (!anims.exists(CheeseTouch.ANIM_IDLE)) {
+            anims.create({
+                key: CheeseTouch.ANIM_IDLE,
+                frames: [{ key: ASSETS.spritesheet.cheeseTouchAttack.key, frame: 0 }],
+                frameRate: 1,
+                repeat: -1
+            });
+        }
+
+        // Beam animation: frame 1 (hands up) held continuously
+        if (!anims.exists(CheeseTouch.ANIM_BEAM)) {
+            anims.create({
+                key: CheeseTouch.ANIM_BEAM,
+                frames: [{ key: ASSETS.spritesheet.cheeseTouchAttack.key, frame: 1 }],
+                frameRate: 1,
+                repeat: -1
+            });
+        }
+
+        // Start with idle animation
+        this.play(CheeseTouch.ANIM_IDLE);
     }
 
     public preUpdate(time: number, delta: number) {
@@ -90,6 +141,10 @@ export class CheeseTouch extends PlayerController {
         // Play cheese eating sound
         audioManager.playCheeseEat();
 
+        //stop the beam to start eating (make it more dangerous to heal)
+
+        this.stopBeam();
+
         // Consume cheese meter to heal
         const healAmount = Math.min(1, this.skillMeter / 50);  // Heal 1 HP per 50 cheese
         const cheeseUsed = Math.min(this.skillMeter, 50);
@@ -104,6 +159,9 @@ export class CheeseTouch extends PlayerController {
 
     startBeam(): void {
         this.isBeaming = true;
+
+        // Play beam animation (hands up)
+        this.play(CheeseTouch.ANIM_BEAM);
 
         // Create beam graphics
         this.beamGraphics = this.gameScene.add.graphics();
@@ -125,6 +183,9 @@ export class CheeseTouch extends PlayerController {
     stopBeam(): void {
         this.isBeaming = false;
         this.lockedTarget = null;
+
+        // Return to idle animation
+        this.play(CheeseTouch.ANIM_IDLE);
 
         if (this.beamGraphics) {
             this.beamGraphics.destroy();
@@ -170,11 +231,12 @@ export class CheeseTouch extends PlayerController {
     }
 
     updateLockOnTarget(): void {
-        // Find closest enemy within lockOnRadius of cursor
-        const enemies = this.gameScene.enemyGroup.getChildren();
-        let closestEnemy: Phaser.Physics.Arcade.Sprite | null = null;
+        // Find closest target (enemy or destructible wall) within lockOnRadius of cursor
+        let closestTarget: Phaser.Physics.Arcade.Sprite | null = null;
         let closestDist = this.lockOnRadius;
 
+        // Check enemies
+        const enemies = this.gameScene.enemyGroup.getChildren();
         for (const enemy of enemies) {
             const e = enemy as Phaser.Physics.Arcade.Sprite;
             if (!e.active) continue;
@@ -189,11 +251,31 @@ export class CheeseTouch extends PlayerController {
 
             if (dist < closestDist && playerDist <= this.beamRange) {
                 closestDist = dist;
-                closestEnemy = e;
+                closestTarget = e;
             }
         }
 
-        this.lockedTarget = closestEnemy;
+        // Check destructible walls
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active || w.isIndestructible) continue;
+
+            // Distance from cursor to wall
+            const dx = w.x - this.currentAim.x;
+            const dy = w.y - this.currentAim.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Also check if wall is within beam range from player
+            const playerDist = Math.sqrt((w.x - this.x) ** 2 + (w.y - this.y) ** 2);
+
+            if (dist < closestDist && playerDist <= this.beamRange) {
+                closestDist = dist;
+                closestTarget = w;
+            }
+        }
+
+        this.lockedTarget = closestTarget;
     }
 
     drawLockOnIndicator(): void {
@@ -224,6 +306,19 @@ export class CheeseTouch extends PlayerController {
                 this.updateSkillBarValue();
             }
             return;
+        }
+
+        // Check for walls in beam path
+        const walls = this.gameScene.wallGroup.getChildren();
+        for (const wall of walls) {
+            const w = wall as any;
+            if (!w.active) continue;
+
+            if (this.isInBeamPath(w.x, w.y)) {
+                if (w.hit && !w.isIndestructible) {
+                    w.hit(this.beamDamage);
+                }
+            }
         }
 
         // Fallback: Check for enemies in beam path
@@ -273,9 +368,12 @@ export class CheeseTouch extends PlayerController {
         return perpDist < 30;
     }
 
-    // TODO
-    updateAI(): void {
-        // For CPU-controlled characters
-        // Not implemented in this phase
+    /**
+     * Character-specific AI logic for CheeseTouch
+     * The main AI behavior is handled by the AllyBehavior system
+     */
+    updateAI(_time: number, _delta: number): void {
+        // CheeseTouch AI focuses on beam attacks and self-healing
+        // The FollowAndAttackBehavior handles the general logic
     }
 }

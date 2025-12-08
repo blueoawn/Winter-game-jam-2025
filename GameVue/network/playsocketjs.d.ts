@@ -18,6 +18,10 @@ declare module 'playsocketjs' {
         sendRequest(requestName: string, data?: any): void;
         onEvent(eventName: string, handler: (data: any) => void): void;
         destroy(): void;
+
+        // Volatile messaging (undocumented but used in codebase)
+        emitVolatile(eventName: string, data: any): void;
+        onStorageKey(key: string, handler: (value: any) => void): void;
     }
 
     export class PlaySocketServer {
@@ -29,5 +33,8 @@ declare module 'playsocketjs' {
         destroyRoom(roomId: string): void;
         kick(clientId: string, reason?: string): void;
         stop(): void;
+
+        // Volatile messaging (undocumented but used in codebase)
+        emitToRoomVolatile(roomId: string, eventName: string, data: any, options?: { except?: string }): void;
     }
 }
