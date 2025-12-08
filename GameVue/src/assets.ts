@@ -3,12 +3,20 @@ export default {
         cheeseEat: {
             key: 'cheese-eat',
             // Not sure if it's legal to use roblox sound effects, but it's funny
-            args: ['assets/SoundEffects/roblox-eating-sound-effect-nom-nom-nom.mp3']
+            args: ['assets/SoundEffects/Cheese-Touch-Heal-sound.m4a']
         },
         // Placeholder railgun fire sound. Add `assets/SoundEffects/railgun-fire.mp3` to the assets folder.
         railgunFire: {
             key: 'railgun-fire',
-            args: ['assets/SoundEffects/railgun-fire.mp3']
+            args: ['assets/SoundEffects/Railgun-laser-sound.m4a']
+        },
+        ninjastar: {
+            key: 'ninja-star',
+            args: ['assets/SoundEffects/plasma-shot-sound.m4a']
+        },
+        characterSelectMusic: {
+            key: 'character-select-music',
+            args: ['assets/SoundEffects/Character-select-hsh.m4a']
         },
     },
     tilemapTiledJSON: {
