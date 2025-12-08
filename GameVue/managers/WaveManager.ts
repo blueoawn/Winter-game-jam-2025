@@ -5,6 +5,7 @@
 
 import type { GameScene } from '../src/scenes/GameScene';
 import type { IBehavior } from '../src/behaviorScripts/Behavior';
+import { KamikazeBehavior } from '../src/behaviorScripts/KamikazeBehavior';
 import ASSETS from '../src/assets';
 import { audioManager } from './AudioManager';
 
@@ -22,6 +23,7 @@ export interface WaveConfig {
     count: number;
     spawnDelay: number;  // Delay between individual enemy spawns (ms)
     behavior?: IBehavior;
+    behaviorConfig?: { minSpeed?: number; maxSpeed?: number; explosionRange?: number };
     spawnPositions?: 'edges' | 'random' | Array<{ x: number; y: number }>;
 }
 
@@ -134,12 +136,28 @@ export class WaveManager {
     private spawnEnemy(wave: WaveConfig): void {
         const spawnPos = this.getSpawnPosition(wave.spawnPositions);
 
+        // Create behavior - either use provided one or create randomized from config
+        let behavior: IBehavior | undefined = wave.behavior;
+
+        if (!behavior && wave.behaviorConfig) {
+            // Create randomized KamikazeBehavior
+            const minSpeed = wave.behaviorConfig.minSpeed ?? 100;
+            const maxSpeed = wave.behaviorConfig.maxSpeed ?? 100;
+            const randomSpeed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+            const explosionRange = wave.behaviorConfig.explosionRange ?? 60;
+
+            behavior = new KamikazeBehavior({
+                moveSpeed: randomSpeed,
+                explosionRange: explosionRange
+            });
+        }
+
         switch (wave.enemyType) {
             case 'EnemySlime':
-                const slime = this.scene.addSlimeEnemy(spawnPos.x, spawnPos.y, wave.behavior);
+                const slime = this.scene.addSlimeEnemy(spawnPos.x, spawnPos.y, behavior);
                 break;
             case 'EnemyLizardWizard':
-                const wizard = this.scene.addLizardWizardEnemy(spawnPos.x, spawnPos.y, wave.behavior);
+                const wizard = this.scene.addLizardWizardEnemy(spawnPos.x, spawnPos.y, behavior);
                 break;
         }
     }

@@ -40,7 +40,6 @@ import {
 import { getCharacterType, createCharacter, CHARACTER_ID_MAP } from '../utils/CharacterFactory.ts';
 import * as CollisionManager from '../../managers/CollisionManager.ts';
 import { WaveManager } from '../../managers/WaveManager.ts';
-import { KamikazeBehavior } from '../behaviorScripts/KamikazeBehavior.ts';
 import { BossBehavior } from '../behaviorScripts/BossBehavior.ts';
 
 
@@ -460,14 +459,28 @@ export class GameScene extends Scene
                     enemyType: 'EnemySlime',
                     count: 5,
                     spawnDelay: 1000,
-                    behavior: new KamikazeBehavior({ moveSpeed: 100, explosionRange: 60 }),
+                    behaviorConfig: { minSpeed: 80, maxSpeed: 120 },
                     spawnPositions: 'edges' as const
                 },
                 {
                     enemyType: 'EnemySlime',
                     count: 8,
                     spawnDelay: 800,
-                    behavior: new KamikazeBehavior({ moveSpeed: 120, explosionRange: 60 }),
+                    behaviorConfig: { minSpeed: 110, maxSpeed: 150 },
+                    spawnPositions: 'edges' as const
+                },
+                {
+                    enemyType: 'EnemySlime',
+                    count: 12,
+                    spawnDelay: 700,
+                    behaviorConfig: { minSpeed: 140, maxSpeed: 190 },
+                    spawnPositions: 'edges' as const
+                },
+                {
+                    enemyType: 'EnemySlime',
+                    count: 15,
+                    spawnDelay: 600,
+                    behaviorConfig: { minSpeed: 170, maxSpeed: 230 },
                     spawnPositions: 'edges' as const
                 }
             ],

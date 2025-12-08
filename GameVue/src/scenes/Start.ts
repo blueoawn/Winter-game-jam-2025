@@ -30,6 +30,7 @@ export class Start extends Phaser.Scene {
         const scaleY = height / background.height;
         const scale = Math.max(scaleX, scaleY);
         background.setScale(scale);
+        background.setAlpha(0.4)
         background.setDepth(-1); // Put background behind everything
 
         this.add.text(centerX, 100, 'Half-dozen Heroz', {

@@ -131,11 +131,7 @@ export class CharacterSelectScene extends Scene {
     private static readonly STORAGE_KEY = 'unlockedCharacters';
     // TODO modify this variable to have less characters when the game is ready
     private static readonly DEFAULT_UNLOCKED: string[] = [
-        CharacterIdsEnum.BigSword,
-        CharacterIdsEnum.SwordAndBoard,
         CharacterIdsEnum.BoomStick,
-        CharacterIdsEnum.CheeseTouch,
-        CharacterIdsEnum.Railgun
     ];
 
     constructor() {
@@ -282,15 +278,28 @@ export class CharacterSelectScene extends Scene {
         this.isAnimating = false;
         this.characterCards.clear();
 
+        // Sort characters: unlocked first, then locked
+        const sortedCharacters = [...this.characters].sort((a, b) => {
+            const aUnlocked = this.isCharacterUnlocked(a.id);
+            const bUnlocked = this.isCharacterUnlocked(b.id);
+
+            if (aUnlocked && !bUnlocked) return -1; // a comes first
+            if (!aUnlocked && bUnlocked) return 1;  // b comes first
+            return 0; // maintain original order for same lock status
+        });
+
         // Create carousel container centered on screen
         this.carouselContainer = this.add.container(centerX, centerY);
 
         // Create all character cards at position 0,0 (we'll position them in updateCarouselPositions)
-        this.characters.forEach((character, index) => {
+        sortedCharacters.forEach((character, index) => {
             const card = this.createCharacterCard(character, 0, 0, 320, 420, index);
             this.characterCards.set(character.id, card);
             this.carouselContainer.add(card);
         });
+
+        // Update the characters array to match sorted order
+        this.characters = sortedCharacters;
 
         // Create navigation arrows
         this.createCarouselArrows(centerY);
@@ -552,7 +561,7 @@ export class CharacterSelectScene extends Scene {
             }).setOrigin(0.5);
             container.add(lockText);
 
-            const unlockHint = this.add.text(0, startY + 100, 'Complete challenges\nto unlock!', {
+            const unlockHint = this.add.text(0, startY + 100, '', {
                 fontFamily: 'Arial',
                 fontSize: '14px',
                 color: '#666666',
@@ -695,10 +704,9 @@ export class CharacterSelectScene extends Scene {
                 this.updatePlayerStatus();
             }
         } else {
-            // Single player - just enable start button
+            // Single player - just enable start button visually
             this.startButtonBg.setFillStyle(0x00aa00);
             this.startButton.setColor('#ffffff');
-            this.startButtonBg.setInteractive({ useHandCursor: true });
         }
     }
 
@@ -706,6 +714,9 @@ export class CharacterSelectScene extends Scene {
         // Button background
         this.startButtonBg = this.add.rectangle(x, y, 300, 60, 0x444444);
         this.startButtonBg.setStrokeStyle(4, 0x666666);
+
+        // Make button interactive from the start
+        this.startButtonBg.setInteractive({ useHandCursor: true });
 
         // Button text
         this.startButton = this.add.text(x, y, 'READY', {
@@ -715,7 +726,7 @@ export class CharacterSelectScene extends Scene {
             align: 'center'
         }).setOrigin(0.5);
 
-        // Make button interactive (disabled initially)
+        // Button click handler - checks if character is selected
         this.startButtonBg.on('pointerdown', () => {
             if (this.selectedCharacterId) {
                 this.onStartButtonClick();

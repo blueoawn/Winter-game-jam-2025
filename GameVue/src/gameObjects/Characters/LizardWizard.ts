@@ -7,6 +7,7 @@ import { audioManager } from '../../../managers/AudioManager';
 export class LizardWizard extends PlayerController {
     private missiles: Set<MagicMissile> = new Set();
     private ability2SpawnDistance: number = 40;
+    private soundIsPlaying: boolean = false;
 
     // Animation keys
     static readonly ANIM_ABILITY1 = 'lizard_ability1';
@@ -109,7 +110,13 @@ export class LizardWizard extends PlayerController {
         }
 
         // Play wizard blep sound
-        audioManager.play(ASSETS.audio.wizardBlep.key, { volume: 0.3 });
+        if (!this.soundIsPlaying) {
+            audioManager.play(ASSETS.audio.wizardBlep.key, { volume: audioManager.getVolume() * Math.random() });
+            this.soundIsPlaying = true;
+            this.gameScene.time.delayedCall(50, () => {
+                this.soundIsPlaying = false;
+            })
+        }
 
         // Calculate direction from character to aim point
         const dirX = this.currentAim.x - this.x;
