@@ -240,6 +240,10 @@ setInterval(() => {
                 console.log(`💀 Removing dead client ${clientId} from ${roomId}`);
                 meta.heartbeats.delete(clientId);
                 meta.lastInputSeq.delete(clientId);
+                
+                // Actually disconnect the client from PlaySocketJS
+                server.disconnectClient(clientId);
+                
                 if (clientId === meta.hostId) {
                     const next = [...meta.heartbeats.keys()][0] || null;
                     meta.hostId = next;
