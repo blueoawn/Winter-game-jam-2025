@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import ASSETS from '../assets';
 import NetworkManager from '../../managers/NetworkManager.ts';
 import { CharacterIdsEnum } from "../gameObjects/Characters/CharactersEnum.ts";
+import { Team } from '../types/Team';
 
 interface CharacterData {
     id: string;
@@ -21,6 +22,10 @@ interface CharacterSelection {
     characterId: string;
     ready: boolean;
     timestamp: number;
+}
+
+interface TeamAssignments {
+    [playerId: string]: Team;
 }
 
 export class CharacterSelectScene extends Scene {
@@ -108,6 +113,7 @@ export class CharacterSelectScene extends Scene {
     private networkEnabled: boolean = false;
     private isHost: boolean = false;
     private players: string[] = [];
+    private teamAssignments: TeamAssignments = {};
     private inCharacterSelection: boolean = false;  // Guard against multiple character selection transitions
     private characterSelections: Map<string, CharacterSelection> = new Map();
 
@@ -186,11 +192,13 @@ export class CharacterSelectScene extends Scene {
         this.networkEnabled = data?.networkEnabled || false;
         this.isHost = data?.isHost || false;
         this.players = data?.players || [];
+        this.teamAssignments = data?.teamAssignments || {};
 
         console.log('CharacterSelect initialized:', {
             networkEnabled: this.networkEnabled,
             isHost: this.isHost,
-            players: this.players
+            players: this.players,
+            teamAssignments: this.teamAssignments
         });
     }
 
@@ -819,14 +827,16 @@ export class CharacterSelectScene extends Scene {
                 characterId: this.selectedCharacterId,
                 networkEnabled: this.networkEnabled,
                 isHost: this.isHost,
-                players: this.players
+                players: this.players,
+                teamAssignments: this.teamAssignments
             });
 
             this.scene.start('GameScene', {
                 characterId: this.selectedCharacterId,
                 networkEnabled: this.networkEnabled,
                 isHost: this.isHost,
-                players: this.players
+                players: this.players,
+                teamAssignments: this.teamAssignments
             });
 
             console.log('Scene transition started');

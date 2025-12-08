@@ -105,6 +105,7 @@ export class GameScene extends Scene
         this.networkEnabled = data?.networkEnabled || false;
         this.isHost = data?.isHost || false;
         this.players = data?.players || [];
+        (this as any).teamAssignments = data?.teamAssignments || {};
 
         // Store selected character ID
         (this as any).selectedCharacterId = data?.characterId || 'lizard-wizard';
@@ -113,6 +114,7 @@ export class GameScene extends Scene
             networkEnabled: this.networkEnabled,
             isHost: this.isHost,
             players: this.players,
+            teamAssignments: (this as any).teamAssignments,
             characterId: (this as any).selectedCharacterId
         });
     }
@@ -281,15 +283,15 @@ export class GameScene extends Scene
 
         this.players.forEach((playerId) => {
             const isLocal = (playerId === localPlayerId);
-            
+
             // Get the character ID for this player from storage
             let characterType: CharacterNamesEnum | undefined;
             const selection = characterSelections[playerId];
-            
+
             if (selection && selection.characterId) {
                 characterType = CHARACTER_ID_MAP[selection.characterId];
             }
-            
+
             // Fall back to first character if not found
             if (!characterType) {
                 characterType = Object.values(CharacterNamesEnum)[0];
@@ -297,7 +299,18 @@ export class GameScene extends Scene
             }
 
             try {
-                this.playerManager!.createPlayer(playerId, isLocal, characterType);
+                const player = this.playerManager!.createPlayer(playerId, isLocal, characterType);
+
+                // Assign team based on teamAssignments
+                const teamAssignments = (this as any).teamAssignments || {};
+                if (teamAssignments[playerId]) {
+                    player.team = teamAssignments[playerId];
+                    console.log(`Assigned player ${playerId} to team ${teamAssignments[playerId]}`);
+                } else {
+                    // Default to Red team if no assignment
+                    player.team = Team.Red;
+                    console.warn(`No team assignment for ${playerId}, defaulting to Red`);
+                }
             } catch (err) {
                 console.error(`Error creating player ${playerId}:`, err);
             }

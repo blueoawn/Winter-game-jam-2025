@@ -1,5 +1,6 @@
 import NetworkManager from '../../managers/NetworkManager';
 import { LobbyUI } from '../ui/LobbyUI';
+import { Team } from '../types/Team';
 
 interface LobbyInitData {
     mode?: 'host' | 'join';
@@ -13,6 +14,11 @@ interface GameSceneData {
     networkEnabled: boolean;
     isHost: boolean;
     players: string[];
+    teamAssignments: TeamAssignments;
+}
+
+interface TeamAssignments {
+    [playerId: string]: Team;
 }
 
 //TODO Background image?
@@ -20,6 +26,7 @@ interface GameSceneData {
 export class Lobby extends Phaser.Scene {
     private ui: LobbyUI | null = null;
     private connectedPlayers: string[] = [];
+    private teamAssignments: TeamAssignments = {};
     private isHost: boolean = false;
     private mode: 'host' | 'join' | null = null;
 
@@ -75,6 +82,12 @@ export class Lobby extends Phaser.Scene {
         // Add self to player list
         const stats = NetworkManager.getStats();
         this.connectedPlayers = stats.playerId ? [stats.playerId] : [];
+
+        // Assign host to red team by default
+        if (stats.playerId) {
+            this.teamAssignments[stats.playerId] = Team.Red;
+        }
+
         this.updatePlayerList();
 
         // Listen for players joining
@@ -89,6 +102,23 @@ export class Lobby extends Phaser.Scene {
             }
 
             this.connectedPlayers = players;
+
+            // Assign new player to a team (alternate between Red and Blue)
+            if (!this.teamAssignments[peerId]) {
+                // Count current team sizes
+                const redCount = Object.values(this.teamAssignments).filter(t => t === Team.Red).length;
+                const blueCount = Object.values(this.teamAssignments).filter(t => t === Team.Blue).length;
+
+                // Assign to team with fewer players
+                this.teamAssignments[peerId] = redCount <= blueCount ? Team.Red : Team.Blue;
+
+                // Sync team assignments to all clients
+                const socket = NetworkManager.getSocket();
+                if (socket) {
+                    socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
+                }
+            }
+
             this.updatePlayerList();
             this.ui!.updateStatus(`${this.connectedPlayers.length} player(s) connected`, '#00ff00');
         });
@@ -121,9 +151,10 @@ export class Lobby extends Phaser.Scene {
             this.ui!.changeMode('host');
             this.ui!.updateStatus('Connected! Waiting for host to initiate character select ', '#00ff00');
 
-            // Get current players from storage
+            // Get current players and team assignments from storage
             const storage = NetworkManager.getStorage();
             this.connectedPlayers = storage?.players || [];
+            this.teamAssignments = storage?.teamAssignments || {};
             this.updatePlayerList();
 
             // Listen for host disconnect
@@ -150,8 +181,14 @@ export class Lobby extends Phaser.Scene {
             // Update player list
             if (storage.players) {
                 this.connectedPlayers = storage.players;
-                this.updatePlayerList();
             }
+
+            // Update team assignments
+            if (storage.teamAssignments) {
+                this.teamAssignments = storage.teamAssignments;
+            }
+
+            this.updatePlayerList();
 
             // Check if character selection phase has started - trigger for ALL clients when flag is true
             if (storage.characterSelectionInProgress === true) {
@@ -162,7 +199,26 @@ export class Lobby extends Phaser.Scene {
     }
 
     updatePlayerList(): void {
-        this.ui!.updatePlayerList(this.connectedPlayers, this.isHost);
+        this.ui!.updatePlayerList(this.connectedPlayers, this.teamAssignments, this.isHost);
+    }
+
+    assignPlayerTeam(playerId: string, team: Team): void {
+        this.teamAssignments[playerId] = team;
+
+        // Sync to storage if host
+        if (this.isHost) {
+            const socket = NetworkManager.getSocket();
+            if (socket) {
+                socket.updateStorage('teamAssignments', 'set', this.teamAssignments);
+            }
+        }
+
+        this.updatePlayerList();
+    }
+
+    switchPlayerTeam(playerId: string, newTeam: Team): void {
+        console.log(`Switching player ${playerId} to team ${newTeam}`);
+        this.assignPlayerTeam(playerId, newTeam);
     }
 
     onSelectCharacters(): void {
@@ -193,11 +249,13 @@ export class Lobby extends Phaser.Scene {
 
     startCharacterSelection(players: string[]): void {
         console.log('Starting character selection with players:', players);
+        console.log('Team assignments:', this.teamAssignments);
 
         const gameData: GameSceneData = {
             networkEnabled: true,
             isHost: this.isHost,
-            players: players
+            players: players,
+            teamAssignments: this.teamAssignments
         };
 
         // Transition to Character Select scene

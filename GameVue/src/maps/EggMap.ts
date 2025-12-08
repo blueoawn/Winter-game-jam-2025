@@ -27,16 +27,12 @@ export const EggMap: MapData = {
         team2: { x: 3216, y: 2816 },    // Right side (width*0.75, height/2)
     },
 
-    // No spawners initially (placeholder for future phase)
     spawners: [],
 
-    // No walls (the map image itself has visual walls)
     walls: [],
 
-    // No consumables initially
     consumables: [],
 
-    // No area boundaries initially
     areaBoundaries: []
 }
 
