@@ -32,8 +32,13 @@ export class NetworkManager {
     async initialize(): Promise<string> {
         const clientId = `player_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+        // Use secure WebSocket in production, localhost for development
+        const wsEndpoint = window.location.hostname === 'localhost'
+            ? 'ws://localhost:3001'
+            : `wss://${window.location.host}/ws`;
+
         this.socket = new PlaySocket(clientId, {
-            endpoint: 'ws://localhost:3001'
+            endpoint: wsEndpoint
         });
 
         this.localPlayerId = await this.socket.init();

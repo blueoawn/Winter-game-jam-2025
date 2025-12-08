@@ -1,0 +1,16 @@
+grem.studio {
+    # Serve the built frontend static files
+    root * /var/www/grem.studio/dist
+    file_server
+
+    # Proxy WebSocket connections to the local PlaySocketJS server
+    handle /ws {
+        reverse_proxy localhost:3001
+    }
+
+    # Enable compression for better performance
+    encode gzip
+
+    # SPA fallback - serve index.html for client-side routing
+    try_files {path} /index.html
+}
