@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
+import { audioManager } from '../../../managers/AudioManager';
 
 export class BigSword extends PlayerController {
     // Ability 1 - Heavy Slash config
@@ -101,6 +102,7 @@ export class BigSword extends PlayerController {
         if (this.isDashing || this.isCharging || this.isSlashing) return;
 
         this.startSlash();
+        audioManager.play('sword-slash');
         this.startAbility1Cooldown();
     }
 

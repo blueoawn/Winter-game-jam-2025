@@ -129,7 +129,7 @@ export class Railgun extends PlayerController {
 
         // Play firing sound (if asset present)
         try {
-            audioManager.play(ASSETS.audio.railgunFire.key);
+            audioManager.play(ASSETS.audio.ninjastar.key);
         } catch (e) {
             // Fail silently if audio asset isn't available yet
         }
@@ -162,6 +162,9 @@ export class Railgun extends PlayerController {
     }
 
     private fireBeam(damage: number, width: number): void {
+        // Play railgun fire sound
+        audioManager.play('railgun-fire');
+
         // 1. Calculate Beam Geometry
         const angle = Phaser.Math.Angle.Between(this.x, this.y, this.currentAim.x, this.currentAim.y);
 

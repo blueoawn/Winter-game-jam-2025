@@ -163,6 +163,9 @@ export class CheeseTouch extends PlayerController {
         // Play beam animation (hands up)
         this.play(CheeseTouch.ANIM_BEAM);
 
+        // Play drain sound
+        audioManager.play('cheese-touch-drain');
+
         // Create beam graphics
         this.beamGraphics = this.gameScene.add.graphics();
         this.beamGraphics.setDepth(Depth.ABILITIES);
