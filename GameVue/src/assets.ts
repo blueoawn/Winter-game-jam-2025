@@ -18,6 +18,42 @@ export default {
             key: 'battle-theme-1',
             args: ['Music/Battle-Theme-1.m4a']
         },
+        gameOverMusic: {
+            key: 'game-over-music',
+            args: ['assets/Music/Game-over.m4a']
+        },
+        shotgunFire: {
+            key: 'shotgun-fire',
+            args: ['assets/SoundEffects/Shotgun-fire-sound.m4a']
+        },
+        cheeseTouchDrain: {
+            key: 'cheese-touch-drain',
+            args: ['assets/SoundEffects/Cheese-touch-drain-Sound.m4a']
+        },
+        youDidIt: {
+            key: 'you-did-it',
+            args: ['assets/SoundEffects/You-did-it.m4a']
+        },
+        wizardLizardBlep: {
+            key: 'wizard-lizard-blep',
+            args: ['assets/SoundEffects/Wizard-lizard-blep.m4a']
+        },
+        swordSlash: {
+            key: 'sword-slash',
+            args: ['assets/SoundEffects/Sword-slash-sound.m4a']
+        },
+        wallShieldCollision: {
+            key: 'wall-shield-collision',
+            args: ['assets/SoundEffects/Wall_-shield-collision-sound.m4a']
+        },
+        lizardDeath1: {
+            key: 'lizard-death-1',
+            args: ['assets/SoundEffects/lizard-ded-1.m4a']
+        },
+        lizardDeath2: {
+            key: 'lizard-death-2',
+            args: ['assets/SoundEffects/lizard-ded-2.m4a']
+        },
     },
     tilemapTiledJSON: {
         dungeonCrawl: {

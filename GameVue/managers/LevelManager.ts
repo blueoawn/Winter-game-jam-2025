@@ -22,6 +22,7 @@ import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
 import { SpeedBoost } from '../src/gameObjects/Consumable/SpeedBoost';
 import { Consumable } from '../src/gameObjects/Consumable/Consumable';
 import { AreaBoundary, AreaBoundaryConfig } from '../src/gameObjects/AreaBoundary';
+import { audioManager } from './AudioManager';
 
 /**
  * Initialize spawners from map data
@@ -476,6 +477,10 @@ export function hitWall(_scene: GameScene, bullet: any, wall: Wall): void {
         if (!wall.isIndestructible) {
             wall.hit(bullet.getPower());
         }
+        
+        // Play collision sound
+        audioManager.play('wall-shield-collision');
+        
         bullet.remove();
     } catch (err) {
         console.error('[LEVEL] Error handling wall hit:', err);
@@ -493,6 +498,9 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
                 // Apply effect to player
                 consumable.applyEffect(player);
                 
+                // Play pickup sound
+                audioManager.play('you-did-it');
+                
                 // Remove consumable
                 removeConsumable(scene, consumable);
                 break;
@@ -508,6 +516,9 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
  */
 export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, enemyBullet: EnemyBullet): void {
     try {
+        // Play collision sound
+        audioManager.play('wall-shield-collision');
+        
         removeEnemyBullet(scene, enemyBullet);
     } catch (err) {
         console.error('[LEVEL] Error destroying enemy bullet:', err);

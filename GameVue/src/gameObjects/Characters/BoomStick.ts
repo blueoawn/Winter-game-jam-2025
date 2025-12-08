@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import { ShotgunPellet } from '../Projectile/ShotgunPellet';
+import { audioManager } from '../../../managers/AudioManager';
 
 export class BoomStick extends PlayerController {
     private pellets: Set<ShotgunPellet> = new Set();
@@ -98,6 +99,8 @@ export class BoomStick extends PlayerController {
         const dx = this.currentAim.x - this.x;
         const dy = this.currentAim.y - this.y;
         const baseAngle = Math.atan2(dy, dx);
+
+        audioManager.play('shotgun-fire');
 
         // Calculate barrel position with configurable offsets
         const cos = Math.cos(baseAngle);

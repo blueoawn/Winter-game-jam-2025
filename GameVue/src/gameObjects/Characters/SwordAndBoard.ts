@@ -7,6 +7,7 @@ import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 import { NinjaStar } from '../Projectile/NinjaStar';
 import { Slash } from '../Projectile/Slash';
+import { audioManager } from '../../../managers/AudioManager';
 
 export class SwordAndBoard extends PlayerController {
     private slashes: Set<NinjaStar> = new Set();
@@ -116,6 +117,7 @@ export class SwordAndBoard extends PlayerController {
         if (this.isSlashing) return;
 
         this.startSlash();
+        audioManager.play('sword-slash');
         this.startAbility1Cooldown();
     }
 

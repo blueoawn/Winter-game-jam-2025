@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene.ts';
 import { MagicMissile } from '../Projectile/MagicMissile';
 import ASSETS from "../../assets.ts";
+import { audioManager } from '../../../managers/AudioManager';
 
 export class LizardWizard extends PlayerController {
     private missiles: Set<MagicMissile> = new Set();
@@ -92,6 +93,10 @@ export class LizardWizard extends PlayerController {
 
         // Play ability 1 animation - projectiles will fire automatically on frames 1 and 2
         this.play(LizardWizard.ANIM_ABILITY1);
+        
+        // Play plasma shot sound
+        audioManager.play('ninja-star');
+        
         this.startAbility1Cooldown();
     }
 
@@ -155,6 +160,9 @@ export class LizardWizard extends PlayerController {
 
         // Play ability 2 animation
         this.play(LizardWizard.ANIM_ABILITY2);
+
+        // Play blep sound
+        audioManager.play('wizard-lizard-blep');
 
         // Calculate direction from character to aim point
         const dirX = this.currentAim.x - this.x;

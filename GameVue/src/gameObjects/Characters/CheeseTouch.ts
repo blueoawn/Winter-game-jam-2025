@@ -164,6 +164,9 @@ export class CheeseTouch extends PlayerController {
         // Play beam animation (hands up)
         this.play(CheeseTouch.ANIM_BEAM);
 
+        // Play drain sound
+        audioManager.play('cheese-touch-drain');
+
         // Calculate initial beam angle
         const angle = Math.atan2(this.currentAim.y - this.y, this.currentAim.x - this.x);
 
