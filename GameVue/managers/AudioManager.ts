@@ -5,7 +5,7 @@ import ASSETS from '../src/assets';
 export class AudioManager {
     private static instance: AudioManager;
     private scene: Scene | null = null;
-    private volume: number = 1.0;
+    private volume: number = 0.1;
     private muted: boolean = false;
 
     private constructor() {}

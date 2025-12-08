@@ -482,38 +482,33 @@ export class CharacterSelectScene extends Scene {
         bg.setStrokeStyle(4, isLocked ? 0x333333 : 0x666666);
         container.add(bg);
 
-        // Add decorative background image above character name if available
-        // Using the lizard-wizard background image as an example and repeating for all cards
-        if (this.textures.exists(ASSETS.image.lizardWizardBackgroundSmall.key)) {
-            const cardBgImage = this.add.image(0, -120, ASSETS.image.lizardWizardBackgroundSmall.key);
+        // Map character IDs to portrait asset keys
+        const portraitMap: Record<string, string> = {
+            'big-sword': ASSETS.image.bigGPortrait.key,
+            'cheese-touch': ASSETS.image.ctPortrait.key,
+            'rail-gun': ASSETS.image.railgunnerPortrait.key,
+            'sword-and-board': ASSETS.image.sbPortrait.key,
+            'boom-stick': ASSETS.image.shotgunnerPortrait.key,
+            'lizard-wizard': ASSETS.image.wizardLizardPortrait.key
+        };
 
-            // Calculate scale to fit within 200x150 while maintaining aspect ratio
-            const maxWidth = 200;
-            const maxHeight = 150;
-            const texture = this.textures.get(ASSETS.image.lizardWizardBackgroundSmall.key);
-            const textureWidth = texture.source[0].width;
-            const textureHeight = texture.source[0].height;
+        // Add character portrait with border
+        const portraitKey = portraitMap[character.id];
+        if (portraitKey && this.textures.exists(portraitKey)) {
+            // Create portrait image
+            const portrait = this.add.image(0, -110, portraitKey);
 
-            const scaleX = maxWidth / textureWidth;
-            const scaleY = maxHeight / textureHeight;
-            const fitScale = Math.min(scaleX, scaleY);
+            // Scale portrait to fit within card without overflowing
+            const maxSize = 160;
+            portrait.setDisplaySize(maxSize, maxSize);
 
-            cardBgImage.setScale(fitScale);
-            cardBgImage.setDepth(1);
-            cardBgImage.setAlpha(1);
             if (isLocked) {
-                cardBgImage.setTint(0x000000);
+                portrait.setTint(0x000000);
+                portrait.setAlpha(0.3);
             }
-            container.add(cardBgImage);
-        }
 
-        // Character sprite - black silhouette for locked characters
-        // const sprite = this.add.sprite(0, -100, ASSETS.spritesheet.ships.key, character.frame);
-        // sprite.setScale(3.5);
-        // if (isLocked) {
-        //     sprite.setTint(0x000000);
-        // }
-        // container.add(sprite);
+            container.add(portrait);
+        }
 
         // Name - show "???" for locked characters
         const nameText = this.add.text(0, -10, isLocked ? '???' : character.name, {

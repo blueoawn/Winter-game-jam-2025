@@ -53,6 +53,30 @@ export default {
         sword: {
             key: 'sword',
             args: ['assets/Sprites/swordSpriteCropped.png']
+        },
+        bigGPortrait: {
+            key: 'BigG_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/BigG_Portrait.png']
+        },
+        ctPortrait: {
+            key: 'CT_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/CT_Portrait.png']
+        },
+        railgunnerPortrait: {
+            key: 'Railgunner_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/Railgunner_Portrait.png']
+        },
+        sbPortrait: {
+            key: 'SB_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/SB_Portrait.png']
+        },
+        shotgunnerPortrait: {
+            key: 'Shotgunner_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/Shotgunner_Portrait.png']
+        },
+        wizardLizardPortrait: {
+            key: 'WizardLizard_Portrait',
+            args: ['assets/Sprites/CharacterSelectPortraits/WizardLizard_Portrait.png']
         }
     },
     spritesheet: {
