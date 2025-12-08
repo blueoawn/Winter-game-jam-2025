@@ -23,8 +23,8 @@ export const EggMap: MapData = {
     // Calculations: center=(2144, 2816), left-center=(1072, 2816), right-center=(3216, 2816)
     spawnPoints: {
         default: { x: 2144, y: 2816 },  // Center of map (width/2, height/2)
-        team1: { x: 1072, y: 2816 },    // Left side (width*0.25, height/2)
-        team2: { x: 3216, y: 2816 },    // Right side (width*0.75, height/2)
+        teamBlue: { x: 1072, y: 2816 }, // Left side (width*0.25, height/2) - Blue team
+        teamRed: { x: 3216, y: 2816 },  // Right side (width*0.75, height/2) - Red team
     },
 
     spawners: [],
