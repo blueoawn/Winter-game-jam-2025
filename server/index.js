@@ -3,10 +3,17 @@
 
 import PlaySocketServer from 'playsocketjs/server';
 
+const MAX_MESSAGE_SIZE = 8 * 1024; // 8 KB max per message
+function isObject(o) {
+    return o && typeof o === 'object' && !Array.isArray(o);
+}
+
+// SECURITY CHANGE: bind ONLY to localhost
 const server = new PlaySocketServer({
     port: 3001,
-    host: '0.0.0.0',
-    rateLimit: 2000
+    host: '127.0.0.1',
+    // SECURITY CHANGE: reasonable public-facing rate limit
+    rateLimit: 300
 });
 
 console.log('🚀 PlaySocketJS Server Booted on port 3001');
@@ -63,51 +70,62 @@ server.onEvent('clientDisconnected', (clientId, roomId) => {
 // Handle custom requests from clients (heartbeat, state, snapshot)
 // Note: PlaySocketJS uses 'name' not 'requestName' in the event payload
 server.onEvent('requestReceived', ({ clientId, roomId, name, data }) => {
-    // Debug: log all requests except heartbeat
-    if (name !== 'heartbeat') {
-        console.log(`📨 Request received: ${name} from ${clientId} in ${roomId}`);
-    }
 
-    const meta = roomData.get(roomId);
-    if (!meta) {
-        console.warn(`⚠️ No room metadata for ${roomId}`);
+    // ✅ SECURITY: basic validation
+    if (!clientId || !roomId || typeof name !== 'string') {
         return;
     }
 
+    // ✅ SECURITY: message size guard
+    try {
+        const size = JSON.stringify(data ?? {}).length;
+        if (size > MAX_MESSAGE_SIZE) {
+            console.warn(`⛔ Oversized message from ${clientId}`);
+            return;
+        }
+    } catch {
+        return;
+    }
+
+    if (name !== 'heartbeat') {
+        console.log(`📨 ${name} from ${clientId} in ${roomId}`);
+    }
+
+    const meta = roomData.get(roomId);
+    if (!meta) return;
+
+    // ✅ Heartbeat: lowest-cost path
     if (name === 'heartbeat') {
         meta.heartbeats.set(clientId, now());
         return;
     }
 
+    // ✅ State updates: only accept objects with numeric tick
     if (name === 'state') {
-        // Host or authoritative client may send a state delta; server will validate tick
-        const delta = data;
-        if (!delta || typeof delta.tick !== 'number') {
-            console.warn(`⛔ Invalid state request from ${clientId} in ${roomId}`);
+        if (!isObject(data) || typeof data.tick !== 'number') {
             return;
         }
 
-        if (delta.tick > meta.lastTick) {
-            meta.lastTick = delta.tick;
-            // Use updateRoomStorage to properly broadcast to all clients
-            // This triggers the CRDT update and sends to all room participants
-            console.log(`📡 Broadcasting state tick=${delta.tick} to room ${roomId}`);
-            server.updateRoomStorage(roomId, 'lastStateDelta', 'set', delta);
-        } else if (delta.tick === meta.lastTick) {
-            // duplicate - ignore
-        } else {
-            console.log(`⚠️ Out-of-order state tick=${delta.tick} from ${clientId} (server ${meta.lastTick})`);
+        if (data.tick > meta.lastTick) {
+            meta.lastTick = data.tick;
+            server.updateRoomStorage(roomId, 'lastStateDelta', 'set', data);
         }
 
         return;
     }
 
+    // ✅ Snapshot: throttle to host only
     if (name === 'snapshot') {
-        console.log(`📸 Snapshot requested by ${clientId} in room ${roomId}`);
-        // TODO: Implement snapshot response (e.g., send via request response or update storage)
+        if (clientId !== meta.hostId) {
+            console.warn(`⛔ Snapshot denied for non-host ${clientId}`);
+            return;
+        }
+
+        console.log(`📸 Snapshot requested by host ${clientId}`);
         return;
     }
 });
+
 
 // Storage validation: enforce who can write which keys and validate input sequence numbers
 server.onEvent('storageUpdateRequested', (params) => {
