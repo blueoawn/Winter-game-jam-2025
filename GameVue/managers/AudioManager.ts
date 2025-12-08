@@ -27,6 +27,12 @@ export class AudioManager {
     play(key: string, config?: Phaser.Types.Sound.SoundConfig): void {
         if (!this.scene || this.muted) return;
 
+        // Check if audio exists in cache before attempting to play
+        if (!this.scene.cache.audio.exists(key)) {
+            console.warn(`Audio key "${key}" not found in cache, skipping playback`);
+            return;
+        }
+
         // If config has a volume, multiply it with global volume, otherwise use global volume
         const configVolume = config?.volume ?? 1.0;
 
@@ -35,7 +41,11 @@ export class AudioManager {
             volume: this.volume * configVolume
         };
 
-        this.scene.sound.play(key, soundConfig);
+        try {
+            this.scene.sound.play(key, soundConfig);
+        } catch (error) {
+            console.warn(`Failed to play audio "${key}":`, error);
+        }
     }
 
     // Play cheese eat sound
@@ -46,6 +56,12 @@ export class AudioManager {
     // Play background music
     playMusic(key: string, config?: Phaser.Types.Sound.SoundConfig): void {
         if (!this.scene) return;
+
+        // Check if audio exists in cache before attempting to play
+        if (!this.scene.cache.audio.exists(key)) {
+            console.warn(`Audio key "${key}" not found in cache, skipping music playback`);
+            return;
+        }
 
         // Stop current music if playing
         this.stopMusic();
@@ -59,11 +75,16 @@ export class AudioManager {
             volume: this.volume * configVolume
         };
 
-        this.currentMusic = this.scene.sound.add(key, musicConfig);
+        try {
+            this.currentMusic = this.scene.sound.add(key, musicConfig);
 
-        // Only play if not muted
-        if (!this.muted) {
-            this.currentMusic.play();
+            // Only play if not muted
+            if (!this.muted) {
+                this.currentMusic.play();
+            }
+        } catch (error) {
+            console.warn(`Failed to play music "${key}":`, error);
+            this.currentMusic = null;
         }
     }
 

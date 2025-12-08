@@ -37,11 +37,43 @@ export class Preloader extends Scene
 
     preload() {
         //  Load the assets for the game - see ./src/assets.js
+
+        // Track failed audio files
+        const failedAudio = new Set<string>();
+
+        // Handle audio loading errors gracefully
+        this.load.on('loaderror', (file: any) => {
+            console.warn(`Failed to load: ${file.type} "${file.key}" from ${file.url}`);
+            if (file.type === 'audio') {
+                failedAudio.add(file.key);
+            }
+        });
+
+        // Handle file decode errors (e.g., unsupported audio formats)
+        this.load.on('fileerror', (file: any) => {
+            console.warn(`Error decoding file: ${file.type} "${file.key}"`);
+            if (file.type === 'audio') {
+                failedAudio.add(file.key);
+            }
+        });
+
+        // Continue even if some files fail
+        this.load.on('complete', () => {
+            if (failedAudio.size > 0) {
+                console.warn(`Failed to load ${failedAudio.size} audio file(s). Game will continue without these sounds.`);
+            }
+        });
+
         for (let type in ASSETS) {
             for (let key in ASSETS[type] as any) {
                 let args = ASSETS[type][key].args.slice();
                 args.unshift(ASSETS[type][key].key);
-                this.load[type].apply(this.load, args);
+
+                try {
+                    this.load[type].apply(this.load, args);
+                } catch (error) {
+                    console.warn(`Failed to queue asset: ${type} "${ASSETS[type][key].key}"`, error);
+                }
             }
         }
     }
