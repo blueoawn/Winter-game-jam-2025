@@ -83,6 +83,50 @@ export class Start extends Phaser.Scene {
 
         this.createVolumeSlider(centerX, height - 120);
 
+        // Hidden unlock all characters button (bottom-left corner)
+        const unlockAllButton = this.add.text(20, height - 20, 'Unlock All', {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            color: '#808080',
+            backgroundColor: '#191919',
+            padding: { x: 5, y: 2 }
+        })
+        .setOrigin(0, 1)
+        .setAlpha(0.3)
+        .setInteractive({ useHandCursor: true });
+
+        unlockAllButton.on('pointerover', () => {
+            unlockAllButton.setAlpha(0.8);
+            unlockAllButton.setColor('#ffff00');
+        });
+
+        unlockAllButton.on('pointerout', () => {
+            unlockAllButton.setAlpha(0.3);
+            unlockAllButton.setColor('#333333');
+        });
+
+        unlockAllButton.on('pointerdown', () => {
+            // Unlock all characters in localStorage
+            const allCharacterIds = [
+                'lizard-wizard',
+                'sword-and-board',
+                'railgun',
+                'big-sword',
+                'boomstick',
+                'cheese-touch'
+            ];
+            localStorage.setItem('unlockedCharacters', JSON.stringify(allCharacterIds));
+
+            // Visual feedback
+            unlockAllButton.setColor('#00ff00');
+            unlockAllButton.setText('✓ Unlocked!');
+
+            this.time.delayedCall(1000, () => {
+                unlockAllButton.setText('Unlock All');
+                unlockAllButton.setColor('#333333');
+            });
+        });
+
         this.add.text(centerX, height - 50, 'Mouse and Keyboard', {
             fontFamily: 'Arial',
             fontSize: 18,
