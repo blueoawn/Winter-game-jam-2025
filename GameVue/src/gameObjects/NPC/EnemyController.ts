@@ -3,6 +3,7 @@ import type { GameScene } from '../../scenes/GameScene.ts';
 import { Depth } from '../../constants.ts';
 import Container = Phaser.GameObjects.Container;
 import { SyncableEntity } from '../../../network/SyncableEntity.ts';
+import Rectangle = Phaser.GameObjects.Rectangle;
 
 //TODO - Add stuff in here for network sync/rollback
 
@@ -29,7 +30,7 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
 
         this.setDepth(Depth.ENEMIES);
 
-        this.createHealthBar();
+        // Health bar will be created by subclass after scaling
         this.handleDestruction();
     }
 
@@ -66,12 +67,15 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
     createHealthBar(): void {
         if (!this.showHealthBar) return;
 
+        // Use displayWidth which accounts for scale, fallback to width * scaleX
+        const barWidth = this.displayWidth || (this.width * this.scaleX);
+
         // Create rectangles at (0, 0) since they're relative to the container
-        const healthBarBottom = this.scene.add.rectangle(0, 0, this.width, 6, 0xff0000);
-        const healthBarTop = this.scene.add.rectangle(0, 0, this.width, 6, 0x08ff00);
+        const healthBarBottom = this.scene.add.rectangle(0, 0, barWidth, 6, 0xff0000);
+        const healthBarTop = this.scene.add.rectangle(0, 0, barWidth, 6, 0x08ff00);
 
         // Create container above enemy
-        this.healthBarContainer = this.scene.add.container(this.x, this.y - this.height, [
+        this.healthBarContainer = this.scene.add.container(this.x, this.y - this.height * this.scaleY, [
             healthBarBottom,
             healthBarTop
         ]);

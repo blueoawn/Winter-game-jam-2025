@@ -13,7 +13,7 @@ export class Railgun extends PlayerController {
     private readonly maxBeamRange = 600;
     private readonly maxBeamWidth = 50;
     private readonly minBeamWidth = 3;
-    private readonly maxBeamDamage = 8;
+    private readonly maxBeamDamage = 40;
 
     // Barrel offset config (adjust these to position the beam origin)
     barrelOffsetForward = 40;  // Distance in front of character
@@ -27,12 +27,12 @@ export class Railgun extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 0);
 
-        this.characterSpeed = 400;
-        this.velocityMax = 350;
-        this.maxHealth = 25;
+        this.characterSpeed = 450;
+        this.velocityMax = 380;
+        this.maxHealth = 70;
         this.health = this.maxHealth;
-        this.ability1Rate = 120;
-        this.ability2Rate = 120;
+        this.ability1Rate = 100;
+        this.ability2Rate = 150;
 
         // Use playable characters sprite sheet - frame 0 is Railgun
         this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 0);
@@ -94,7 +94,7 @@ export class Railgun extends PlayerController {
         // Configuration for the spread shot
         const spreadAngle = 4; // Higher = tighter spread (PI / spread)
         const amountOfProjectiles = 3;
-        const baseDamage = 3;
+        const baseDamage = 15;
 
         const yDifference = this.currentAim.y - this.y;
         const xDifference = this.currentAim.x - this.x;

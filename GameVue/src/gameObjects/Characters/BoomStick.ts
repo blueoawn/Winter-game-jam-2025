@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { audioManager } from '../../../managers/AudioManager';
 import Graphics = Phaser.GameObjects.Graphics;
 import { ShotgunPellet } from '../Projectile/ShotgunPellet';
 
@@ -18,7 +19,7 @@ export class BoomStick extends PlayerController {
     barrelOffsetUp = 5;        // Vertical offset (negative = down)
 
     // Damage falloff config
-    baseDamage = 3;
+    baseDamage = 12;
     minDamageMultiplier = 0.2;
     falloffStart = 80;
     falloffEnd = 220;
@@ -37,12 +38,12 @@ export class BoomStick extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 1);
 
-        this.characterSpeed = 720;
-        this.velocityMax = 420;
-        this.maxHealth = 20;
+        this.characterSpeed = 800;
+        this.velocityMax = 480;
+        this.maxHealth = 85;
         this.health = this.maxHealth;
-        this.ability1Rate = 80;
-        this.ability2Rate = 90;
+        this.ability1Rate = 70;
+        this.ability2Rate = 100;
 
         // Use playable characters sprite sheet - frame 1 is BoomStick
         this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 1);
@@ -81,6 +82,9 @@ export class BoomStick extends PlayerController {
 
     protected ability1(): void {
         if (!this.canUseAbility1()) return;
+
+        // Play shotgun fire sound
+        audioManager.play(ASSETS.audio.shotgunFire.key, { volume: 0.5 });
 
         this.fireShotgunBlast();
         this.startAbility1Cooldown();

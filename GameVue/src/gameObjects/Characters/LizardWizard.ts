@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene.ts';
 import { MagicMissile } from '../Projectile/MagicMissile';
 import ASSETS from "../../assets.ts";
+import { audioManager } from '../../../managers/AudioManager';
 
 export class LizardWizard extends PlayerController {
     private missiles: Set<MagicMissile> = new Set();
@@ -14,12 +15,12 @@ export class LizardWizard extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 0);
 
-        this.characterSpeed = 800;
-        this.velocityMax = 450;
-        this.maxHealth = 20;
+        this.characterSpeed = 900;
+        this.velocityMax = 500;
+        this.maxHealth = 80;
         this.health = this.maxHealth;
-        this.ability1Rate = 60;
-        this.ability2Rate = 60*2;
+        this.ability1Rate = 45;
+        this.ability2Rate = 120;
 
         this.setAppearance(ASSETS.spritesheet.lizardWizardAttack.key, 0);
         this.setOrigin(0.5, 0.5);
@@ -107,6 +108,9 @@ export class LizardWizard extends PlayerController {
             handOffsetX = -20;
         }
 
+        // Play wizard blep sound
+        audioManager.play(ASSETS.audio.wizardBlep.key, { volume: 0.3 });
+
         // Calculate direction from character to aim point
         const dirX = this.currentAim.x - this.x;
         const dirY = this.currentAim.y - this.y;
@@ -135,7 +139,7 @@ export class LizardWizard extends PlayerController {
             spawnY,
             this.currentAim.x,
             this.currentAim.y,
-            1
+            10
         );
 
         this.missiles.add(missile);
@@ -150,6 +154,9 @@ export class LizardWizard extends PlayerController {
 
     protected ability2(spread = 6, amountOfProjectiles = 3): void {
         if (!this.canUseAbility2()) return;
+
+        // Play plasma shot sound for spread attack
+        audioManager.play(ASSETS.audio.plasmaShot.key, { volume: 0.4 });
 
         // Play ability 2 animation
         this.play(LizardWizard.ANIM_ABILITY2);
@@ -185,7 +192,7 @@ export class LizardWizard extends PlayerController {
                 spawnY,
                 xLeftTo,
                 yLeftTo,
-                1
+                10
             );
 
             this.missiles.add(missile);

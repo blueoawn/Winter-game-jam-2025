@@ -2,6 +2,7 @@ import { Scene } from 'phaser';
 import ASSETS from '../assets';
 import NetworkManager from '../../managers/NetworkManager.ts';
 import { CharacterIdsEnum } from "../gameObjects/Characters/CharactersEnum.ts";
+import { audioManager } from '../../managers/AudioManager';
 
 interface CharacterData {
     id: string;
@@ -108,6 +109,7 @@ export class CharacterSelectScene extends Scene {
     private networkEnabled: boolean = false;
     private isHost: boolean = false;
     private players: string[] = [];
+    private mapId: string = 'summoners-rift';  // Default map
     private inCharacterSelection: boolean = false;  // Guard against multiple character selection transitions
     private characterSelections: Map<string, CharacterSelection> = new Map();
 
@@ -129,7 +131,6 @@ export class CharacterSelectScene extends Scene {
     private static readonly STORAGE_KEY = 'unlockedCharacters';
     // TODO modify this variable to have less characters when the game is ready
     private static readonly DEFAULT_UNLOCKED: string[] = [
-        CharacterIdsEnum.LizardWizard,
         CharacterIdsEnum.BigSword,
         CharacterIdsEnum.SwordAndBoard,
         CharacterIdsEnum.BoomStick,
@@ -182,21 +183,29 @@ export class CharacterSelectScene extends Scene {
     }
 
     init(data: any): void {
-        // Receive data from Lobby scene
+        // Receive data from Lobby scene or Start menu
         this.networkEnabled = data?.networkEnabled || false;
         this.isHost = data?.isHost || false;
         this.players = data?.players || [];
+        this.mapId = data?.mapId || 'summoners-rift';
+
+        // Reload unlocked characters to catch any new unlocks from boss defeats
+        this.loadUnlockedCharacters();
 
         console.log('CharacterSelect initialized:', {
             networkEnabled: this.networkEnabled,
             isHost: this.isHost,
-            players: this.players
+            players: this.players,
+            mapId: this.mapId
         });
     }
 
     create(): void {
         const centerX = this.scale.width / 2;
         const centerY = this.scale.height / 2;
+
+        // Play character select music (continue from Start scene or restart)
+        audioManager.playMusic(ASSETS.audio.characterSelect.key, { loop: true, volume: 0.5 });
 
         // Title
         this.titleText = this.add.text(centerX, 80, 'SELECT YOUR CHARACTER', {
@@ -821,7 +830,8 @@ export class CharacterSelectScene extends Scene {
                 characterId: this.selectedCharacterId,
                 networkEnabled: this.networkEnabled,
                 isHost: this.isHost,
-                players: this.players
+                players: this.players,
+                mapId: this.mapId
             });
 
             console.log('Scene transition started');

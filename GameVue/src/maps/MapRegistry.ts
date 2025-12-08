@@ -4,6 +4,7 @@
 import { MapData } from './SummonerRift';
 import SummonersRift from './SummonerRift';
 import DungeonCrawl from './DungeonCrawl';
+import SlimeInvasion from './SlimeInvasion';
 
 /**
  * Registry of all available maps
@@ -12,8 +13,7 @@ import DungeonCrawl from './DungeonCrawl';
 export const MapRegistry: Record<string, MapData> = {
     'summoners-rift': SummonersRift,
     'dungeon-crawl': DungeonCrawl,
-    // Add more maps here as they're created:
-    // 'howling-abyss': HowlingAbyss,
+    'slime-invasion': SlimeInvasion,
 };
 
 /**

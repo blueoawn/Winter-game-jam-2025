@@ -39,6 +39,9 @@ import {
 } from '../init.ts';
 import { getCharacterType, createCharacter, CHARACTER_ID_MAP } from '../utils/CharacterFactory.ts';
 import * as CollisionManager from '../../managers/CollisionManager.ts';
+import { WaveManager } from '../../managers/WaveManager.ts';
+import { KamikazeBehavior } from '../behaviorScripts/KamikazeBehavior.ts';
+import { BossBehavior } from '../behaviorScripts/BossBehavior.ts';
 
 
 export class GameScene extends Scene
@@ -91,6 +94,7 @@ export class GameScene extends Scene
     enemyIdCache: Set<string> = new Set();  // Reusable Set for enemy ID tracking
     currentMap: MapData;  // Current active map data
     spawners: Spawner[] = [];  // Enemy spawners for current map
+    waveManager: WaveManager | null = null;  // Wave-based level manager
     deltaDeserializer: DeltaDeserializer = new DeltaDeserializer();  // Delta reconstruction
     lastReceivedTick: number = 0;  // Track last received tick for desync detection
 
@@ -108,11 +112,15 @@ export class GameScene extends Scene
         // Store selected character ID
         (this as any).selectedCharacterId = data?.characterId || 'lizard-wizard';
 
+        // Store selected map ID
+        (this as any).selectedMapId = data?.mapId || 'summoners-rift';
+
         console.log('Game initialized:', {
             networkEnabled: this.networkEnabled,
             isHost: this.isHost,
             players: this.players,
-            characterId: (this as any).selectedCharacterId
+            characterId: (this as any).selectedCharacterId,
+            mapId: (this as any).selectedMapId
         });
     }
 
@@ -122,8 +130,18 @@ export class GameScene extends Scene
             // Initialize audio manager
             audioManager.init(this);
 
-            // Load current map (default to Summoners Rift)
-            this.currentMap = getDefaultMap();
+            // Load current map based on selected mapId
+            const mapId = (this as any).selectedMapId || 'summoners-rift';
+            this.currentMap = getMapById(mapId) || getDefaultMap();
+            console.log(`[GAME] Loading map: ${this.currentMap.name}`);
+
+            // Stop menu music and start battle music
+            audioManager.stopMusic();
+            if (mapId === 'slime-invasion') {
+                audioManager.playMusic(ASSETS.audio.spook2.key, { loop: true, volume: 0.4 });
+            } else {
+                audioManager.playMusic(ASSETS.audio.battleTheme1.key, { loop: true, volume: 0.4 });
+            }
 
             // Initialize variables using extracted init function
             const vars = initVariables(this, this.currentMap);
@@ -184,6 +202,7 @@ export class GameScene extends Scene
             }
 
             this.initSpawners();  // Initialize enemy spawners from map config
+            this.initWaveLevel(); // Initialize wave-based level if applicable
             this.initWalls();     // Initialize walls from map config
             this.initConsumables(); // Initialize consumable items from map config
             this.initAreaBoundaries(); // Initialize area effect zones from map config
@@ -202,6 +221,11 @@ export class GameScene extends Scene
 
     update() {
         if (!this.gameStarted) return;
+
+        // Update wave manager if active
+        if (this.waveManager) {
+            this.waveManager.update();
+        }
 
         if (this.networkEnabled) {
             this.updateMultiplayer();
@@ -416,6 +440,151 @@ export class GameScene extends Scene
     }
 
     /**
+     * Initialize wave-based level for Slime Invasion
+     * Creates WaveManager and sets up wave progression
+     */
+    initWaveLevel(): void {
+        if (this.currentMap.id !== 'slime-invasion') {
+            return;
+        }
+
+        console.log('[WAVE] Initializing wave-based level');
+
+
+        // Create wave configuration
+        const levelConfig = {
+            id: 'slime-invasion-level',
+            name: 'Slime Invasion',
+            waves: [
+                {
+                    enemyType: 'EnemySlime',
+                    count: 5,
+                    spawnDelay: 1000,
+                    behavior: new KamikazeBehavior({ moveSpeed: 100, explosionRange: 60 }),
+                    spawnPositions: 'edges' as const
+                },
+                {
+                    enemyType: 'EnemySlime',
+                    count: 8,
+                    spawnDelay: 800,
+                    behavior: new KamikazeBehavior({ moveSpeed: 120, explosionRange: 60 }),
+                    spawnPositions: 'edges' as const
+                }
+            ],
+            bossConfig: {
+                enemyType: 'EnemyLizardWizard',
+                spawnDelay: 3000,
+                behavior: new BossBehavior({ moveSpeed: 150, attackRange: 600 }),
+                spawnPosition: { x: this.currentMap.width / 2, y: this.currentMap.height / 2 }
+            },
+            onComplete: () => {
+                console.log('[WAVE] Level complete!');
+                this.showLevelCompleteMessage();
+            }
+        };
+
+        this.waveManager = new WaveManager(this, levelConfig);
+
+        // Set up wave callbacks
+        this.waveManager.onWaveComplete((waveIndex: number) => {
+            console.log(`[WAVE] Wave ${waveIndex + 1} complete!`);
+            this.showWaveCompleteMessage(waveIndex + 1);
+        });
+
+        this.waveManager.onBossSpawn(() => {
+            console.log('[WAVE] Boss incoming!');
+            this.showBossWarningMessage();
+        });
+
+        // Start the wave sequence
+        this.time.delayedCall(2000, () => {
+            if (this.waveManager) {
+                this.waveManager.start();
+            }
+        });
+    }
+
+    showWaveCompleteMessage(waveNum: number): void {
+        const text = this.add.text(
+            this.scale.width / 2,
+            this.scale.height / 2,
+            `WAVE ${waveNum} COMPLETE!`,
+            {
+                fontFamily: 'Arial Black',
+                fontSize: '48px',
+                color: '#00ff00',
+                stroke: '#000000',
+                strokeThickness: 8,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+
+        this.tweens.add({
+            targets: text,
+            alpha: 0,
+            duration: 2000,
+            ease: 'Power2',
+            onComplete: () => text.destroy()
+        });
+    }
+
+    showBossWarningMessage(): void {
+        const text = this.add.text(
+            this.scale.width / 2,
+            this.scale.height / 2,
+            'BOSS APPROACHING!',
+            {
+                fontFamily: 'Arial Black',
+                fontSize: '56px',
+                color: '#ff0000',
+                stroke: '#000000',
+                strokeThickness: 8,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+
+        // Pulsing effect
+        this.tweens.add({
+            targets: text,
+            scaleX: 1.2,
+            scaleY: 1.2,
+            duration: 500,
+            yoyo: true,
+            repeat: 2,
+            onComplete: () => {
+                this.tweens.add({
+                    targets: text,
+                    alpha: 0,
+                    duration: 1000,
+                    ease: 'Power2',
+                    onComplete: () => text.destroy()
+                });
+            }
+        });
+    }
+
+    showLevelCompleteMessage(): void {
+        const text = this.add.text(
+            this.scale.width / 2,
+            this.scale.height / 2,
+            'LEVEL COMPLETE!\nReturning to menu...',
+            {
+                fontFamily: 'Arial Black',
+                fontSize: '48px',
+                color: '#FFD700',
+                stroke: '#000000',
+                strokeThickness: 8,
+                align: 'center'
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
+
+        this.time.delayedCall(3000, () => {
+            text.destroy();
+            this.scene.start('Start');
+        });
+    }
+
+    /**
      * Initialize walls from current map configuration
      * Delegates to LevelManager
      */
@@ -470,6 +639,10 @@ export class GameScene extends Scene
         LevelManager.fireEnemyBullet(this, x, y, power, targetX, targetY);
     }
 
+    fireEnemyMagicMissile(x: number, y: number, power: number, targetX: number, targetY: number) {
+        LevelManager.fireEnemyMagicMissile(this, x, y, power, targetX, targetY);
+    }
+
     removeEnemyBullet(bullet: EnemyBullet) {
         LevelManager.removeEnemyBullet(this, bullet);
     }
@@ -486,11 +659,11 @@ export class GameScene extends Scene
         return LevelManager.addEnemy(this, shipId, pathId, speed, power);
     }
 
-    addLizardWizardEnemy(x: number, y: number) {
-        return LevelManager.addLizardWizardEnemy(this, x, y);
+    addLizardWizardEnemy(x: number, y: number, behavior?: any, isBoss: boolean = false) {
+        return LevelManager.addLizardWizardEnemy(this, x, y, behavior, isBoss);
     }
-    addSlimeEnemy(x: number, y: number) {
-        return LevelManager.addSlimeEnemy(this, x, y);
+    addSlimeEnemy(x: number, y: number, behavior?: any) {
+        return LevelManager.addSlimeEnemy(this, x, y, behavior);
     }
 
     removeEnemy(enemy: EnemyController) {

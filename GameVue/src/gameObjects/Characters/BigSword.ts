@@ -2,12 +2,13 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { audioManager } from '../../../managers/AudioManager';
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
 
 export class BigSword extends PlayerController {
     // Ability 1 - Heavy Slash config
-    slashDamage = 2;
+    slashDamage = 20;
     slashWidth = 80;        // Hitbox width (reduced to better match blade sprite)
     slashHeight = 230;      // Hitbox height (increased to match blade length)
     slashOffset = 40;       // Distance from character to slash position
@@ -20,7 +21,7 @@ export class BigSword extends PlayerController {
     trailSegments = 35;     // Number of trail segments
 
     // Ability 2 - Piercing Strike config
-    dashDamage = 3;
+    dashDamage = 30;
     dashDistance = 200;
     dashSpeed = 800;
     dashChargeTime = 500;
@@ -50,11 +51,11 @@ export class BigSword extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 2);
 
-        this.characterSpeed = 650;
-        this.velocityMax = 380;
-        this.maxHealth = 25;
+        this.characterSpeed = 750;
+        this.velocityMax = 420;
+        this.maxHealth = 100;
         this.health = this.maxHealth;
-        this.ability1Rate = 40;
+        this.ability1Rate = 35;
         this.ability2Rate = 180;
 
         // Use playable characters sprite sheet - frame 2 is BigSword
@@ -118,6 +119,9 @@ export class BigSword extends PlayerController {
         // Calculate base angle to start from the character's right side
         this.slashBaseAngle = this.rotation - Math.PI / 2;
         this.hitEnemiesSlash.clear();
+
+        // Play sword slash sound
+        audioManager.play(ASSETS.audio.swordSlash.key, { volume: 0.6 });
 
         // Create sword sprite
         this.slashSprite = this.gameScene.add.image(0, 0, ASSETS.image.sword.key);

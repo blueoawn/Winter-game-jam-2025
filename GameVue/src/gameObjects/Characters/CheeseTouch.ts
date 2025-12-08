@@ -26,7 +26,7 @@ export class CheeseTouch extends PlayerController {
     isBeaming = false;
     beamDamageTimer: TimerEvent | null = null;
     beamRange = 300;
-    beamDamage = 1;
+    beamDamage = 8;
 
     // Lock-on properties
     lockOnRadius = 100;
@@ -36,12 +36,12 @@ export class CheeseTouch extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 2);
 
-        this.characterSpeed = 700;
-        this.velocityMax = 400;
-        this.maxHealth = 15;
+        this.characterSpeed = 780;
+        this.velocityMax = 450;
+        this.maxHealth = 90;
         this.health = this.maxHealth;
         this.ability1Rate = 5;
-        this.ability2Rate = 60*2;
+        this.ability2Rate = 120;
 
         // Use sprite sheet
         this.setAppearance(ASSETS.spritesheet.cheeseTouchAttack.key, 0);
@@ -139,7 +139,8 @@ export class CheeseTouch extends PlayerController {
         if (this.health >= this.maxHealth) return;  // Already full health
 
         // Play cheese eating sound
-        audioManager.playCheeseEat();
+        audioManager.play(ASSETS.audio.cheeseEat.key, { volume: 0.5 });
+        audioManager.play(ASSETS.audio.cheeseHeal.key, { volume: 0.4 });
 
         //stop the beam to start eating (make it more dangerous to heal)
 
@@ -162,6 +163,9 @@ export class CheeseTouch extends PlayerController {
 
         // Play beam animation (hands up)
         this.play(CheeseTouch.ANIM_BEAM);
+
+        // Play cheese drain sound
+        audioManager.play(ASSETS.audio.cheeseDrain.key, { volume: 0.4, loop: true });
 
         // Create beam graphics
         this.beamGraphics = this.gameScene.add.graphics();
@@ -186,6 +190,9 @@ export class CheeseTouch extends PlayerController {
 
         // Return to idle animation
         this.play(CheeseTouch.ANIM_IDLE);
+
+        // Stop cheese drain sound
+        audioManager.stop(ASSETS.audio.cheeseDrain.key);
 
         if (this.beamGraphics) {
             this.beamGraphics.destroy();

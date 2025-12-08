@@ -2,6 +2,7 @@ import { PlayerController } from './PlayerController';
 import { GameScene } from '../../scenes/GameScene';
 import { Depth } from '../../constants';
 import ASSETS from '../../assets';
+import { audioManager } from '../../../managers/AudioManager';
 import Image = Phaser.GameObjects.Image;
 import Graphics = Phaser.GameObjects.Graphics;
 import TimerEvent = Phaser.Time.TimerEvent;
@@ -13,7 +14,7 @@ export class SwordAndBoard extends PlayerController {
     shieldTimer: TimerEvent | null;
 
     // Ability 1 - Heavy Slash config
-    slashDamage = 2;
+    slashDamage = 15;
     slashWidth = 60;
     slashHeight = 15;
     slashOffset = 50;
@@ -30,12 +31,12 @@ export class SwordAndBoard extends PlayerController {
     constructor(scene: GameScene, x: number, y: number) {
         super(scene, x, y, 3);
 
-        this.characterSpeed = 600;
-        this.velocityMax = 350;
-        this.maxHealth = 3;
+        this.characterSpeed = 650;
+        this.velocityMax = 400;
+        this.maxHealth = 120;
         this.health = this.maxHealth;
-        this.ability1Rate = 20;
-        this.ability2Rate = 180;
+        this.ability1Rate = 25;
+        this.ability2Rate = 200;
 
         // Use playable characters sprite sheet - frame 3 is SwordAndBoard
         this.setAppearance(ASSETS.spritesheet.playableCharacters.key, 3);
@@ -77,6 +78,9 @@ export class SwordAndBoard extends PlayerController {
             this.slashStartTime = this.gameScene.time.now;
             this.slashBaseAngle = this.rotation - Math.PI / 2;
             this.hitEnemiesSlash.clear();
+
+            // Play slash sound
+            audioManager.play(ASSETS.audio.swordSlash.key, { volume: 0.5 });
 
             this.slashGraphics = this.gameScene.add.graphics();
             this.slashGraphics.setDepth(Depth.ABILITIES);
@@ -188,6 +192,9 @@ export class SwordAndBoard extends PlayerController {
         this.removeShield();
         this.spawnShield();
         this.updateShieldPositionAndRotation();
+
+        // Play shield activation sound
+        audioManager.play(ASSETS.audio.wallShield.key, { volume: 0.4 });
 
         this.shieldTimer = this.gameScene.time.delayedCall(2000, () => {
             this.removeShield();

@@ -1,7 +1,7 @@
 import ASSETS from '../../assets.js';
 import { GameScene } from "../../scenes/GameScene.ts";
 import { Depth } from '../../constants.ts';
-// Note: InputState and PlayerState should be defined in network module
+import { audioManager } from '../../../managers/AudioManager';
 import { SyncableEntity } from '../../../network/SyncableEntity';
 import { IAllyBehavior } from '../../behaviorScripts/AllyBehavior';
 import Vector2 = Phaser.Math.Vector2;
@@ -19,7 +19,7 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     protected ability2Cooldown = 0;
     fireRate = 10;  // Keep for backward compatibility
     fireCounter = 0;
-    maxHealth = 1;
+    maxHealth = 100;
     health = this.maxHealth;
     gameScene: GameScene;
     isLocal: boolean = false;
@@ -244,6 +244,10 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     }
 
     die() {
+        // Stop battle music and play game over music
+        audioManager.stopMusic();
+        audioManager.playMusic(ASSETS.audio.gameOver.key, { volume: 0.5 });
+
         this.gameScene.addExplosion(this.x, this.y);
         this.destroy(); // destroy sprite so it is no longer updated
     }

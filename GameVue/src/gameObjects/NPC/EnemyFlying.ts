@@ -45,6 +45,9 @@ export default class EnemyFlying extends EnemyController {
             this.setPosition(this.gameScene.scale.width / 2, this.gameScene.scale.height / 2);
         }
         this.initPath(pathId, speed);
+
+        // Create health bar after initialization
+        this.createHealthBar();
     }
 
     protected updateAI(_time: number, _delta: number): void {

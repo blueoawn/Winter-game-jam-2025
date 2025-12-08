@@ -22,6 +22,7 @@ import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
 import { SpeedBoost } from '../src/gameObjects/Consumable/SpeedBoost';
 import { Consumable } from '../src/gameObjects/Consumable/Consumable';
 import { AreaBoundary, AreaBoundaryConfig } from '../src/gameObjects/AreaBoundary';
+import { EnemyMagicMissile } from "../src/gameObjects/Projectile/EnemyMagicMissile.ts";
 
 /**
  * Initialize spawners from map data
@@ -234,6 +235,18 @@ export function fireEnemyBullet(scene: GameScene, x: number, y: number, power: n
 }
 
 /**
+ * Create enemy magic missile (for boss)
+ */
+export function fireEnemyMagicMissile(scene: GameScene, x: number, y: number, power: number, targetX: number, targetY: number): void {
+    try {
+        const missile = new EnemyMagicMissile(scene, x, y, targetX, targetY, power);
+        scene.enemyBulletGroup.add(missile);
+    } catch (err) {
+        console.error('[LEVEL] Error firing enemy magic missile:', err);
+    }
+}
+
+/**
  * Remove enemy bullet
  */
 export function removeEnemyBullet(scene: GameScene, bullet: EnemyBullet): void {
@@ -283,9 +296,9 @@ export function addEnemy(scene: GameScene, shipId: number, pathId: number, speed
 /**
  * Create lizard wizard enemy
  */
-export function addLizardWizardEnemy(scene: GameScene, x: number, y: number): EnemyLizardWizard {
+export function addLizardWizardEnemy(scene: GameScene, x: number, y: number, behavior?: IBehavior, isBoss: boolean = false): EnemyLizardWizard {
     try {
-        const enemy = new EnemyLizardWizard(scene, x, y);
+        const enemy = new EnemyLizardWizard(scene, x, y, behavior, isBoss);
         scene.enemyGroup.add(enemy);
         return enemy;
     } catch (err) {
@@ -297,9 +310,9 @@ export function addLizardWizardEnemy(scene: GameScene, x: number, y: number): En
 /**
  * Create slime enemy
  */
-export function addSlimeEnemy(scene: GameScene, x: number, y: number): EnemySlime {
+export function addSlimeEnemy(scene: GameScene, x: number, y: number, behavior?: IBehavior): EnemySlime {
     try {
-        const enemy = new EnemySlime(scene, x, y);
+        const enemy = new EnemySlime(scene, x, y, behavior);
         scene.enemyGroup.add(enemy);
         return enemy;
     } catch (err) {

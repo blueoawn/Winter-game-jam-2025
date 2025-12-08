@@ -1,4 +1,5 @@
 import { audioManager } from '../../managers/AudioManager';
+import ASSETS from '../assets';
 
 export class Start extends Phaser.Scene {
     private buttons: Phaser.GameObjects.Text[] = [];
@@ -17,6 +18,19 @@ export class Start extends Phaser.Scene {
         const centerY = height * 0.5;
 
         audioManager.init(this);
+
+        // Play character select music on loop
+        audioManager.playMusic(ASSETS.audio.characterSelect.key, { loop: true, volume: 0.5 });
+
+        // Add background image
+        const background = this.add.image(centerX, centerY, ASSETS.image.mainMenuArt.key);
+
+        // Scale background to cover the screen while maintaining aspect ratio
+        const scaleX = width / background.width;
+        const scaleY = height / background.height;
+        const scale = Math.max(scaleX, scaleY);
+        background.setScale(scale);
+        background.setDepth(-1); // Put background behind everything
 
         this.add.text(centerX, 100, 'Half-dozen Heroz', {
             fontFamily: 'Arial Black',
@@ -38,30 +52,37 @@ export class Start extends Phaser.Scene {
 
         this.buttons = [];
 
-        this.buttons.push(this.createButton(
-            centerX,
-            centerY - 60,
-            'Solo Play',
-            () => this.startSoloGame()
-        ));
+        // this.buttons.push(this.createButton(
+        //     centerX,
+        //     centerY - 60,
+        //     'Solo Play',
+        //     () => this.startSoloGame()
+        // ));
 
         this.buttons.push(this.createButton(
             centerX,
-            centerY + 20,
-            'Host Game',
-            () => this.hostMultiplayerGame()
+            centerY + 60,
+            'Slime Invasion',
+            () => this.startSlimeInvasion()
         ));
 
-        this.buttons.push(this.createButton(
-            centerX,
-            centerY + 100,
-            'Join Game',
-            () => this.joinMultiplayerGame()
-        ));
+        // this.buttons.push(this.createButton(
+        //     centerX,
+        //     centerY + 20,
+        //     'Host Game',
+        //     () => this.hostMultiplayerGame()
+        // ));
+        //
+        // this.buttons.push(this.createButton(
+        //     centerX,
+        //     centerY + 100,
+        //     'Join Game',
+        //     () => this.joinMultiplayerGame()
+        // ));
 
         this.createVolumeSlider(centerX, height - 120);
 
-        this.add.text(centerX, height - 50, 'Mouse 🖱️ Keyboard ⌨️ Gamepad 🎮', {
+        this.add.text(centerX, height - 50, 'Mouse and Keyboard', {
             fontFamily: 'Arial',
             fontSize: 18,
             color: '#666666',
@@ -240,7 +261,17 @@ export class Start extends Phaser.Scene {
         this.scene.start('CharacterSelectScene', {
             networkEnabled: false,
             isHost: false,
-            players: []
+            players: [],
+            mapId: 'summoners-rift'
+        });
+    }
+
+    startSlimeInvasion() {
+        this.scene.start('CharacterSelectScene', {
+            networkEnabled: false,
+            isHost: false,
+            players: [],
+            mapId: 'slime-invasion'
         });
     }
 

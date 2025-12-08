@@ -172,18 +172,18 @@ export const SummonersRift: MapData = {
 
     // Wall barriers - Destructible barrier across mid lane
     walls: [
-        { x: 600, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 664, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 728, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 792, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 856, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 920, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
-        { x: 984, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 600, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 664, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 728, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 792, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 856, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 920, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
+        // { x: 984, y: 672, spriteKey: 'cookie-cutter-wall', health: 5 },
     ],
 
     // Consumable items
     consumables: [
-        { x: 900, y: 900, type: 'HealthPack', value: 1 },
+        // { x: 900, y: 900, type: 'HealthPack', value: 1 },
     ],
 
     // Area boundaries - Zone effects
