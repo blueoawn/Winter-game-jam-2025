@@ -67,6 +67,13 @@ export class Start extends Phaser.Scene {
             () => this.startSlimeInvasion()
         ));
 
+        this.buttons.push(this.createButton(
+            centerX,
+            centerY + 140,
+            'Reload Game',
+            () => this.reloadGame()
+        ));
+
         // this.buttons.push(this.createButton(
         //     centerX,
         //     centerY + 20,
@@ -326,6 +333,11 @@ export class Start extends Phaser.Scene {
 
     joinMultiplayerGame() {
         this.scene.start('Lobby', { mode: 'join' });
+    }
+
+    reloadGame() {
+        // Reload the page completely
+        window.location.reload();
     }
 
 }

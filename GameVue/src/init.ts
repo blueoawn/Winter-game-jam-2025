@@ -125,6 +125,40 @@ export function initGameUi(scene: Scene): {
         .setDepth(200)
         .setVisible(false);
 
+    // Back to Main Menu button (bottom right corner)
+    const backButton = scene.add.text(
+        scene.scale.width - 20,
+        scene.scale.height - 20,
+        'Main Menu',
+        {
+            fontFamily: 'Arial Black',
+            fontSize: '18px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4,
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        }
+    )
+        .setOrigin(1, 1)
+        .setScrollFactor(0)
+        .setDepth(200)
+        .setInteractive({ useHandCursor: true });
+
+    backButton.on('pointerover', () => {
+        backButton.setColor('#ffff00');
+        backButton.setScale(1.1);
+    });
+
+    backButton.on('pointerout', () => {
+        backButton.setColor('#ffffff');
+        backButton.setScale(1.0);
+    });
+
+    backButton.on('pointerdown', () => {
+        scene.scene.start('Start');
+    });
+
     return { scoreText, tutorialText, gameOverText };
 }
 

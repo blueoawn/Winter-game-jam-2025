@@ -245,6 +245,34 @@ export class CharacterSelectScene extends Scene {
             align: 'center'
         }).setOrigin(0.5);
 
+        // Back to Main Menu button (bottom right)
+        const backButton = this.add.text(this.scale.width - 20, this.scale.height - 20, 'Main Menu', {
+            fontFamily: 'Arial Black',
+            fontSize: '20px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4,
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setOrigin(1, 1)
+        .setInteractive({ useHandCursor: true });
+
+        backButton.on('pointerover', () => {
+            backButton.setColor('#ffff00');
+            backButton.setScale(1.1);
+        });
+
+        backButton.on('pointerout', () => {
+            backButton.setColor('#ffffff');
+            backButton.setScale(1.0);
+        });
+
+        backButton.on('pointerdown', () => {
+            audioManager.stopMusic();
+            this.scene.start('Start');
+        });
+
         // Setup network storage handlers if multiplayer
         if (this.networkEnabled) {
             this.setupStorageHandlers();
