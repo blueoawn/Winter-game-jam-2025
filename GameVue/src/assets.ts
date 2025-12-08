@@ -18,6 +18,10 @@ export default {
             key: 'character-select-music',
             args: ['assets/SoundEffects/Character-select-hsh.m4a']
         },
+        battleTheme1: {
+            key: 'battle-theme-1',
+            args: ['assets/Music/Battle-Theme-1.m4a']
+        },
     },
     tilemapTiledJSON: {
         dungeonCrawl: {
