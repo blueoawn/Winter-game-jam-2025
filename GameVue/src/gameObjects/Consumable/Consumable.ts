@@ -1,6 +1,6 @@
 import { SyncableEntity, EntityState, EntityDelta } from '../../../network/SyncableEntity';
 import Sprite = Phaser.Physics.Arcade.Sprite;
-// import { v4 as uuidv4 } from 'uuid'; // TODO: Install uuid package or use crypto.randomUUID()
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Consumable types enumeration
@@ -34,7 +34,7 @@ export class Consumable implements SyncableEntity {
     public lastSyncedState: ConsumableState | null = null;
 
     constructor(initialState: ConsumableState) {
-        this.id = initialState.id || crypto.randomUUID();
+        this.id = initialState.id || uuidv4();
         this.state = initialState;
         this.state.id = this.id;
         this.state.type = 'Consumable';
