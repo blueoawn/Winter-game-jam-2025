@@ -47,13 +47,14 @@ export class DeltaDeserializer {
             }
         }
 
+        // Return deep copies to prevent external mutations from affecting internal state
         return {
             tick: delta.tick,
             timestamp: delta.timestamp,
-            players: { ...this.fullPlayers },
-            enemies: { ...this.fullEnemies },
-            projectiles: { ...this.fullProjectiles },
-            walls: { ...this.fullWalls },
+            players: this.deepCloneRecord(this.fullPlayers),
+            enemies: this.deepCloneRecord(this.fullEnemies),
+            projectiles: this.deepCloneRecord(this.fullProjectiles),
+            walls: this.deepCloneRecord(this.fullWalls),
             meta: { ...this.meta },
         };
     }
@@ -70,5 +71,17 @@ export class DeltaDeserializer {
             // Overwrite or create
             target[id] = change;
         }
+    }
+
+    private deepCloneRecord<T>(record: Record<string, T>): Record<string, T> {
+        const clone: Record<string, T> = {};
+        for (const key in record) {
+            const value = record[key];
+            // Deep clone objects, copy primitives directly
+            clone[key] = (typeof value === 'object' && value !== null)
+                ? JSON.parse(JSON.stringify(value))
+                : value;
+        }
+        return clone;
     }
 }
