@@ -25,6 +25,7 @@
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^6.0.2",
+        "@vitest/coverage-v8": "^4.0.15",
         "@vitest/ui": "^4.0.15",
         "happy-dom": "^20.0.11",
         "typescript": "~5.7.2",

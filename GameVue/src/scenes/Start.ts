@@ -12,11 +12,23 @@ export class Start extends Phaser.Scene {
     }
 
     create() {
+        // Initialize audio manager with this scene so audio can play
+        audioManager.init(this);
+
+        // Resume AudioContext on first user interaction (browser autoplay policy)
+        const resumeAudio = () => {
+            const resumed = audioManager.resumeContext();
+            console.log('[Audio Debug] Context resumed:', resumed, 'State:', audioManager.getContextState());
+        };
+        this.input.once('pointerdown', resumeAudio);
+        this.input.keyboard?.once('keydown', resumeAudio);
+
+        // Debug: Log audio context state
+        console.log('[Audio Debug] Initial context state:', audioManager.getContextState());
+
         const { width, height } = this.scale;
         const centerX = width * 0.5;
         const centerY = height * 0.5;
-
-        audioManager.init(this);
 
         this.add.text(centerX, 100, 'Half-dozen Heroz', {
             fontFamily: 'Arial Black',
@@ -61,7 +73,11 @@ export class Start extends Phaser.Scene {
 
         this.createVolumeSlider(centerX, height - 120);
 
-        this.add.text(centerX, height - 50, 'Mouse 🖱️ Keyboard ⌨️ Gamepad 🎮', {
+        //TODO REFACTOR THIS TEXT TO CHANGE WHEN INPUT METHOD CHANGES
+        //Default = Mobile
+        //cursor or keyboard = Mouse and Keyboard
+        //gamepad initialized = Gamepad
+        this.add.text(centerX, height - 50, 'Mouse 🖱️ Keyboard ⌨️', {
             fontFamily: 'Arial',
             fontSize: 18,
             color: '#666666',

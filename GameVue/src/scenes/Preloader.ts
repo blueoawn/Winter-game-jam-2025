@@ -36,6 +36,11 @@ export class Preloader extends Scene
     }
 
     preload() {
+        // Log load errors for debugging
+        this.load.on('loaderror', (file: Phaser.Loader.File) => {
+            console.error('[Audio Debug] Failed to load:', file.key, file.url);
+        });
+
         //  Load the assets for the game - see ./src/assets.js
         for (let type in ASSETS) {
             for (let key in ASSETS[type] as any) {

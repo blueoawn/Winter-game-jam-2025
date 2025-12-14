@@ -1,15 +1,104 @@
 export default {
     audio: {
+        // Sound Effects
         cheeseEat: {
             key: 'cheese-eat',
-            // Not sure if it's legal to use roblox sound effects, but it's funny
             args: ['assets/SoundEffects/roblox-eating-sound-effect-nom-nom-nom.mp3']
         },
-        // Placeholder railgun fire sound. Add `assets/SoundEffects/railgun-fire.mp3` to the assets folder.
         railgunFire: {
             key: 'railgun-fire',
-            args: ['assets/SoundEffects/railgun-fire.mp3']
+            args: ['assets/SoundEffects/Railgun laser sound.m4a']
         },
+        bulletSound: {
+            key: 'bullet-sound',
+            args: ['assets/SoundEffects/Bullet sound.m4a']
+        },
+        cheeseTouch: {
+            key: 'cheese-touch-drain',
+            args: ['assets/SoundEffects/Cheese touch drain Sound.m4a']
+        },
+        cheeseTouchHeal: {
+            key: 'cheese-touch-heal',
+            args: ['assets/SoundEffects/Cheese Touch Heal sound.m4a']
+        },
+        lizardDead1: {
+            key: 'lizard-dead-1',
+            args: ['assets/SoundEffects/lizard ded 1.m4a']
+        },
+        lizardDead2: {
+            key: 'lizard-dead-2',
+            args: ['assets/SoundEffects/lizard dead 2.m4a']
+        },
+        lizardDead3: {
+            key: 'lizard-dead-3',
+            args: ['assets/SoundEffects/lizard ded 3.m4a']
+        },
+        pew2: {
+            key: 'pew-2',
+            args: ['assets/SoundEffects/Pew2.m4a']
+        },
+        pew3: {
+            key: 'pew-3',
+            args: ['assets/SoundEffects/pew 3.m4a']
+        },
+        pewPew: {
+            key: 'pew-pew',
+            args: ['assets/SoundEffects/pew pew.m4a']
+        },
+        plasmaShot: {
+            key: 'plasma-shot',
+            args: ['assets/SoundEffects/plasma shot sound.m4a']
+        },
+        sandSound: {
+            key: 'sand-sound',
+            args: ['assets/SoundEffects/Sand sound.m4a']
+        },
+        shotgunFire: {
+            key: 'shotgun-fire',
+            args: ['assets/SoundEffects/Shotgun fire sound.m4a']
+        },
+        swordSlash: {
+            key: 'sword-slash',
+            args: ['assets/SoundEffects/Sword slash sound.m4a']
+        },
+        wallShieldCollision: {
+            key: 'wall-shield-collision',
+            args: ['assets/SoundEffects/Wall_ shield collision sound.m4a']
+        },
+        wizardLizardBlep: {
+            key: 'wizard-lizard-blep',
+            args: ['assets/SoundEffects/Wizard lizard blep.m4a']
+        },
+        wizardLizardBoss: {
+            key: 'wizard-lizard-boss',
+            args: ['assets/SoundEffects/Wizard lizard blep   Boss.m4a']
+        },
+        youDidIt: {
+            key: 'you-did-it',
+            args: ['assets/SoundEffects/You did it.m4a']
+        },
+
+        // Music
+        battleTheme1: {
+            key: 'battle-theme-1',
+            args: ['assets/Music/Battle Theme 1.m4a']
+        },
+        battleTheme2: {
+            key: 'battle-theme-2',
+            args: ['assets/Music/Battle Theme 2.m4a']
+        },
+        characterSelectMusic: {
+            key: 'character-select-music',
+            args: ['assets/Music/Character select hsh.m4a']
+        },
+        gameOverMusic: {
+            key: 'game-over-music',
+            args: ['assets/Music/Game over.m4a']
+        },
+        spook2: {
+            key: 'spook-2',
+            args: ['assets/Music/Spook 2.m4a']
+        }
     },
     tilemapTiledJSON: {
         dungeonCrawl: {
