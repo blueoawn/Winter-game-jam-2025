@@ -8,8 +8,8 @@
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Split-Path -Parent $ScriptDir
-$SoundEffectsDir = Join-Path $ProjectDir "public\assets\SoundEffects"
-$MusicDir = Join-Path $ProjectDir "public\assets\Music"
+$SoundEffectsDir = Join-Path $ProjectDir "MultiPlayerClient\public\assets\SoundEffects"
+$MusicDir = Join-Path $ProjectDir "MultiPlayerClient\public\assets\Music"
 
 Write-Host "Audio Conversion Script" -ForegroundColor Cyan
 Write-Host "======================" -ForegroundColor Cyan
