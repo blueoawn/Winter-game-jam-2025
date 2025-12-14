@@ -24,13 +24,14 @@ export class AudioManager {
     }
 
     // Resume AudioContext if suspended (required for browser autoplay policy)
-    // Returns true if context was resumed, false if already running or no context
-    resumeContext(): boolean {
+    // Returns a promise that resolves to true if context was resumed
+    async resumeContext(): Promise<boolean> {
         if (!this.scene) return false;
 
         const soundManager = this.scene.sound as Phaser.Sound.WebAudioSoundManager;
         if (soundManager.context?.state === 'suspended') {
-            soundManager.context.resume();
+            await soundManager.context.resume();
+            console.log('[Audio Debug] Context state after await:', soundManager.context.state);
             return true;
         }
         return false;

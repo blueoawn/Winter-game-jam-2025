@@ -7,97 +7,97 @@ export default {
         },
         railgunFire: {
             key: 'railgun-fire',
-            args: ['assets/SoundEffects/Railgun laser sound.m4a']
+            args: ['assets/SoundEffects/Railgun laser sound.mp3']
         },
         bulletSound: {
             key: 'bullet-sound',
-            args: ['assets/SoundEffects/Bullet sound.m4a']
+            args: ['assets/SoundEffects/Bullet sound.mp3']
         },
         cheeseTouch: {
             key: 'cheese-touch-drain',
-            args: ['assets/SoundEffects/Cheese touch drain Sound.m4a']
+            args: ['assets/SoundEffects/Cheese touch drain Sound.mp3']
         },
         cheeseTouchHeal: {
             key: 'cheese-touch-heal',
-            args: ['assets/SoundEffects/Cheese Touch Heal sound.m4a']
+            args: ['assets/SoundEffects/Cheese Touch Heal sound.mp3']
         },
         lizardDead1: {
             key: 'lizard-dead-1',
-            args: ['assets/SoundEffects/lizard ded 1.m4a']
+            args: ['assets/SoundEffects/lizard ded 1.mp3']
         },
         lizardDead2: {
             key: 'lizard-dead-2',
-            args: ['assets/SoundEffects/lizard dead 2.m4a']
+            args: ['assets/SoundEffects/lizard dead 2.mp3']
         },
         lizardDead3: {
             key: 'lizard-dead-3',
-            args: ['assets/SoundEffects/lizard ded 3.m4a']
+            args: ['assets/SoundEffects/lizard ded 3.mp3']
         },
         pew2: {
             key: 'pew-2',
-            args: ['assets/SoundEffects/Pew2.m4a']
+            args: ['assets/SoundEffects/Pew2.mp3']
         },
         pew3: {
             key: 'pew-3',
-            args: ['assets/SoundEffects/pew 3.m4a']
+            args: ['assets/SoundEffects/pew 3.mp3']
         },
         pewPew: {
             key: 'pew-pew',
-            args: ['assets/SoundEffects/pew pew.m4a']
+            args: ['assets/SoundEffects/pew pew.mp3']
         },
         plasmaShot: {
             key: 'plasma-shot',
-            args: ['assets/SoundEffects/plasma shot sound.m4a']
+            args: ['assets/SoundEffects/plasma shot sound.mp3']
         },
         sandSound: {
             key: 'sand-sound',
-            args: ['assets/SoundEffects/Sand sound.m4a']
+            args: ['assets/SoundEffects/Sand sound.mp3']
         },
         shotgunFire: {
             key: 'shotgun-fire',
-            args: ['assets/SoundEffects/Shotgun fire sound.m4a']
+            args: ['assets/SoundEffects/Shotgun fire sound.mp3']
         },
         swordSlash: {
             key: 'sword-slash',
-            args: ['assets/SoundEffects/Sword slash sound.m4a']
+            args: ['assets/SoundEffects/Sword slash sound.mp3']
         },
         wallShieldCollision: {
             key: 'wall-shield-collision',
-            args: ['assets/SoundEffects/Wall_ shield collision sound.m4a']
+            args: ['assets/SoundEffects/Wall_ shield collision sound.mp3']
         },
         wizardLizardBlep: {
             key: 'wizard-lizard-blep',
-            args: ['assets/SoundEffects/Wizard lizard blep.m4a']
+            args: ['assets/SoundEffects/Wizard lizard blep.mp3']
         },
         wizardLizardBoss: {
             key: 'wizard-lizard-boss',
-            args: ['assets/SoundEffects/Wizard lizard blep   Boss.m4a']
+            args: ['assets/SoundEffects/Wizard lizard blep   Boss.mp3']
         },
         youDidIt: {
             key: 'you-did-it',
-            args: ['assets/SoundEffects/You did it.m4a']
+            args: ['assets/SoundEffects/You did it.mp3']
         },
 
         // Music
         battleTheme1: {
             key: 'battle-theme-1',
-            args: ['assets/Music/Battle Theme 1.m4a']
+            args: ['assets/Music/Battle Theme 1.mp3']
         },
         battleTheme2: {
             key: 'battle-theme-2',
-            args: ['assets/Music/Battle Theme 2.m4a']
+            args: ['assets/Music/Battle Theme 2.mp3']
         },
         characterSelectMusic: {
             key: 'character-select-music',
-            args: ['assets/Music/Character select hsh.m4a']
+            args: ['assets/Music/Character select hsh.mp3']
         },
         gameOverMusic: {
             key: 'game-over-music',
-            args: ['assets/Music/Game over.m4a']
+            args: ['assets/Music/Game over.mp3']
         },
         spook2: {
             key: 'spook-2',
-            args: ['assets/Music/Spook 2.m4a']
+            args: ['assets/Music/Spook 2.mp3']
         }
     },
     tilemapTiledJSON: {

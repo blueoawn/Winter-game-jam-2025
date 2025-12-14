@@ -129,7 +129,6 @@ export class CheeseTouch extends PlayerController {
         } else {
             this.startBeam();
         }
-
         this.startAbility1Cooldown();
     }
 

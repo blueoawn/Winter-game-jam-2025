@@ -16,8 +16,8 @@ export class Start extends Phaser.Scene {
         audioManager.init(this);
 
         // Resume AudioContext on first user interaction (browser autoplay policy)
-        const resumeAudio = () => {
-            const resumed = audioManager.resumeContext();
+        const resumeAudio = async () => {
+            const resumed = await audioManager.resumeContext();
             console.log('[Audio Debug] Context resumed:', resumed, 'State:', audioManager.getContextState());
         };
         this.input.once('pointerdown', resumeAudio);

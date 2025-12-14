@@ -133,6 +133,7 @@ export class Railgun extends PlayerController {
         }
 
         this.startAbility1Cooldown();
+        audioManager.playBulletSound();
     }
 
     // Ability 2: Piercing Railgun Beam
@@ -157,6 +158,7 @@ export class Railgun extends PlayerController {
         this.skillMeter = 0;
         this.updateSkillBarValue();
         this.startAbility2Cooldown();
+        audioManager.playRailgunFire();
     }
 
     private fireBeam(damage: number, width: number): void {

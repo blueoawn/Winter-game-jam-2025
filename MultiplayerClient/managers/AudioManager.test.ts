@@ -394,7 +394,7 @@ describe('AudioManager', () => {
     describe('AudioContext Management', () => {
         const mockContext = {
             state: 'suspended' as AudioContextState,
-            resume: vi.fn()
+            resume: vi.fn().mockResolvedValue(undefined)
         };
 
         const mockSceneWithContext = {
@@ -408,32 +408,33 @@ describe('AudioManager', () => {
         beforeEach(() => {
             vi.clearAllMocks();
             mockContext.state = 'suspended';
+            mockContext.resume.mockResolvedValue(undefined);
         });
 
-        it('should return false when scene is not initialized', () => {
+        it('should return false when scene is not initialized', async () => {
             // Fresh instance without init
             (AudioManager as any).instance = undefined;
             const uninitializedManager = AudioManager.getInstance();
 
-            expect(uninitializedManager.resumeContext()).toBe(false);
+            expect(await uninitializedManager.resumeContext()).toBe(false);
             expect(uninitializedManager.isContextReady()).toBe(false);
             expect(uninitializedManager.getContextState()).toBe(null);
         });
 
-        it('should resume suspended AudioContext', () => {
+        it('should resume suspended AudioContext', async () => {
             audioManager.init(mockSceneWithContext as any);
 
-            const result = audioManager.resumeContext();
+            const result = await audioManager.resumeContext();
 
             expect(result).toBe(true);
             expect(mockContext.resume).toHaveBeenCalled();
         });
 
-        it('should return false when AudioContext is already running', () => {
+        it('should return false when AudioContext is already running', async () => {
             mockContext.state = 'running';
             audioManager.init(mockSceneWithContext as any);
 
-            const result = audioManager.resumeContext();
+            const result = await audioManager.resumeContext();
 
             expect(result).toBe(false);
             expect(mockContext.resume).not.toHaveBeenCalled();
@@ -463,7 +464,7 @@ describe('AudioManager', () => {
             expect(audioManager.getContextState()).toBe('running');
         });
 
-        it('should handle scene without context gracefully', () => {
+        it('should handle scene without context gracefully', async () => {
             const sceneWithoutContext = {
                 ...mockScene,
                 sound: {
@@ -473,7 +474,7 @@ describe('AudioManager', () => {
             };
             audioManager.init(sceneWithoutContext as any);
 
-            expect(audioManager.resumeContext()).toBe(false);
+            expect(await audioManager.resumeContext()).toBe(false);
             expect(audioManager.isContextReady()).toBe(false);
             expect(audioManager.getContextState()).toBeNull();
         });

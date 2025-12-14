@@ -4,6 +4,7 @@ import { Depth } from '../../constants';
 import ASSETS from '../../assets';
 import Graphics = Phaser.GameObjects.Graphics;
 import { ShotgunPellet } from '../Projectile/ShotgunPellet';
+import { audioManager } from '../../../managers/AudioManager';
 
 export class BoomStick extends PlayerController {
     private pellets: Set<ShotgunPellet> = new Set();
@@ -146,6 +147,7 @@ export class BoomStick extends PlayerController {
 
         this.showMuzzleFlash(baseAngle, barrelX, barrelY);
         this.applyRecoil(baseAngle);
+        audioManager.playShotgunFire();
     }
 
     showMuzzleFlash(angle: number, barrelX: number, barrelY: number): void {
