@@ -172,7 +172,7 @@ export class BoomStick extends PlayerController {
     }
 
     applyRecoil(angle: number): void {
-        const recoilForce = 300;
+        const recoilForce = 750;
         const recoilX = -Math.cos(angle) * recoilForce;
         const recoilY = -Math.sin(angle) * recoilForce;
         this.setVelocity(

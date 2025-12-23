@@ -22,8 +22,8 @@ export default class EnemySlime extends EnemyController {
         this.enemyType = 'EnemySlime';
 
         // Set stats
-        this.health = 3;
-        this.maxHealth = 3;
+        this.health = 300;
+        this.maxHealth = 300;
         this.power = 1;
 
         this.setScale(0.15, 0.15)

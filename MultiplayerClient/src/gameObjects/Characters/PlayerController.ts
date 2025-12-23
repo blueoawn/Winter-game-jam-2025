@@ -21,7 +21,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     fireCounter = 0;
     maxHealth = 1;
     health = this.maxHealth;
+    knockback = 300;  // Knockback force when colliding with enemies
     gameScene: GameScene;
+
+    // Collision cooldown - prevents rapid damage from continuous contact
+    lastCollisionTime: number = 0;
+    collisionCooldown: number = 500;  // Minimum ms between taking contact damage
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
@@ -241,6 +246,21 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
         this.health -= damage;
         this.updateHealthBarValue();
         if (this.health <= 0) this.die();
+    }
+
+    /**
+     * Check if this player can take contact damage (respects cooldown)
+     */
+    canTakeContactDamage(): boolean {
+        const now = this.gameScene.time.now;
+        return now - this.lastCollisionTime >= this.collisionCooldown;
+    }
+
+    /**
+     * Mark that contact damage was taken (starts cooldown)
+     */
+    markContactDamage(): void {
+        this.lastCollisionTime = this.gameScene.time.now;
     }
 
     die() {

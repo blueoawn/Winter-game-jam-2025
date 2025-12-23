@@ -7,7 +7,6 @@
 
 import type { GameScene } from '../src/scenes/GameScene';
 import NetworkManager from '../managers/NetworkManager';
-import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';
 import { MagicMissile } from '../src/gameObjects/Projectile/MagicMissile';
 import { ShotgunPellet } from '../src/gameObjects/Projectile/ShotgunPellet';
 import { NinjaStar } from '../src/gameObjects/Projectile/NinjaStar';

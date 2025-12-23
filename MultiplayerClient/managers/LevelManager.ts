@@ -7,17 +7,14 @@
 import type { GameScene } from '../src/scenes/GameScene.ts';
 import Projectile from '../src/gameObjects/Projectile/Projectile';
 import Explosion from '../src/gameObjects/Explosion';
-import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';
+import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
 import EnemyLizardWizard from '../src/gameObjects/NPC/EnemyLizardWizard';
 import Wall from '../src/gameObjects/Wall.ts';
 import { Spawner } from '../src/gameObjects/Spawner';
-import type { PlayerController } from '../src/gameObjects/Characters/PlayerController';
 import { AggressiveBehavior } from '../src/behaviorScripts/Aggressive';
 import { TerritorialBehavior } from '../src/behaviorScripts/Territorial';
 import { PacifistBehavior } from '../src/behaviorScripts/Pacifist';
 import type { IBehavior } from '../src/behaviorScripts/Behavior';
-import Rectangle = Phaser.GameObjects.Rectangle;
-import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
 import { HealthPack } from '../src/gameObjects/Consumable/HealthPack';
 import { SpeedBoost } from '../src/gameObjects/Consumable/SpeedBoost';
 import { Consumable } from '../src/gameObjects/Consumable/Consumable';
@@ -252,53 +249,6 @@ export function fireEnemyBullet(scene: GameScene, x: number, y: number, power: n
 }
 
 /**
- * Remove enemy bullet
- */
-export function removeEnemyBullet(scene: GameScene, bullet: Projectile): void {
-    try {
-        scene.enemyBulletGroup.remove(bullet, true, true);
-    } catch (err) {
-        console.error('[LEVEL] Error removing enemy bullet:', err);
-    }
-}
-
-/**
- * Add enemy bullet destroyer (used for player collision areas)
- */
-export function addEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
-    try {
-        scene.enemyBulletDestroyersGroup.add(destroyer);
-    } catch (err) {
-        console.error('[LEVEL] Error adding bullet destroyer:', err);
-    }
-}
-
-/**
- * Remove enemy bullet destroyer
- */
-export function removeEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
-    try {
-        scene.enemyBulletDestroyersGroup.remove(destroyer, true, true);
-    } catch (err) {
-        console.error('[LEVEL] Error removing bullet destroyer:', err);
-    }
-}
-
-/**
- * Create flying enemy
- */
-export function addEnemy(scene: GameScene, shipId: number, pathId: number, speed: number, power: number): EnemyFlying {
-    try {
-        const enemy = new EnemyFlying(scene, shipId, pathId, speed, power);
-        scene.enemyGroup.add(enemy);
-        return enemy;
-    } catch (err) {
-        console.error('[LEVEL] Error adding enemy:', err);
-        return null as any;
-    }
-}
-
-/**
  * Create lizard wizard enemy
  */
 export function addLizardWizardEnemy(scene: GameScene, x: number, y: number): EnemyLizardWizard {
@@ -455,102 +405,34 @@ export function addExplosion(scene: GameScene, x: number, y: number): void {
 }
 
 /**
- * Handle player hit by projectile
+ * Remove enemy bullet
  */
-export function hitPlayer(scene: GameScene, player: PlayerController, projectile: Projectile): void {
+export function removeEnemyBullet(scene: GameScene, bullet: Projectile): void {
     try {
-        addExplosion(scene, player.x, player.y);
-        player.hit(projectile.getPower());
-        projectile.remove();
-        
-        if (player.health <= 0) {
-            console.log('[LEVEL] Player defeated');
-            scene.GameOver();
-        }
+        scene.enemyBulletGroup.remove(bullet, true, true);
     } catch (err) {
-        console.error('[LEVEL] Error handling player hit by projectile:', err);
+        console.error('[LEVEL] Error removing enemy bullet:', err);
     }
 }
 
 /**
- * Handle player collision with enemy (contact damage)
+ * Add enemy bullet destroyer (used for player collision areas)
  */
-export function hitPlayerByEnemy(scene: GameScene, player: PlayerController, enemy: any): void {
+export function addEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
     try {
-        addExplosion(scene, player.x, player.y);
-        addExplosion(scene, enemy.x, enemy.y);
-        
-        // Player takes damage from enemy power
-        player.hit(enemy.getPower());
-        
-        // Enemy dies on contact (current behavior - can be modified)
-        enemy.die();
-        
-        if (player.health <= 0) {
-            console.log('[LEVEL] Player defeated by enemy contact');
-            scene.GameOver();
-        }
+        scene.enemyBulletDestroyersGroup.add(destroyer);
     } catch (err) {
-        console.error('[LEVEL] Error handling player-enemy collision:', err);
+        console.error('[LEVEL] Error adding bullet destroyer:', err);
     }
 }
 
 /**
- * Handle enemy hit by player bullet
+ * Remove enemy bullet destroyer
  */
-export function hitEnemy(scene: GameScene, bullet: any, enemy: EnemyFlying): void {
+export function removeEnemyBulletDestroyer(scene: GameScene, destroyer: Phaser.GameObjects.GameObject): void {
     try {
-        scene.updateScore(10);
-        bullet.remove();
-        enemy.hit(bullet.getPower());
+        scene.enemyBulletDestroyersGroup.remove(destroyer, true, true);
     } catch (err) {
-        console.error('[LEVEL] Error handling enemy hit:', err);
-    }
-}
-
-/**
- * Handle wall hit by bullet
- */
-export function hitWall(_scene: GameScene, bullet: any, wall: Wall): void {
-    try {
-        // Only damage destructible walls
-        if (!wall.isIndestructible) {
-            wall.hit(bullet.getPower());
-        }
-        bullet.remove();
-    } catch (err) {
-        console.error('[LEVEL] Error handling wall hit:', err);
-    }
-}
-
-/**
- * Handle player picking up consumable
- */
-export function pickupConsumable(scene: GameScene, player: any, consumableView: any): void {
-    try {
-        // Find the consumable instance from the view
-        for (const [id, consumable] of scene.syncedConsumables.entries()) {
-            if (consumable.view === consumableView) {
-                // Apply effect to player
-                consumable.applyEffect(player);
-                
-                // Remove consumable
-                removeConsumable(scene, consumable);
-                break;
-            }
-        }
-    } catch (err) {
-        console.error('[LEVEL] Error handling consumable pickup:', err);
-    }
-}
-
-/**
- * Destroy enemy bullet when it hits a bullet destroyer (e.g., shield)
- */
-export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, enemyBullet: Projectile): void {
-    try {
-        removeEnemyBullet(scene, enemyBullet);
-    } catch (err) {
-        console.error('[LEVEL] Error destroying enemy bullet:', err);
+        console.error('[LEVEL] Error removing bullet destroyer:', err);
     }
 }

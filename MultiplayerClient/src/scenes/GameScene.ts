@@ -23,6 +23,7 @@ import { applyDeltaState } from '../../network/Sync.ts';
 import { PlayerManager } from '../../managers/MultiplayerManager.ts';
 import { SceneManager } from '../../managers/SceneManager.ts';
 import * as LevelManager from '../../managers/LevelManager.ts';
+import * as CollisionManager from '../../managers/CollisionManager.ts';
 import Rectangle = Phaser.GameObjects.Rectangle;
 import { MapData } from '../maps/SummonerRift.ts';
 import { getDefaultMap, getMapById } from '../maps/MapRegistry.ts';
@@ -38,7 +39,6 @@ import {
     initInput
 } from '../init.ts';
 import { getCharacterType, createCharacter, CHARACTER_ID_MAP } from '../utils/CharacterFactory.ts';
-import * as CollisionManager from '../../managers/CollisionManager.ts';
 
 
 export class GameScene extends Scene
@@ -510,27 +510,27 @@ export class GameScene extends Scene
     }
 
     hitPlayer(player: PlayerController, projectile: Projectile) {
-        LevelManager.hitPlayer(this, player, projectile);
+        CollisionManager.hitPlayer(this, player, projectile);
     }
 
     hitPlayerByEnemy(player: PlayerController, enemy: any) {
-        LevelManager.hitPlayerByEnemy(this, player, enemy);
+        CollisionManager.hitPlayerByEnemy(this, player, enemy);
     }
 
     hitEnemy(bullet: any, enemy: EnemyFlying) {
-        LevelManager.hitEnemy(this, bullet, enemy);
+        CollisionManager.hitEnemy(this, bullet, enemy);
     }
 
     hitWall(bullet: any, wall: Wall) {
-        LevelManager.hitWall(this, bullet, wall);
+        CollisionManager.hitWall(this, bullet, wall);
     }
 
     pickupConsumable(player: any, consumableView: any) {
-        LevelManager.pickupConsumable(this, player, consumableView);
+        CollisionManager.pickupConsumable(this, player, consumableView);
     }
 
     destroyEnemyBullet(_bulletDestroyer: Rectangle, projectile: Projectile) {
-        LevelManager.destroyEnemyBullet(this, _bulletDestroyer, projectile);
+        CollisionManager.destroyEnemyBullet(this, _bulletDestroyer, projectile);
     }
 
     updateScore(points: number) {

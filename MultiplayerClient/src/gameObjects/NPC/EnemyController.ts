@@ -10,11 +10,21 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
     health: number = 1;
     maxHealth: number = 1;
     power: number = 1;  // Damage dealt to player
+    knockback: number = 200;  // Knockback force when colliding with players
     enemyId: string;
     enemyType: string = 'EnemyFlying';  // Default type, should be overridden by subclasses
     gameScene: GameScene;
     healthBarContainer: Container | null = null;
     protected showHealthBar: boolean = true;  // Can be disabled per enemy type
+
+    // Knockback state - prevents AI from overriding velocity during knockback
+    protected isInKnockback: boolean = false;
+    protected knockbackTimer: Phaser.Time.TimerEvent | null = null;
+    protected knockbackDuration: number = 300;  // Duration in ms that AI is disabled after knockback
+
+    // Collision cooldown - prevents rapid damage from continuous contact
+    lastCollisionTime: number = 0;
+    collisionCooldown: number = 500;  // Minimum ms between taking contact damage
 
     private static nextId = 0;
 
@@ -38,8 +48,10 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
 
         this.updateHealthBarPosition();
 
-        // Update AI behavior (implemented by subclasses)
-        this.updateAI(time, delta);
+        // Only update AI behavior if not in knockback state
+        if (!this.isInKnockback) {
+            this.updateAI(time, delta);
+        }
     }
 
     hit(damage: number): void {
@@ -48,6 +60,52 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
         if (this.health <= 0) {
             this.die();
         }
+    }
+
+    /**
+     * Apply knockback velocity and enter knockback state (disables AI temporarily)
+     * @param velocityX X component of knockback velocity
+     * @param velocityY Y component of knockback velocity
+     */
+    applyKnockback(velocityX: number, velocityY: number): void {
+        if (!this.body) return;
+
+        // Apply the knockback velocity
+        this.body.velocity.x = velocityX;
+        this.body.velocity.y = velocityY;
+
+        // Enter knockback state to prevent AI from overriding
+        this.isInKnockback = true;
+
+        // Clear any existing knockback timer
+        if (this.knockbackTimer) {
+            this.knockbackTimer.destroy();
+        }
+
+        // Set timer to exit knockback state
+        this.knockbackTimer = this.gameScene.time.addEvent({
+            delay: this.knockbackDuration,
+            callback: () => {
+                this.isInKnockback = false;
+                this.knockbackTimer = null;
+            },
+            callbackScope: this
+        });
+    }
+
+    /**
+     * Check if this enemy can take contact damage (respects cooldown)
+     */
+    canTakeContactDamage(): boolean {
+        const now = this.gameScene.time.now;
+        return now - this.lastCollisionTime >= this.collisionCooldown;
+    }
+
+    /**
+     * Mark that contact damage was taken (starts cooldown)
+     */
+    markContactDamage(): void {
+        this.lastCollisionTime = this.gameScene.time.now;
     }
 
     die(): void {
@@ -102,6 +160,10 @@ export abstract class EnemyController extends Phaser.Physics.Arcade.Sprite imple
             if (this.healthBarContainer) {
                 this.healthBarContainer.destroy();
                 this.healthBarContainer = null;
+            }
+            if (this.knockbackTimer) {
+                this.knockbackTimer.destroy();
+                this.knockbackTimer = null;
             }
         });
     }
