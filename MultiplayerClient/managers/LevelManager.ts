@@ -5,7 +5,7 @@
  */
 
 import type { GameScene } from '../src/scenes/GameScene.ts';
-import EnemyBullet from '../src/gameObjects/Projectile/EnemyBullet';
+import Projectile from '../src/gameObjects/Projectile/Projectile';
 import Explosion from '../src/gameObjects/Explosion';
 import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';
 import EnemyLizardWizard from '../src/gameObjects/NPC/EnemyLizardWizard';
@@ -222,11 +222,29 @@ export function updateSpawners(scene: GameScene): void {
 }
 
 /**
- * Create enemy bullet
+ * Create enemy projectile
  */
 export function fireEnemyBullet(scene: GameScene, x: number, y: number, power: number, targetX?: number, targetY?: number): void {
     try {
-        const bullet = new EnemyBullet(scene, x, y, power, targetX, targetY);
+        // Import MagicMissile - default enemy projectile type
+        const { MagicMissile } = require('../src/gameObjects/Projectile/MagicMissile');
+        
+        // Calculate target if not provided (shoot at player)
+        let finalTargetX = targetX;
+        let finalTargetY = targetY;
+        if (finalTargetX === undefined || finalTargetY === undefined) {
+            const player = scene.player || scene.playerManager?.getLocalPlayer();
+            if (player) {
+                finalTargetX = player.x;
+                finalTargetY = player.y;
+            } else {
+                finalTargetX = x;
+                finalTargetY = y + 100; // Default downward
+            }
+        }
+        
+        const bullet = new MagicMissile(scene, x, y, finalTargetX, finalTargetY, power);
+        bullet.team = 'enemy'; // Set team for future collision filtering
         scene.enemyBulletGroup.add(bullet);
     } catch (err) {
         console.error('[LEVEL] Error firing enemy bullet:', err);
@@ -236,7 +254,7 @@ export function fireEnemyBullet(scene: GameScene, x: number, y: number, power: n
 /**
  * Remove enemy bullet
  */
-export function removeEnemyBullet(scene: GameScene, bullet: EnemyBullet): void {
+export function removeEnemyBullet(scene: GameScene, bullet: Projectile): void {
     try {
         scene.enemyBulletGroup.remove(bullet, true, true);
     } catch (err) {
@@ -437,20 +455,43 @@ export function addExplosion(scene: GameScene, x: number, y: number): void {
 }
 
 /**
- * Handle player hit by enemy bullet
+ * Handle player hit by projectile
  */
-export function hitPlayer(scene: GameScene, player: PlayerController, obstacle: EnemyBullet): void {
+export function hitPlayer(scene: GameScene, player: PlayerController, projectile: Projectile): void {
     try {
         addExplosion(scene, player.x, player.y);
-        player.hit(obstacle.getPower());
-        obstacle.die();
+        player.hit(projectile.getPower());
+        projectile.remove();
         
         if (player.health <= 0) {
             console.log('[LEVEL] Player defeated');
             scene.GameOver();
         }
     } catch (err) {
-        console.error('[LEVEL] Error handling player hit:', err);
+        console.error('[LEVEL] Error handling player hit by projectile:', err);
+    }
+}
+
+/**
+ * Handle player collision with enemy (contact damage)
+ */
+export function hitPlayerByEnemy(scene: GameScene, player: PlayerController, enemy: any): void {
+    try {
+        addExplosion(scene, player.x, player.y);
+        addExplosion(scene, enemy.x, enemy.y);
+        
+        // Player takes damage from enemy power
+        player.hit(enemy.getPower());
+        
+        // Enemy dies on contact (current behavior - can be modified)
+        enemy.die();
+        
+        if (player.health <= 0) {
+            console.log('[LEVEL] Player defeated by enemy contact');
+            scene.GameOver();
+        }
+    } catch (err) {
+        console.error('[LEVEL] Error handling player-enemy collision:', err);
     }
 }
 
@@ -504,9 +545,9 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
 }
 
 /**
- * Destroy enemy bullet via destroyer
+ * Destroy enemy bullet when it hits a bullet destroyer (e.g., shield)
  */
-export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, enemyBullet: EnemyBullet): void {
+export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, enemyBullet: Projectile): void {
     try {
         removeEnemyBullet(scene, enemyBullet);
     } catch (err) {

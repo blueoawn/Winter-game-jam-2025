@@ -20,6 +20,10 @@ export abstract class Projectile extends Phaser.Physics.Arcade.Sprite implements
 
   // Optional damage/power fields - many projectiles will set these
   public damage: number = 1;
+  
+  // Team identifier for future collision filtering (stub for now)
+  // Options: 'player', 'enemy', 'neutral', etc.
+  public team: string = 'neutral';
 
   constructor(scene: GameScene, x: number, y: number, texture: string, frame?: string | number) {
     super(scene, x, y, texture as string, frame as any);

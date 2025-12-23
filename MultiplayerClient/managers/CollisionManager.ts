@@ -45,7 +45,7 @@ export function setupSinglePlayerCollisions(scene: GameScene): void {
     scene.physics.add.overlap(
         scene.player,
         scene.enemyGroup,
-        scene.hitPlayer as () => void,
+        scene.hitPlayerByEnemy as () => void,
         undefined,
         scene
     );
@@ -154,7 +154,7 @@ export function setupMultiplayerCollisions(scene: GameScene): void {
         scene.physics.add.overlap(
             player,
             scene.enemyGroup,
-            scene.hitPlayer as () => void,
+            scene.hitPlayerByEnemy as () => void,
             undefined,
             scene
         );

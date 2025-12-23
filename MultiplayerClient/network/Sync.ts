@@ -7,9 +7,7 @@
 
 import type { GameScene } from '../src/scenes/GameScene';
 import NetworkManager from '../managers/NetworkManager';
-import EnemyBullet from '../src/gameObjects/Projectile/EnemyBullet';
 import EnemyFlying from '../src/gameObjects/NPC/EnemyFlying';
-import EnemySlime from '../src/gameObjects/NPC/EnemySlime';
 import { MagicMissile } from '../src/gameObjects/Projectile/MagicMissile';
 import { ShotgunPellet } from '../src/gameObjects/Projectile/ShotgunPellet';
 import { NinjaStar } from '../src/gameObjects/Projectile/NinjaStar';
@@ -288,25 +286,31 @@ export function applyNetworkState(scene: GameScene, state: any): void {
             let bullet = scene.syncedEnemyBullets.get(bulletState.id);
 
             if (!bullet) {
-                // Create new enemy bullet
-                bullet = new EnemyBullet(
+                // Create new projectile - using MagicMissile as default enemy projectile
+                // Calculate target position ahead of current position based on velocity
+                const targetX = bulletState.x + (bulletState.velocityX || 0);
+                const targetY = bulletState.y + (bulletState.velocityY || 0);
+                
+                const newBullet = new MagicMissile(
                     scene,
                     bulletState.x,
                     bulletState.y,
-                    bulletState.power
+                    targetX,
+                    targetY,
+                    bulletState.power || 1
                 );
 
                 // Override generated ID with network state ID for sync
-                bullet.id = bulletState.id;
+                newBullet.id = bulletState.id;
 
                 // Set velocity from network state
-                if (bullet.body) {
-                    bullet.body.velocity.x = bulletState.velocityX;
-                    bullet.body.velocity.y = bulletState.velocityY;
+                if (newBullet.body) {
+                    newBullet.body.velocity.x = bulletState.velocityX;
+                    newBullet.body.velocity.y = bulletState.velocityY;
                 }
 
-                scene.enemyBulletGroup.add(bullet);
-                scene.syncedEnemyBullets.set(bulletState.id, bullet);
+                scene.enemyBulletGroup.add(newBullet);
+                scene.syncedEnemyBullets.set(bulletState.id, newBullet);
             } else {
                 // Update existing enemy bullet position and velocity
                 bullet.setPosition(bulletState.x, bulletState.y);

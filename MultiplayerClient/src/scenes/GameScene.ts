@@ -11,7 +11,7 @@ import CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys;
 
 import ANIMATION from '../animation.ts';
 import ASSETS from '../assets.ts';
-import EnemyBullet from "../gameObjects/Projectile/EnemyBullet.ts";
+import Projectile from "../gameObjects/Projectile/Projectile.ts";
 import Wall from "../gameObjects/Wall.ts";
 import TimerEvent = Phaser.Time.TimerEvent;
 import EnemyFlying from "../gameObjects/NPC/EnemyFlying.ts";
@@ -82,7 +82,7 @@ export class GameScene extends Scene
     inputSendRate: number;
     lastInputSendTime: number;
     tick: number;
-    syncedEnemyBullets: Map<string, EnemyBullet> = new Map();  // Track network-synced enemy bullets
+    syncedEnemyBullets: Map<string, Projectile> = new Map();  // Track network-synced enemy bullets
     syncedEnemies: Map<string, EnemyFlying> = new Map();  // Track network-synced enemies
     syncedWalls: Map<string, Wall> = new Map();  // Track network-synced walls
     syncedConsumables: Map<string, any> = new Map();  // Track network-synced consumables
@@ -470,7 +470,7 @@ export class GameScene extends Scene
         LevelManager.fireEnemyBullet(this, x, y, power, targetX, targetY);
     }
 
-    removeEnemyBullet(bullet: EnemyBullet) {
+    removeEnemyBullet(bullet: Projectile) {
         LevelManager.removeEnemyBullet(this, bullet);
     }
 
@@ -509,8 +509,12 @@ export class GameScene extends Scene
         LevelManager.addExplosion(this, x, y);
     }
 
-    hitPlayer(player: PlayerController, obstacle: EnemyBullet) {
-        LevelManager.hitPlayer(this, player, obstacle);
+    hitPlayer(player: PlayerController, projectile: Projectile) {
+        LevelManager.hitPlayer(this, player, projectile);
+    }
+
+    hitPlayerByEnemy(player: PlayerController, enemy: any) {
+        LevelManager.hitPlayerByEnemy(this, player, enemy);
     }
 
     hitEnemy(bullet: any, enemy: EnemyFlying) {
@@ -525,8 +529,8 @@ export class GameScene extends Scene
         LevelManager.pickupConsumable(this, player, consumableView);
     }
 
-    destroyEnemyBullet(_bulletDestroyer: Rectangle, enemyBullet: EnemyBullet) {
-        LevelManager.destroyEnemyBullet(this, _bulletDestroyer, enemyBullet);
+    destroyEnemyBullet(_bulletDestroyer: Rectangle, projectile: Projectile) {
+        LevelManager.destroyEnemyBullet(this, _bulletDestroyer, projectile);
     }
 
     updateScore(points: number) {

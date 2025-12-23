@@ -13,10 +13,6 @@ import Projectile from './Projectile';
 export class MagicMissile extends Projectile {
     private static nextId = 0;
 
-    id: string;
-    damage: number;
-    private createdTime: number;
-    private maxLifetime: number = 3000; // 3 seconds
     private particleTrail: Phaser.GameObjects.Graphics | null = null;
 
     constructor(
@@ -32,7 +28,7 @@ export class MagicMissile extends Projectile {
 
         this.id = `magic_missile_${Date.now()}_${MagicMissile.nextId++}`;
         this.damage = damage;
-        this.createdTime = Date.now();
+        this.maxLifetime = 3000; // 3 seconds
 
         // Configure sprite
         this.setTint(0x9966ff);
