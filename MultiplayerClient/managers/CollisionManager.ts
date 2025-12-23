@@ -222,10 +222,9 @@ export function hitPlayerByEnemy(scene: GameScene, player: PlayerController, ene
         const playerKnockback = player.knockback || 200;
         const enemyKnockback = enemy.knockback || 200;
 
-        // Apply knockback to player (pushed away from enemy)
-        if (player.body && playerCanTakeDamage) {
-            player.body.velocity.x = normalizedX * playerKnockback;
-            player.body.velocity.y = normalizedY * playerKnockback;
+        // Apply knockback to player using the new method (includes stun state)
+        if (playerCanTakeDamage) {
+            player.applyKnockback(normalizedX * playerKnockback, normalizedY * playerKnockback);
         }
 
         // Apply knockback to enemy using the new method (includes stun state)

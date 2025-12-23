@@ -27,6 +27,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
     // Collision cooldown - prevents rapid damage from continuous contact
     lastCollisionTime: number = 0;
     collisionCooldown: number = 500;  // Minimum ms between taking contact damage
+
+    // Knockback state - prevents input from overriding velocity during knockback
+    protected isInKnockback: boolean = false;
+    protected knockbackTimer: Phaser.Time.TimerEvent | null = null;
+    protected knockbackDuration: number = 200;  // Duration in ms that input is disabled after knockback
+
     isLocal: boolean = false;
     playerId: string = '';
     lastVelocity: Vector2;
@@ -195,18 +201,21 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
 
     // Process input from ButtonMapper or network
     processInput(input: any): void {
-        // Handle movement
-        let movement: Phaser.Math.Vector2;
-        if ('movement' in input) {
-            movement = input.movement.clone();
-        } else {
-            movement = new Phaser.Math.Vector2(input.velocity.x, input.velocity.y);
-        }
+        // Skip movement input if in knockback state (let knockback velocity play out)
+        if (!this.isInKnockback) {
+            // Handle movement
+            let movement: Phaser.Math.Vector2;
+            if ('movement' in input) {
+                movement = input.movement.clone();
+            } else {
+                movement = new Phaser.Math.Vector2(input.velocity.x, input.velocity.y);
+            }
 
-        movement.normalize();
-        // Use characterSpeed for acceleration, max velocity is handled by setMaxVelocity
-        // All speed modifications (area modifiers, boosts) are applied through setMaxVelocity
-        this.setVelocity(movement.x * this.characterSpeed, movement.y * this.characterSpeed);
+            movement.normalize();
+            // Use characterSpeed for acceleration, max velocity is handled by setMaxVelocity
+            // All speed modifications (area modifiers, boosts) are applied through setMaxVelocity
+            this.setVelocity(movement.x * this.characterSpeed, movement.y * this.characterSpeed);
+        }
 
         // Handle rotation and aim
         if ('aim' in input && input.aim) {
@@ -261,6 +270,37 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
      */
     markContactDamage(): void {
         this.lastCollisionTime = this.gameScene.time.now;
+    }
+
+    /**
+     * Apply knockback velocity and enter knockback state (disables input temporarily)
+     * @param velocityX X component of knockback velocity
+     * @param velocityY Y component of knockback velocity
+     */
+    applyKnockback(velocityX: number, velocityY: number): void {
+        if (!this.body) return;
+
+        // Apply the knockback velocity
+        this.body.velocity.x = velocityX;
+        this.body.velocity.y = velocityY;
+
+        // Enter knockback state to prevent input from overriding
+        this.isInKnockback = true;
+
+        // Clear any existing knockback timer
+        if (this.knockbackTimer) {
+            this.knockbackTimer.destroy();
+        }
+
+        // Set timer to exit knockback state
+        this.knockbackTimer = this.gameScene.time.addEvent({
+            delay: this.knockbackDuration,
+            callback: () => {
+                this.isInKnockback = false;
+                this.knockbackTimer = null;
+            },
+            callbackScope: this
+        });
     }
 
     die() {
@@ -436,6 +476,12 @@ export abstract class PlayerController extends Phaser.Physics.Arcade.Sprite impl
 
     handleDestruction(): void {
         this.on('destroy', () => {
+            // Clean up knockback timer immediately
+            if (this.knockbackTimer) {
+                this.knockbackTimer.destroy();
+                this.knockbackTimer = null;
+            }
+
             // Delay destruction of health bar to ensure it is visible when player dies
             // Because instantly destroying it after death would be kinda jank?? idk
             const delayedDestructionTimer = this.gameScene.time.delayedCall(1000, () => {
