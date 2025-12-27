@@ -9,6 +9,7 @@ import Projectile from '../src/gameObjects/Projectile/Projectile';
 import Explosion from '../src/gameObjects/Explosion';
 import EnemySlime from '../src/gameObjects/NPC/EnemySlime.ts';
 import EnemyLizardWizard from '../src/gameObjects/NPC/EnemyLizardWizard';
+import { MagicMissile } from '../src/gameObjects/Projectile/MagicMissile.ts';
 import Wall from '../src/gameObjects/Wall.ts';
 import { Spawner } from '../src/gameObjects/Spawner';
 import { AggressiveBehavior } from '../src/behaviorScripts/Aggressive';
@@ -223,9 +224,6 @@ export function updateSpawners(scene: GameScene): void {
  */
 export function fireEnemyBullet(scene: GameScene, x: number, y: number, power: number, targetX?: number, targetY?: number): void {
     try {
-        // Import MagicMissile - default enemy projectile type
-        const { MagicMissile } = require('../src/gameObjects/Projectile/MagicMissile');
-        
         // Calculate target if not provided (shoot at player)
         let finalTargetX = targetX;
         let finalTargetY = targetY;

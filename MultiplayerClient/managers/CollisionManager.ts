@@ -8,7 +8,7 @@ import type { PlayerController } from "../src/gameObjects/Characters/PlayerContr
 import Projectile from "../src/gameObjects/Projectile/Projectile";
 import Wall from "../src/gameObjects/Wall.ts";
 import Rectangle = Phaser.GameObjects.Rectangle;
-import { addExplosion } from './LevelManager';
+import { addExplosion, removeConsumable, removeEnemyBullet } from './LevelManager';
 
 /**
  * Set up all collisions for singleplayer mode
@@ -304,7 +304,6 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
                 consumable.applyEffect(player);
                 
                 // Remove consumable
-                const { removeConsumable } = require('./LevelManager');
                 removeConsumable(scene, consumable);
                 break;
             }
@@ -319,7 +318,6 @@ export function pickupConsumable(scene: GameScene, player: any, consumableView: 
  */
 export function destroyEnemyBullet(scene: GameScene, _bulletDestroyer: Rectangle, projectile: Projectile): void {
     try {
-        const { removeEnemyBullet } = require('./LevelManager');
         removeEnemyBullet(scene, projectile);
     } catch (err) {
         console.error('[COLLISION] Error destroying enemy bullet:', err);
